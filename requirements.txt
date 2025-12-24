@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+hl7apy
+fhir.resources
+streamlit
+requests
+python-dotenv
+pytest

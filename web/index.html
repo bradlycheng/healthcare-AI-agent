@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Healthcare AI Agent | Intelligent Interoperability</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="background-glow"></div>
+
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-staff-snake"></i>
+            <span>HealthAgent.ai</span>
+        </div>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#how-it-works">How it Works</a>
+            <a href="#tech-stack">Technology</a>
+        </div>
+        <a href="#demo" class="btn-primary">Get Started</a>
+    </nav>
+
+    <header class="hero">
+        <div class="hero-content">
+            <div class="badge">
+                <span class="pulse"></span>
+                v1.0 Now Available
+            </div>
+            <h1>The Future of <br><span class="gradient-text">Healthcare Interoperability</span></h1>
+            <p class="hero-sub">
+                Transform raw HL7 messages into structured FHIR resources and actionable clinical insights using
+                advanced AI agents.
+            </p>
+            <div class="hero-actions">
+                <a href="#demo" class="btn-primary large">Get Started</a>
+                <a href="#features" class="btn-secondary large">Learn More</a>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="glass-card float-animation">
+                <div class="code-snippet">
+                    <div class="code-header">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                    </div>
+                    <pre><code>MSH|^~\&|HIS|MedCenter|...
+PID|1|99001|SMITH^JOHN...
+OBX|1|NM|GLUCOSE||105|...</code></pre>
+                </div>
+                <div class="arrow-down">
+                    <i class="fa-solid fa-arrow-down"></i>
+                </div>
+                <div class="fhir-preview">
+                    <i class="fa-solid fa-fire"></i>
+                    <span>FHIR Bundle Generated</span>
+                    <div class="status-badge success">Success</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section id="features" class="features">
+        <div class="section-header">
+            <h2>Capabilities</h2>
+            <p>Powered by modern LLMs and robust parsing logic.</p>
+        </div>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="icon-box">
+                    <i class="fa-solid fa-dna"></i>
+                </div>
+                <h3>Intelligent Parsing</h3>
+                <p>Seamlessly ingest ORU^R01 HL7 messages and extract patient demographics and observations with 99%
+                    accuracy.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon-box">
+                    <i class="fa-solid fa-brain"></i>
+                </div>
+                <h3>Clinical Reasoning</h3>
+                <p>The agent generates concise clinical summaries, flagging abnormalities and suggesting potential
+                    diagnoses.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon-box">
+                    <i class="fa-solid fa-fire-flame-curved"></i>
+                </div>
+                <h3>Native FHIR Conversion</h3>
+                <p>Automatically convert legacy HL7 v2 data into standard HL7 FHIR R4 Bundles for modern
+                    interoperability.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="how-it-works" class="how-it-works">
+        <div class="section-header">
+            <h2>How It Works</h2>
+        </div>
+        <div class="steps-container">
+            <div class="step">
+                <div class="step-number">01</div>
+                <h3>Ingest</h3>
+                <p>Upload raw HL7 files or stream data via MLLP.</p>
+            </div>
+            <div class="line"></div>
+            <div class="step">
+                <div class="step-number">02</div>
+                <h3>Process</h3>
+                <p>Agent pipelines parse, structure, and analyze the data.</p>
+            </div>
+            <div class="line"></div>
+            <div class="step">
+                <div class="step-number">03</div>
+                <h3>Deliver</h3>
+                <p>Receive JSON FHIR bundles and physician-ready summaries.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="tech-stack" class="tech-stack">
+        <div class="section-header">
+            <h2>Built for Scale & Security</h2>
+            <p>Enterprise-grade architecture designed for modern healthcare systems.</p>
+        </div>
+        <div class="tech-grid">
+            <div class="tech-card">
+                <i class="fa-brands fa-python"></i>
+                <h4>Python Core</h4>
+                <p>Robust backend processing with advanced NLP libraries.</p>
+            </div>
+            <div class="tech-card">
+                <i class="fa-brands fa-docker"></i>
+                <h4>Dockerized</h4>
+                <p>Containerized for consistant deployment anywhere.</p>
+            </div>
+            <div class="tech-card">
+                <i class="fa-solid fa-fire"></i>
+                <h4>FHIR Native</h4>
+                <p>First-class support for HL7 FHIR R4 standards.</p>
+            </div>
+            <div class="tech-card">
+                <i class="fa-solid fa-shield-halved"></i>
+                <h4>HIPAA Ready</h4>
+                <p>Secure data handling and encrypted transmission.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="demo" class="cta-section">
+        <div class="cta-content">
+            <h2>Ready to Transform Your Interoperability?</h2>
+            <p>Join leading healthcare providers using AI to modernize their data pipelines.</p>
+            <form class="cta-form">
+                <input type="email" placeholder="Enter your work email" required>
+                <button type="submit" class="btn-primary large">Request Early Access</button>
+            </form>
+            <p class="small-text">No credit card required. SOC2 Compliant.</p>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <p>&copy; 2024 Healthcare AI Agent. Built with Python & DeepMind.</p>
+        <div class="social-links">
+            <a href="#"><i class="fa-brands fa-github"></i></a>
+            <a href="#"><i class="fa-brands fa-twitter"></i></a>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
