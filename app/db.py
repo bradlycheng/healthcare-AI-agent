@@ -92,18 +92,36 @@ def _coerce_value(value: Any) -> Tuple[Optional[float], Optional[str]]:
 
 
 def insert_message_and_observations(
-    hl7_text: str,
-    patient: Dict[str, Any],
-    structured_observations: List[Dict[str, Any]],
-    fhir_bundle: Dict[str, Any],
+    raw_hl7: str = "",
+    patient: Dict[str, Any] = None,
+    observations: List[Dict[str, Any]] = None,
+    fhir_bundle: Dict[str, Any] = None,
     db_path: str = DB_PATH,
+    received_at: str = None,
+    msh: Dict[str, Any] = None,
+    # Legacy parameter names for backwards compatibility
+    hl7_text: str = None,
+    structured_observations: List[Dict[str, Any]] = None,
 ) -> int:
     """
     Inserts into hl7_messages + observations. Returns new message_id.
     """
+    # Handle legacy parameter names
+    if hl7_text is not None and not raw_hl7:
+        raw_hl7 = hl7_text
+    if structured_observations is not None and observations is None:
+        observations = structured_observations
+    if patient is None:
+        patient = {}
+    if observations is None:
+        observations = []
+    if fhir_bundle is None:
+        fhir_bundle = {}
+    
     conn = sqlite3.connect(db_path)
     try:
-        received_at = datetime.utcnow().isoformat(sep=" ", timespec="microseconds")
+        if received_at is None:
+            received_at = datetime.utcnow().isoformat(sep=" ", timespec="microseconds")
 
         pid = str(patient.get("id") or "")
         first = str(patient.get("first_name") or "")
@@ -127,11 +145,11 @@ def insert_message_and_observations(
               fhir_bundle_json
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (received_at, hl7_text, pid, first, last, dob, sex, bundle_json),
+            (received_at, raw_hl7, pid, first, last, dob, sex, bundle_json),
         )
         message_id = int(cur.lastrowid)
 
-        for ob in structured_observations or []:
+        for ob in observations or []:
             code = str(ob.get("code") or "")
             display = str(ob.get("display") or code or "")
             unit = str(ob.get("unit") or "")

@@ -15,11 +15,17 @@ DB_PATH = "agent.db"
 
 app = FastAPI(title="Healthcare HL7 → FHIR Agent API")
 
+# Simple in-memory rate limiter: keys=IP, values=timestamp of last LLM request
+# We only rate limit the LLM part to prevent expensive calls.
+_RATE_LIMIT_STORE: Dict[str, float] = {}
+RATE_LIMIT_SECONDS = 5.0
+
 
 # ---------- Pydantic Models ----------
 
 class ORUParseRequest(BaseModel):
     hl7_text: str
+    use_llm: bool = True
 
 
 class PatientOut(BaseModel):
@@ -108,19 +114,38 @@ def _obs_value(row: sqlite3.Row) -> Any:
 
 # ---------- Routes ----------
 
+from fastapi import Request
+
 @app.get("/health")
 def health_check() -> Dict[str, str]:
     return {"status": "ok"}
 
 
 @app.post("/oru/parse", response_model=ORUParseResponse)
-def parse_oru_endpoint(req: ORUParseRequest) -> ORUParseResponse:
+def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseResponse:
     """
     Run the ORU pipeline and return the result.
 
     Note: run_oru_pipeline() should also persist to SQLite if your agent does that.
     """
-    result: Dict[str, Any] = run_oru_pipeline(req.hl7_text)
+    # Rate limit check if requesting LLM
+    if req.use_llm:
+        client_ip = request.client.host if request.client else "unknown"
+        now_ts = __import__("time").time()
+        last_ts = _RATE_LIMIT_STORE.get(client_ip, 0.0)
+        
+        if now_ts - last_ts < RATE_LIMIT_SECONDS:
+            # Too many requests - fallback to NO LLM to be nice, 
+            # or could raise 429. Let's just disable LLM for this run so it's fast.
+            # req.use_llm = False
+            # Actually, per user request, let's strict limit it or raise exception.
+            # But making it just disable LLM is a better UX for a demo so it doesn't crash.
+            # Let's raise 429 so the UI knows to tell them "Slow down".
+            raise HTTPException(status_code=429, detail="Too many AI requests. Please wait a few seconds.")
+
+        _RATE_LIMIT_STORE[client_ip] = now_ts
+
+    result: Dict[str, Any] = run_oru_pipeline(req.hl7_text, use_llm=req.use_llm)
 
     patient_dict = result.get("patient", {}) or {}
     clinical_summary = result.get("clinical_summary", "") or ""
@@ -320,5 +345,11 @@ from fastapi.responses import FileResponse
 async def read_index():
     return FileResponse('web/index.html')
 
+# Serve dashboard.html
+@app.get("/dashboard.html")
+async def read_dashboard():
+    return FileResponse('web/dashboard.html')
+
 # Mount the web directory for static assets (css, js)
 app.mount("/", StaticFiles(directory="web"), name="static")
+

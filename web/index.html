@@ -18,14 +18,15 @@
     <div class="background-glow"></div>
 
     <nav class="navbar">
-        <div class="logo">
+        <a href="/" class="logo">
             <i class="fa-solid fa-staff-snake"></i>
             <span>HealthAgent.ai</span>
-        </div>
+        </a>
         <div class="nav-links">
             <a href="#features">Features</a>
             <a href="#how-it-works">How it Works</a>
             <a href="#tech-stack">Technology</a>
+            <a href="/dashboard.html">Dashboard</a>
         </div>
         <a href="#demo" class="btn-primary">Get Started</a>
     </nav>
@@ -99,6 +100,84 @@ OBX|1|NM|GLUCOSE||105|...</code></pre>
                 <h3>Native FHIR Conversion</h3>
                 <p>Automatically convert legacy HL7 v2 data into standard HL7 FHIR R4 Bundles for modern
                     interoperability.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- NEW: Live Demo Section -->
+    <section id="demo-live" class="demo-section">
+        <div class="section-header">
+            <h2>Live Demo</h2>
+            <p>Try it yourself. Paste a raw HL7 message below.</p>
+        </div>
+
+        <div class="demo-container">
+            <div class="demo-input">
+                <div class="input-header">
+                    <label for="hl7-input">HL7 Input</label>
+                    <div class="input-controls">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="ai-toggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                        <span class="toggle-label">Enable AI Analysis</span>
+                    </div>
+                </div>
+                <textarea id="hl7-input" placeholder="Paste your HL7 message here...">MSH|^~\&|HIS|MedCenter|LIS|LAB|202412271200||ORU^R01|MSG001|P|2.5
+PID|1||99001||SMITH^JOHN||19800515|M
+OBR|1|ORD001|RES001|CBC^Complete Blood Count|||202412271200
+OBX|1|NM|2345-7^GLUCOSE||105|mg/dL|70-100|N|||F
+OBX|2|NM|718-7^HEMOGLOBIN||14.2|g/dL|13.5-17.5|N|||F
+OBX|3|NM|6690-2^WBC||7200|/uL|4500-11000|N|||F</textarea>
+                <button id="process-btn" class="btn-primary full-width">
+                    <i class="fa-solid fa-bolt"></i> Process Message
+                </button>
+            </div>
+
+            <div class="demo-results hidden" id="results-area">
+                <div class="result-card patient-card">
+                    <div class="card-header">
+                        <i class="fa-solid fa-user-doctor"></i> Patient
+                    </div>
+                    <div class="card-body" id="res-patient">
+                        --
+                    </div>
+                </div>
+
+                <div class="result-card summary-card">
+                    <div class="card-header">
+                        <i class="fa-solid fa-file-medical-alt"></i> Clinical Summary
+                    </div>
+                    <div class="card-body" id="res-summary">
+                        --
+                    </div>
+                </div>
+
+                <div class="result-tabs">
+                    <div class="tab-header">
+                        <button class="tab-btn active" data-tab="tab-obs">Observations</button>
+                        <button class="tab-btn" data-tab="tab-fhir">FHIR JSON</button>
+                    </div>
+                    <div class="tab-content active" id="tab-obs">
+                        <div class="table-responsive">
+                            <table class="obs-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test</th>
+                                        <th>Value</th>
+                                        <th>Flag</th>
+                                        <th>Ref Range</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="res-obs-body">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab-content" id="tab-fhir">
+                        <pre><code id="res-fhir"></code></pre>
+                    </div>
+                </div>
             </div>
         </div>
     </section>

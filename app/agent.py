@@ -365,7 +365,7 @@ def _ensure_obs_fields(obs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def run_oru_pipeline(hl7_text: str) -> Dict[str, Any]:
+def run_oru_pipeline(hl7_text: str, use_llm: bool = True) -> Dict[str, Any]:
     """
     Main pipeline:
 
@@ -386,7 +386,8 @@ def run_oru_pipeline(hl7_text: str) -> Dict[str, Any]:
     fhir_bundle = _build_fhir_bundle(patient, structured_observations)
 
     # 4) Optional LLM enrichment (never let it crash ingestion)
-    if USE_LLM:
+    # Only run if globally enabled AND requested by caller
+    if USE_LLM and use_llm:
         try:
             prompt = _build_llm_prompt(patient, structured_observations)
             llm_raw = call_llm_for_json(prompt)

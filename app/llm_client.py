@@ -10,7 +10,7 @@ OLLAMA_URL = "http://localhost:11434/api/chat"
 
 # Use a smaller, faster model (adjust if you want)
 MODEL_NAME = "llama3.2:3b"  # make sure you pulled this with `ollama pull llama3.2:3b`
-REQUEST_TIMEOUT_SECONDS = 300  # generous for cold start
+REQUEST_TIMEOUT_SECONDS = 25  # generous timeout for complex clinical analyses
 
 
 class LLMError(Exception):
