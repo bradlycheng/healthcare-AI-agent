@@ -6,12 +6,13 @@ import json
 import sqlite3
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel
-
 from .agent import run_oru_pipeline
 
-DB_PATH = "agent.db"
+import os
+
+DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
+# AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
+# AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "healthcare2025")
 
 app = FastAPI(title="Healthcare HL7 → FHIR Agent API")
 

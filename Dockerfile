@@ -10,17 +10,17 @@ COPY requirements.txt .
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
+# Copy the application code and static files
 COPY app/ ./app
 COPY web/ ./web
-COPY agent.db . 
-# Note: In production you might want to use a volume for the DB, or a real DB service.
+COPY agent.db .
 
 # Expose the port the app runs on
 EXPOSE 8080
 
-# Define environment variable
-ENV PORT=8080
+# Environment variables with defaults
+ENV DATABASE_PATH=agent.db
+ENV OLLAMA_URL=http://localhost:11434/api/chat
 
-# Run app.py when the container launches
+# Run the app 
 CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8080"]

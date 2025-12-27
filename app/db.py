@@ -7,7 +7,9 @@ import sqlite3
 from datetime import datetime
 from typing import Any, Dict, List, Tuple, Optional
 
-DB_PATH = "agent.db"
+import os
+
+DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
 
 
 def init_db(db_path: str = DB_PATH) -> None:

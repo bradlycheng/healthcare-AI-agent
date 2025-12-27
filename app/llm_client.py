@@ -1,12 +1,9 @@
 # app/llm_client.py
 
-import json
-from typing import Dict, Any, List
-
-import requests
+import os
 
 # Local Ollama chat endpoint
-OLLAMA_URL = "http://localhost:11434/api/chat"
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
 
 # Use a smaller, faster model (adjust if you want)
 MODEL_NAME = "llama3.2:3b"  # make sure you pulled this with `ollama pull llama3.2:3b`

@@ -1,0 +1,8 @@
+{
+    email bradl@example.com
+}
+
+# Replace with your actual domain
+{$DOMAIN:localhost} {
+    reverse_proxy app:8080
+}
