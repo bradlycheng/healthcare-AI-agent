@@ -3,26 +3,17 @@ services:
     build: .
     ports:
       - "8080:8080"
+    volumes:
+      - sqlite_data:/data
     environment:
       - DATABASE_PATH=/data/agent.db
-      - OLLAMA_URL=http://ollama:11434/api/chat
-      - AUTH_USERNAME=${AUTH_USERNAME:-admin}
-      - AUTH_PASSWORD=${AUTH_PASSWORD:-healthcare2025}
-    volumes:
-      - ./data:/data
-    depends_on:
-      - ollama
-
-  ollama:
-    image: ollama/ollama:latest
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "11434:11434"
+      - AWS_REGION=us-east-1
+      - BEDROCK_MODEL_ID=meta.llama3-8b-instruct-v1:0
+      # If running locally without IAM Role, mount your .aws folder or pass keys
+      # - AWS_PROFILE=default 
 
   caddy:
-    image: caddy:latest
-    restart: unless-stopped
+    image: caddy:2
     ports:
       - "80:80"
       - "443:443"
@@ -30,8 +21,10 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
+    depends_on:
+      - app
 
 volumes:
-  ollama_data:
+  sqlite_data:
   caddy_data:
   caddy_config:

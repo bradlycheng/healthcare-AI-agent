@@ -1,18 +1,28 @@
 # app/llm_client.py
 
 import os
+import json
+import boto3
+from botocore.exceptions import ClientError
+from typing import Dict, Any, List
 
-# Local Ollama chat endpoint
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
-
-# Use a smaller, faster model (adjust if you want)
-MODEL_NAME = "llama3.2:3b"  # make sure you pulled this with `ollama pull llama3.2:3b`
-REQUEST_TIMEOUT_SECONDS = 25  # generous timeout for complex clinical analyses
-
+# AWS Bedrock Configuration
+AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "meta.llama3-8b-instruct-v1:0")
 
 class LLMError(Exception):
-    """Custom error for LLM / Ollama failures."""
+    """Custom error for LLM / Bedrock failures."""
     pass
+
+# Initialize Bedrock Client
+try:
+    bedrock_runtime = boto3.client(
+        service_name="bedrock-runtime",
+        region_name=AWS_REGION
+    )
+except Exception as e:
+    print(f"Warning: Failed to initialize Bedrock client: {e}")
+    bedrock_runtime = None
 
 
 # ---------------------------------------------------------------------------
@@ -145,9 +155,6 @@ def build_oru_prompt(patient: Dict[str, Any],
                      observations: List[Dict[str, Any]]) -> str:
     """
     Build the user prompt for the ORU HL7 pipeline.
-
-    We embed the already-parsed patient + observations as JSON, and
-    prepend strict instructions telling the model not to hallucinate.
     """
     patient_json = json.dumps(patient, ensure_ascii=False)
     obs_json = json.dumps(observations, ensure_ascii=False)
@@ -174,7 +181,7 @@ Remember: output JSON ONLY.
 
 
 # ---------------------------------------------------------------------------
-# Low-level Ollama call + JSON handling
+# Low-level Bedrock call + JSON handling
 # ---------------------------------------------------------------------------
 
 def _strip_markdown_fences(content: str) -> str:
@@ -198,10 +205,6 @@ def _strip_markdown_fences(content: str) -> str:
 def _try_repair_json(raw: str) -> str:
     """
     Very small, conservative JSON "repair" helper.
-
-    We ONLY do trivial fixes that are extremely likely to be correct:
-    - If it starts with '{' but doesn't end with '}', try appending one '}'.
-      If that parses, we use it; otherwise we just return the original.
     """
     text = raw.strip()
 
@@ -212,82 +215,60 @@ def _try_repair_json(raw: str) -> str:
             json.loads(candidate)
             return candidate
         except json.JSONDecodeError:
-            # If that didn't work, fall back to the original
             return text
 
-    # If no fix applies, just return original
     return text
 
 
 def call_llm_for_json(prompt: str) -> Dict[str, Any]:
     """
-    Call Ollama with a prompt that should return a single JSON object.
-
-    Expects the model to respond with JSON only. We:
-      - call the local Ollama chat API
-      - strip markdown fences if present
-      - try to parse JSON
-      - if that fails, try a minimal repair and parse again
+    Call AWS Bedrock with a prompt that should return a single JSON object.
+    Uses Llama 3 format.
     """
+    if not bedrock_runtime:
+        raise LLMError("AWS Bedrock client is not initialized. Check your AWS credentials.")
+
+    # Llama 3 Inference Configuration
+    # https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-meta.html
     payload = {
-        "model": MODEL_NAME,
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are a precise clinical data transformer. "
-                    "Always respond with a SINGLE valid JSON object, "
-                    "no explanations, no markdown."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ],
-        "stream": False,
+        "prompt": f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+        "max_gen_len": 2048,
+        "temperature": 0.1,
+        "top_p": 0.9
     }
 
     try:
-        resp = requests.post(
-            OLLAMA_URL,
-            json=payload,
-            timeout=REQUEST_TIMEOUT_SECONDS,
+        response = bedrock_runtime.invoke_model(
+            modelId=BEDROCK_MODEL_ID,
+            contentType="application/json",
+            accept="application/json",
+            body=json.dumps(payload)
         )
-    except requests.RequestException as e:
-        raise LLMError(
-            f"Error calling Ollama at {OLLAMA_URL}: {e}. "
-            f"Check that Ollama is running and the model '{MODEL_NAME}' is available "
-            f"(try: `ollama run {MODEL_NAME} \"test\"`)."
-        ) from e
+        
+        response_body = json.loads(response.get("body").read())
+        generation = response_body.get("generation", "").strip()
 
-    if resp.status_code != 200:
-        raise LLMError(f"Ollama returned HTTP {resp.status_code}: {resp.text}")
+    except ClientError as e:
+        raise LLMError(f"AWS Bedrock Error: {e}")
+    except Exception as e:
+        raise LLMError(f"Unexpected error calling Bedrock: {e}")
 
-    data = resp.json()
-    content = data.get("message", {}).get("content", "").strip()
+    # JSON Parsing Logic
+    content = _strip_markdown_fences(generation)
 
-    # First pass: strip ```json fences if present
-    content = _strip_markdown_fences(content)
-
-    # Try direct parse
     try:
         parsed = json.loads(content)
     except json.JSONDecodeError as e:
-        # Try a minimal repair (e.g., missing final brace)
         repaired = _try_repair_json(content)
         if repaired != content:
             try:
                 parsed = json.loads(repaired)
             except json.JSONDecodeError as e2:
-                # Still bad; bubble up with the original content for debugging
-                raise LLMError(
-                    f"Failed to parse LLM JSON even after repair: {e2}\nRaw content:\n{content}"
-                ) from e2
+                raise LLMError(f"Failed to parse LLM JSON after repair: {e2}\nRaw: {content}") from e2
         else:
-            # No repair possible, just fail with context
-            raise LLMError(
-                f"Failed to parse LLM JSON: {e}\nRaw content:\n{content}"
-            ) from e
+            raise LLMError(f"Failed to parse LLM JSON: {e}\nRaw: {content}") from e
 
     if not isinstance(parsed, dict):
-        raise LLMError(f"LLM output is not a JSON object. Raw content:\n{content}")
+        raise LLMError(f"LLM output is not a JSON object. Raw: {content}")
 
     return parsed

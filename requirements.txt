@@ -6,3 +6,4 @@ streamlit
 requests
 python-dotenv
 pytest
+boto3
