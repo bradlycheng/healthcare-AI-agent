@@ -34,6 +34,9 @@ venv.bak/
 *.db
 *.sqlite3
 
+# Exception: Allow seed database to be committed
+!agent.db
+
 # Logs
 *.log
 
