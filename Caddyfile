@@ -1,8 +1,4 @@
-{
-    email bradl@example.com
-}
-
-# Replace with your actual domain
-{$DOMAIN:localhost} {
+# Serve HTTP on port 80 without TLS (for IP-based access)
+:80 {
     reverse_proxy app:8080
 }
