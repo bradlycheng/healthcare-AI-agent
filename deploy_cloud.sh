@@ -37,8 +37,8 @@ sudo systemctl enable docker
 # 3. Clone repository
 echo "[3/7] Cloning repository..."
 cd /home/ubuntu
-sudo -u ubuntu git clone https://github.com/bradlycheng/healthcare-AI-agent.git
-cd healthcare-AI-agent
+sudo -u ubuntu git clone https://github.com/bradlycheng/healthcare-Ai-agent.git
+cd healthcare-Ai-agent
 sudo -u ubuntu git checkout feature/aws-bedrock-migration
 
 # 4. Set up environment
