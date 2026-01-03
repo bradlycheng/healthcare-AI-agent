@@ -14,6 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app
 COPY web/ ./web
 COPY agent.db .
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
 # Expose the port the app runs on
 EXPOSE 8080
@@ -23,5 +25,5 @@ ENV DATABASE_PATH=agent.db
 ENV AWS_REGION=us-east-1
 ENV BEDROCK_MODEL_ID=meta.llama3-8b-instruct-v1:0
 
-# Run the app 
-CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8080"]
+# Run the app via entrypoint script
+ENTRYPOINT ["./entrypoint.sh"]
