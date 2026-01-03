@@ -1,49 +1,53 @@
 #!/bin/bash
 # ec2_setup.sh - AWS User Data Script for Healthcare AI Agent
-# Best used with: Ubuntu 22.04 LTS on g4dn.xlarge
+# This script is designed for Ubuntu 22.04 LTS on t2.micro (Free Tier)
+#
+# PREREQUISITES:
+# 1. EC2 Instance IAM Role with bedrock:InvokeModel permission
+# 2. Enable Bedrock model access in AWS Console (us-east-1)
+# 3. Repository must be public OR use GitHub deploy keys
 
 set -e
 
-echo "--- Starting EC2 Setup ---"
+echo "--- Starting EC2 Setup for Healthcare AI Agent ---"
+echo "Started at: $(date)"
 
-# 1. Update and install basic dependencies
+# 1. Update system packages
+echo "[1/5] Updating system packages..."
 sudo apt-get update -y
-sudo apt-get install -y ca-certificates curl gnupg lsb-release git
 
-# 2. Install Docker
-sudo mkdir -p /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+# 2. Install Docker (using Ubuntu's docker.io for simplicity)
+echo "[2/5] Installing Docker..."
+sudo apt-get install -y docker.io docker-compose-v2 git
 
-sudo apt-get update -y
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+# Start and enable Docker service
+sudo systemctl start docker
+sudo systemctl enable docker
 
-# 3. Install NVIDIA Container Toolkit (Requirement for Ollama GPU support)
-curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
-  && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
-    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-
-sudo apt-get update
-sudo apt-get install -y nvidia-container-toolkit
-
-# Configure Docker to use NVIDIA
-sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
-
-# 4. Clone Project (Optional: You can also use ECR, but cloning is easier for a first demo)
+# 3. Clone repository
+echo "[3/5] Cloning repository..."
 cd /home/ubuntu
-git clone https://github.com/YOUR_GITHUB_USERNAME/healthcare_ai_agent.git
-cd healthcare_ai_agent
+sudo -u ubuntu git clone https://github.com/bradlycheng/healthcare-AI-agent.git
+cd healthcare-AI-agent
+sudo -u ubuntu git checkout feature/aws-bedrock-migration
 
-# 5. Build and Start Stack
-sudo docker compose up -d
+# 4. Set up environment
+echo "[4/5] Configuring environment..."
+sudo -u ubuntu cp .env.example .env
 
-# 6. Pre-pull the LLM within the container
-# We wait a few seconds for Ollama to be ready
-sleep 30
-sudo docker exec healthcare_ai_agent-ollama-1 ollama pull llama3.2:3b
+# NOTE: AWS credentials are automatically provided via EC2 IAM Role
+# No need to configure AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY
 
-echo "--- Setup Complete! Dashboard should be live on port 80 ---"
+# 5. Build and start services
+echo "[5/5] Building Docker images and starting application..."
+sudo docker compose build app
+sudo docker compose up -d app caddy
+
+echo ""
+echo "=== Deployment Complete ==="
+echo "Finished at: $(date)"
+echo ""
+echo "Your dashboard should be available at: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)"
+echo ""
+echo "To check logs: cd /home/ubuntu/healthcare-AI-agent && sudo docker compose logs -f"
+echo "To restart: sudo docker compose restart"

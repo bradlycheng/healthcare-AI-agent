@@ -20,7 +20,8 @@ EXPOSE 8080
 
 # Environment variables with defaults
 ENV DATABASE_PATH=agent.db
-ENV OLLAMA_URL=http://localhost:11434/api/chat
+ENV AWS_REGION=us-east-1
+ENV BEDROCK_MODEL_ID=meta.llama3-8b-instruct-v1:0
 
 # Run the app 
 CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8080"]

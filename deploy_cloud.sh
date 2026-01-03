@@ -1,42 +1,61 @@
 #!/bin/bash
-# deploy_cloud.sh - Deploy Healthcare AI Agent to AWS Free Tier (t2.micro)
-# Usage: Paste the contents of this file into the "User Data" field when launching an EC2 instance.
+# deploy_cloud.sh - Bulletproof AWS Free Tier Deployment
+# Usage: Paste into EC2 User Data field
+#
+# PREREQUISITES:
+# - EC2 Instance must have IAM Role with bedrock:InvokeModel permission
+# - Bedrock model access must be enabled in AWS Console (us-east-1)
 
 set -e
+exec > >(tee /var/log/user-data.log)
+exec 2>&1
 
-echo "--- Starting Cloud Deployment (Free Tier) ---"
+echo "=== Healthcare AI Agent Cloud Deployment ==="
+echo "Started at: $(date)"
 
-# 1. Update and install basic dependencies
+# 0. Verify AWS IAM Role is attached
+echo "[0/6] Verifying AWS credentials (IAM Role)..."
+if ! curl -s -f http://169.254.169.254/latest/meta-data/iam/security-credentials/ > /dev/null; then
+    echo "ERROR: No IAM role attached to this EC2 instance!"
+    echo "Please attach an IAM role with bedrock:InvokeModel permission."
+    exit 1
+fi
+echo "✓ IAM Role detected"
+
+# 1. Update system
+echo "[1/7] Updating system packages..."
 sudo apt-get update -y
-sudo apt-get install -y ca-certificates curl gnupg lsb-release git python3-pip
 
-# 2. Install Docker
-sudo mkdir -p /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+# 2. Install Docker from Ubuntu repos (more reliable than docker.com)
+echo "[2/7] Installing Docker..."
+sudo apt-get install -y docker.io docker-compose-v2 git
 
-sudo apt-get update -y
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+# Start Docker service
+sudo systemctl start docker
+sudo systemctl enable docker
 
-# 3. Clone Project
+# 3. Clone repository
+echo "[3/7] Cloning repository..."
 cd /home/ubuntu
-# NOTE: In a real scenario, you would clone your specific repo. 
-# For now, we assume public or auth is handled.
-git clone https://github.com/YOUR_GITHUB_USERNAME/healthcare_ai_agent.git
-cd healthcare_ai_agent
-git checkout feature/aws-bedrock-migration
+sudo -u ubuntu git clone https://github.com/bradlycheng/healthcare-AI-agent.git
+cd healthcare-AI-agent
+sudo -u ubuntu git checkout feature/aws-bedrock-migration
 
-# 4. Configure Environment (Placeholder - You must edit this on the server!)
-# We create a dummy .env so docker-compose doesn't complain, but 
-# YOU MUST EDIT IT TO ADD AWS KEYS IF NOT USING IAM ROLE
-cp .env.example .env
+# 4. Set up environment
+echo "[4/7] Configuring environment..."
+sudo -u ubuntu cp .env.example .env
 
-# 5. Build and Start Stack
-# We use the build process on the t2.micro (it might be slow, but it's free)
+# 5. Build Docker images
+echo "[5/7] Building Docker images (this takes 2-3 minutes)..."
 sudo docker compose build app
+
+# 6. Start services
+echo "[6/7] Starting application..."
 sudo docker compose up -d app caddy
 
-echo "--- Setup Complete! Application running on Port 80 ---"
-echo "IMPORTANT: Ensure this EC2 instance had an IAM Role with 'AmazonBedrockFullAccess' attached!"
+echo "=== Deployment Complete ==="
+echo "Finished at: $(date)"
+echo ""
+echo "Your dashboard should be available at: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)"
+echo ""
+echo "To check logs: sudo docker compose logs -f"
