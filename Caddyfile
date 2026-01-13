@@ -1,4 +1,14 @@
-# Serve HTTP on port 80 without TLS (for IP-based access)
+# Main domain - Health Data Agent website
+healthdataagent.com, www.healthdataagent.com {
+    reverse_proxy app:8080
+}
+
+# Personal domain redirect to main site
+bradlycheng.com, www.bradlycheng.com {
+    redir https://healthdataagent.com{uri} permanent
+}
+
+# Fallback for IP-based access (no HTTPS)
 :80 {
     reverse_proxy app:8080
 }

@@ -60,6 +60,31 @@ body {
     pointer-events: none;
 }
 
+/* Creator Banner */
+.creator-banner {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-align: center;
+    padding: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 1001;
+}
+
+.creator-banner a {
+    color: white;
+    text-decoration: underline;
+    font-weight: 600;
+    transition: opacity 0.3s ease;
+}
+
+.creator-banner a:hover {
+    opacity: 0.8;
+}
+
 /* Navbar */
 .navbar {
     display: flex;
@@ -68,7 +93,8 @@ body {
     padding: 1.5rem 5%;
     position: fixed;
     width: 100%;
-    top: 0;
+    top: 40px;
+    /* Offset for creator banner */
     z-index: 1000;
     backdrop-filter: blur(10px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -148,7 +174,8 @@ body {
     display: flex;
     align-items: center;
     padding: 0 5%;
-    padding-top: 80px;
+    padding-top: 120px;
+    /* Adjusted for creator banner + navbar */
     gap: 4rem;
 }
 

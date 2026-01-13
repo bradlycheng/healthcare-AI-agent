@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Demo | Health Data Agent</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .game-container {
+            max-width: 1200px;
+            margin: 150px auto 50px auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .game-container h1 {
+            font-family: var(--font-heading);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .game-container p {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            font-size: 1.1rem;
+        }
+
+        .game-frame {
+            width: 100%;
+            max-width: 1024px;
+            height: 600px;
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 0 auto;
+            background: #000;
+        }
+
+        .back-link {
+            margin-top: 2rem;
+        }
+
+        .loading-text {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="background-glow"></div>
+
+    <!-- Creator Banner -->
+    <div class="creator-banner">
+        💼 Built by <a href="https://linkedin.com/in/bradlycheng" target="_blank" rel="noopener">Bradly Cheng</a> |
+        Software Engineer
+    </div>
+
+    <nav class="navbar">
+        <a href="/" class="logo">
+            <i class="fa-solid fa-staff-snake"></i>
+            <span>HealthAgent.ai</span>
+        </a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/dashboard.html">Dashboard</a>
+        </div>
+        <a href="/" class="btn-primary">← Back</a>
+    </nav>
+
+    <div class="game-container">
+        <h1>Game Demo</h1>
+        <p>Built with Godot Engine</p>
+
+        <p class="loading-text" id="loading">Loading game...</p>
+
+        <iframe src="/game/index.html" class="game-frame" allowfullscreen
+            onload="document.getElementById('loading').style.display='none'">
+        </iframe>
+
+        <div class="back-link">
+            <a href="/" class="btn-secondary">← Back to Main Site</a>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>&copy; 2024 Health Data Agent | Created by Bradly Cheng</p>
+        <div class="social-links">
+            <a href="https://github.com/bradlycheng" target="_blank" rel="noopener"><i
+                    class="fa-brands fa-github"></i></a>
+            <a href="https://linkedin.com/in/bradlycheng" target="_blank" rel="noopener"><i
+                    class="fa-brands fa-linkedin"></i></a>
+        </div>
+    </footer>
+</body>
+
+</html>
