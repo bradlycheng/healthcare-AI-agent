@@ -5,6 +5,7 @@ healthdataagent.com, www.healthdataagent.com {
     
     # Add CORS and Cross-Origin isolation headers for Godot 4
     header {
+        Access-Control-Allow-Origin *
         Cross-Origin-Embedder-Policy require-corp
         Cross-Origin-Opener-Policy same-origin
     }
