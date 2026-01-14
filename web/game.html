@@ -72,14 +72,50 @@
     </nav>
 
     <div class="game-container">
-        <h1>Game Demo</h1>
-        <p>Built with Godot Engine</p>
+        <h1>EvadeMan</h1>
+        <p>A strategic survival game built with Godot Engine. Navigate through a world filled with zombies, survive, and
+            reach your goal!</p>
 
         <p class="loading-text" id="loading">Loading game...</p>
 
-        <iframe src="/game/index.html" class="game-frame" allowfullscreen
+        <iframe src="/game/index.html" class="game-frame" id="game-frame" allowfullscreen allow="cross-origin-isolated"
             onload="document.getElementById('loading').style.display='none'">
         </iframe>
+
+        <!-- Game Controls -->
+        <div style="margin-top: 1rem; display: flex; justify-content: center; gap: 1rem;">
+            <button class="btn-primary" onclick="toggleFullscreen()" style="padding: 0.5rem 1.5rem; font-size: 1rem;">
+                <i class="fa-solid fa-expand"></i> Fullscreen
+            </button>
+            <button class="btn-primary" onclick="reloadGame()"
+                style="padding: 0.5rem 1.5rem; font-size: 1rem; background: var(--secondary, #4b5563);">
+                <i class="fa-solid fa-rotate-right"></i> Restart
+            </button>
+        </div>
+
+        <div style="margin-top: 1.5rem; color: var(--text-muted); font-size: 0.95rem;">
+            <p><strong>Controls:</strong> Arrow Keys/WASD to move • Shift to sprint • Space to place block • Z to
+                confirm • X to cancel</p>
+        </div>
+
+        <script>
+            function toggleFullscreen() {
+                const iframe = document.getElementById('game-frame');
+                if (!document.fullscreenElement) {
+                    iframe.requestFullscreen().catch(err => {
+                        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+                    });
+                } else {
+                    document.exitFullscreen();
+                }
+            }
+
+            function reloadGame() {
+                const iframe = document.getElementById('game-frame');
+                iframe.src = iframe.src;
+                document.getElementById('loading').style.display = 'block';
+            }
+        </script>
 
         <div class="back-link">
             <a href="/" class="btn-secondary">← Back to Main Site</a>

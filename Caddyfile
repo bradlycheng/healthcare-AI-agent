@@ -1,6 +1,43 @@
 # Main domain - Health Data Agent website
 healthdataagent.com, www.healthdataagent.com {
-    reverse_proxy app:8080
+    # Serve static files from /srv/web
+    root * /srv/web
+    
+    # Add CORS and Cross-Origin isolation headers for Godot 4
+    header {
+        Cross-Origin-Embedder-Policy require-corp
+        Cross-Origin-Opener-Policy same-origin
+    }
+
+    # Set proper MIME types for Godot files
+    @wasm {
+        path **.wasm
+    }
+    header @wasm Content-Type application/wasm
+    
+    @pck {
+        path **.pck
+    }
+    header @pck Content-Type application/octet-stream
+    
+    @js {
+        path **.js
+    }
+    header @js Content-Type application/javascript
+
+    # Try files first, then directory, then fallback to API
+    try_files {path} {path}/ @api
+
+    # Reverse proxy to app container for API endpoints
+    @api {
+        path /api/*
+        path /docs
+        path /openapi.json
+    }
+    reverse_proxy @api app:8080
+
+    # Enable file serving
+    file_server
 }
 
 # Personal domain redirect to main site
@@ -10,5 +47,42 @@ bradlycheng.com, www.bradlycheng.com {
 
 # Fallback for IP-based access (no HTTPS)
 :80 {
-    reverse_proxy app:8080
+    # Serve static files from /srv/web
+    root * /srv/web
+    
+    # Add CORS and Cross-Origin isolation headers for Godot 4
+    header {
+        Cross-Origin-Embedder-Policy require-corp
+        Cross-Origin-Opener-Policy same-origin
+    }
+
+    # Set proper MIME types for Godot files
+    @wasm {
+        path **.wasm
+    }
+    header @wasm Content-Type application/wasm
+    
+    @pck {
+        path **.pck
+    }
+    header @pck Content-Type application/octet-stream
+    
+    @js {
+        path **.js
+    }
+    header @js Content-Type application/javascript
+
+    # Try files first, then directory, then fallback to API
+    try_files {path} {path}/ @api
+
+    # Reverse proxy to app container for API endpoints
+    @api {
+        path /api/*
+        path /docs
+        path /openapi.json
+    }
+    reverse_proxy @api app:8080
+
+    # Enable file serving
+    file_server
 }

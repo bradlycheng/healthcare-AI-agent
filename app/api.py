@@ -18,11 +18,20 @@ DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
 
 app = FastAPI(title="Healthcare HL7 → FHIR Agent API")
 
+
 # Simple in-memory rate limiter: keys=IP, values=timestamp of last LLM request
 # We only rate limit the LLM part to prevent expensive calls.
 _RATE_LIMIT_STORE: Dict[str, float] = {}
 RATE_LIMIT_SECONDS = 5.0
 
+
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    response = await call_next(request)
+    # Required for Godot 4 HTML5 export (SharedArrayBuffer)
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
+    return response
 
 # ---------- Pydantic Models ----------
 

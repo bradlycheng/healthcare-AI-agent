@@ -1,0 +1,42 @@
+# Local development configuration
+# Serves on localhost without HTTPS
+
+:80 {
+    # Serve static files from /web directory first
+    root * /srv/web
+    
+    # Add CORS and Cross-Origin isolation headers for Godot 4
+    header {
+        Access-Control-Allow-Origin *
+        Cross-Origin-Embedder-Policy require-corp
+        Cross-Origin-Opener-Policy same-origin
+    }
+    
+    # Set proper MIME types for Godot files
+    @wasm {
+        path *.wasm
+    }
+    header @wasm Content-Type application/wasm
+    
+    @pck {
+        path *.pck
+    }
+    header @pck Content-Type application/octet-stream
+    
+    @js {
+        path *.js
+    }
+    header @js Content-Type application/javascript
+    
+    # Try files first, then directory, then fallback
+    try_files {path} {path}/ 
+
+    # Reverse proxy to app container for API endpoints
+    reverse_proxy /api/* app:8080
+    reverse_proxy /docs app:8080
+    reverse_proxy /openapi.json app:8080
+    
+    # Enable file serving
+    file_server
+}
+
