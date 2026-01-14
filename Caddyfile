@@ -43,7 +43,7 @@ healthdataagent.com, www.healthdataagent.com {
 
 # Personal domain redirect to main site
 bradlycheng.com, www.bradlycheng.com {
-    redir https://healthdataagent.com{uri} permanent
+    redir https://healthdataagent.com/about.html permanent
 }
 
 # Fallback for IP-based access (no HTTPS)

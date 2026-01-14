@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About | Health Data Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .about-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 8rem 2rem 4rem;
+        }
+
+        .section-block {
+            margin-bottom: 4rem;
+            text-align: center;
+        }
+
+        .section-block h1 {
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .section-block h2 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: var(--text-heading);
+        }
+
+        .text-content {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            line-height: 1.7;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .highlight-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2.5rem;
+            margin: 2rem 0;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            text-align: left;
+        }
+
+        .highlight-box h3 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .game-card {
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 3rem;
+            text-align: center;
+            margin-top: 2rem;
+            transition: transform 0.3s ease;
+        }
+
+        .game-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+
+        .social-links-large {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .social-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .social-btn:hover {
+            background: var(--primary);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="background-glow"></div>
+
+    <nav class="navbar">
+        <a href="/" class="logo">
+            <i class="fa-solid fa-staff-snake"></i>
+            <span>Health Data Agent</span>
+        </a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/dashboard.html">Dashboard</a>
+            <a href="/about.html" class="active">About</a>
+        </div>
+        <a href="https://linkedin.com/in/bradlycheng" target="_blank" class="btn-primary">Contact</a>
+    </nav>
+
+    <main class="about-container">
+
+        <!-- Project Description Section (Top Priority) -->
+        <section class="section-block">
+            <h1>Health Data Agent</h1>
+            <div class="text-content">
+                <p>
+                    The <strong>Health Data Agent</strong> is an intelligent interoperability platform designed to
+                    bridge the gap between legacy healthcare systems and modern standards. By leveraging advanced AI and
+                    Large Language Models (LLMs), it transforms raw, unstructured HL7v2 messages into standardized FHIR
+                    resources and generates actionable clinical insights.
+                </p>
+                <div class="highlight-box">
+                    <h3><i class="fa-solid fa-lightbulb"></i> Why this matters</h3>
+                    <p style="margin-bottom: 0;">
+                        Healthcare data is often trapped in archaic formats. This project demonstrates how modern AI
+                        agents can automatically parse, validate, and reason about this data to improve interoperability
+                        and patient outcomes.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Creator Bio Section -->
+        <section class="section-block">
+            <h2>About the Creator</h2>
+            <div class="text-content">
+                <p>
+                    Hi, I'm <strong>Bradly Cheng</strong>. I'm a Software Engineer passionate about building innovative
+                    solutions at the intersection of healthcare technology and interactive media. This project serves as
+                    a personal playground to experiment with AI agents, data pipelines, and system architecture.
+                </p>
+                <div class="social-links-large">
+                    <a href="https://github.com/bradlycheng" target="_blank" class="social-btn">
+                        <i class="fa-brands fa-github"></i> GitHub
+                    </a>
+                    <a href="https://linkedin.com/in/bradlycheng" target="_blank" class="social-btn">
+                        <i class="fa-brands fa-linkedin"></i> LinkedIn
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Portfolio/Game Section (Linked, not embedded) -->
+        <section class="section-block">
+            <h2>Portfolio Showcase</h2>
+            <div class="game-card">
+                <h3 style="font-size: 1.8rem; margin-bottom: 1rem;">EvadeMan</h3>
+                <p style="color: var(--text-muted); margin-bottom: 2rem;">
+                    A strategic survival game built with Godot Engine. Navigate through a world filled with challenges,
+                    survive the zombie horde, and reach your goal.
+                </p>
+                <a href="/game.html" class="btn-primary large">
+                    <i class="fa-solid fa-play"></i> Play Game
+                </a>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Bradly Cheng. All rights reserved.</p>
+        <div class="social-links">
+            <a href="https://github.com/bradlycheng" target="_blank"><i class="fa-brands fa-github"></i></a>
+            <a href="https://linkedin.com/in/bradlycheng" target="_blank"><i class="fa-brands fa-linkedin"></i></a>
+        </div>
+    </footer>
+</body>
+
+</html>
