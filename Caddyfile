@@ -34,6 +34,9 @@ healthdataagent.com, www.healthdataagent.com {
         path /api/*
         path /docs
         path /openapi.json
+        path /oru/*
+        path /messages*
+        path /health
     }
     reverse_proxy @api app:8080
 
@@ -81,6 +84,9 @@ bradlycheng.com, www.bradlycheng.com {
         path /api/*
         path /docs
         path /openapi.json
+        path /oru/*
+        path /messages*
+        path /health
     }
     reverse_proxy @api app:8080
 

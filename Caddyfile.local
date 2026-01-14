@@ -35,6 +35,9 @@
     reverse_proxy /api/* app:8080
     reverse_proxy /docs app:8080
     reverse_proxy /openapi.json app:8080
+    reverse_proxy /oru/* app:8080
+    reverse_proxy /messages* app:8080
+    reverse_proxy /health app:8080
     
     # Enable file serving
     file_server
