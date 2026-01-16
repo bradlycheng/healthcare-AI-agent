@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModal = document.getElementById('close-modal');
 
     // Initialize
+    console.log('Dashboard JS Loaded v2'); // verify script update
     loadMessages();
     setupEventListeners();
 
@@ -31,11 +32,14 @@ document.addEventListener('DOMContentLoaded', () => {
         filterDate.addEventListener('change', applyFilters);
         refreshBtn.addEventListener('click', loadMessages);
 
-        // Add delete button listener if it exists (or will exist)
-        const deleteBtn = document.getElementById('delete-btn');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', confirmDelete);
-        }
+        // Event Delegation for Delete Button (More robust)
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('#delete-btn');
+            if (btn) {
+                e.preventDefault();
+                confirmDelete();
+            }
+        });
 
         prevPageBtn.addEventListener('click', () => changePage(-1));
         nextPageBtn.addEventListener('click', () => changePage(1));
@@ -56,10 +60,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function confirmDelete() {
-        if (confirm('Are you sure you want to RESET the database? This will delete all current messages and restore the 8 sample patients.')) {
+        console.log('Reset Demo Clicked');
+        // if (confirm('Are you sure...')) { 
+        if (true) {
             try {
+                console.log('Sending DELETE request...');
                 const response = await fetch('/messages', { method: 'DELETE' });
-                if (!response.ok) throw new Error('Failed to reset messages');
+                console.log('Delete response:', response.status);
+                if (!response.ok) {
+                    const txt = await response.text();
+                    throw new Error(txt || 'Failed to reset messages');
+                }
                 showToast('Database reset to sample data', 'success');
                 loadMessages(); // Refresh list to show empty state
             } catch (err) {
