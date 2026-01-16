@@ -310,8 +310,10 @@ Return a SINGLE JSON object with ALL of the following keysINSTRUCTIONS:
    - If you see a quantitative test result in the notes (like "glucose 145", "BP 120/80") that is NOT in the structured list, you MUST extract it.
    - **IMPORTANT: Even if the note says "Patient reports", TREAT THIS AS A VALID FINDING for this extraction.**
    - Example matches: "patient reports glucose 145", "fasting blood glucose of 145", "last visit glucose 145".
+   - **NAMING CONVENTION**: Use standard, concise display names (e.g., use "Glucose" instead of "Fasting Blood Glucose" if possible, or "Blood Pressure" instead of "BP").
    - For extracted items, set "source": "AI_EXTRACTED".
    - For original items, set "source": "HL7".
+   - **CRITICALLY IMPORTANT**: You MUST add these new extracted observations to the "structured_observations" list in your JSON output. Do not just put them in the FHIR bundle.
 3. Generate a "clinical_summary" of the findings.
 4. Generate a valid "fhir_bundle".
 
@@ -442,6 +444,15 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
         except Exception as e:
             print(f"DEBUG UNEXPECTED ERROR: {e}")
             pass
+
+        # Post-processing: If AI extracted meaningful values, hide the raw "Clinical Note" to avoid clutter
+        ai_extracted_count = sum(1 for o in structured_observations if o.get("source") == "AI_EXTRACTED")
+        if ai_extracted_count > 0:
+            # Filter out generic notes
+            structured_observations = [
+                o for o in structured_observations 
+                if not (o.get("code") == "NOTE" or o.get("display") == "Clinical Note")
+            ]
 
     # 5) Persist (Optional)
     if persist:

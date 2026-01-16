@@ -231,296 +231,169 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsArea = document.getElementById('results-area');
     const aiToggle = document.getElementById('ai-toggle');
     const selectAllCheck = document.getElementById('select-all');
+    const addRowBtn = document.getElementById('add-row-btn');
 
     let currentAnalysisData = null;
 
-    // Track current request state
-    let currentAbortController = null;
-    let processingStartTime = null;
-    let timerInterval = null;
-    let rateLimitCooldown = null;
-
-    // Thresholds for stalling detection (in milliseconds)
-    const STALL_WARNING_THRESHOLD = 8000;  // Show warning after 8 seconds
-    const STALL_CRITICAL_THRESHOLD = 15000; // Suggest canceling after 15 seconds
-    const REQUEST_TIMEOUT = 30000;          // Total timeout 30 seconds
-
-    // Create and inject rate limit banner
-    function createRateLimitBanner() {
-        const demoInput = document.querySelector('.demo-input');
-        if (!demoInput) return null;
-
-        const banner = document.createElement('div');
-        banner.className = 'rate-limit-banner';
-        banner.id = 'rate-limit-banner';
-        banner.innerHTML = `
-            <i class="fa-solid fa-clock"></i>
-            <div class="message">
-                <h4>Rate Limit Reached</h4>
-                <p>Please wait before sending another AI request.</p>
-            </div>
-            <div class="countdown" id="rate-limit-countdown">5</div>
-        `;
-
-        demoInput.insertBefore(banner, demoInput.firstChild);
-        return banner;
-    }
-
-    // Create processing timer and cancel button
-    function createProcessingElements() {
-        const inputHeader = document.querySelector('.input-header');
-        if (!inputHeader) return;
-
-        // Add timer display
-        const timerDiv = document.createElement('div');
-        timerDiv.className = 'processing-timer';
-        timerDiv.id = 'processing-timer';
-        timerDiv.innerHTML = '<i class="fa-solid fa-stopwatch"></i> Processing: <span id="timer-value">0s</span>';
-
-        // Add stall warning
-        const stallWarning = document.createElement('div');
-        stallWarning.className = 'stall-warning';
-        stallWarning.id = 'stall-warning';
-        stallWarning.innerHTML = `
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <span id="stall-message">AI is taking longer than expected...</span>
-        `;
-
-        // Add cancel button
-        const cancelBtn = document.createElement('button');
-        cancelBtn.className = 'cancel-btn';
-        cancelBtn.id = 'cancel-btn';
-        cancelBtn.innerHTML = '<i class="fa-solid fa-xmark"></i> Cancel Request';
-        cancelBtn.addEventListener('click', cancelCurrentRequest);
-
-        // Insert after the textarea wrapper
-        const textarea = document.getElementById('hl7-input');
-        if (textarea) {
-            textarea.parentNode.insertBefore(timerDiv, textarea.nextSibling);
-            textarea.parentNode.insertBefore(stallWarning, timerDiv.nextSibling);
-            textarea.parentNode.insertBefore(cancelBtn, stallWarning.nextSibling);
-        }
-    }
-
-    // Initialize extra elements
-    createRateLimitBanner();
-    createProcessingElements();
-
-    function cancelCurrentRequest() {
-        if (currentAbortController) {
-            currentAbortController.abort();
-            showToast('Request cancelled', 'warning');
-            resetProcessingUI();
-        }
-    }
-
-    function startProcessingTimer() {
-        processingStartTime = Date.now();
-        const timerEl = document.getElementById('processing-timer');
-        const timerValue = document.getElementById('timer-value');
-        const stallWarning = document.getElementById('stall-warning');
-        const stallMessage = document.getElementById('stall-message');
-        const cancelBtn = document.getElementById('cancel-btn');
-
-        if (timerEl) timerEl.classList.add('visible');
-        if (cancelBtn) cancelBtn.classList.add('visible');
-
-        timerInterval = setInterval(() => {
-            const elapsed = Date.now() - processingStartTime;
-            const seconds = Math.floor(elapsed / 1000);
-
-            if (timerValue) timerValue.textContent = `${seconds}s`;
-
-            // Check for stalling
-            if (elapsed >= STALL_CRITICAL_THRESHOLD) {
-                if (stallWarning) {
-                    stallWarning.classList.add('visible');
-                    if (stallMessage) {
-                        stallMessage.innerHTML = `
-                            <strong>AI appears to be stalling (${seconds}s).</strong> 
-                            The service might be overloaded. Consider canceling and trying without AI.
-                        `;
-                    }
-                }
-            } else if (elapsed >= STALL_WARNING_THRESHOLD) {
-                if (stallWarning) {
-                    stallWarning.classList.add('visible');
-                    if (stallMessage) {
-                        stallMessage.textContent = `AI is taking longer than expected (${seconds}s)...`;
-                    }
-                }
-            }
-        }, 1000);
-    }
-
-    function stopProcessingTimer() {
-        if (timerInterval) {
-            clearInterval(timerInterval);
-            timerInterval = null;
-        }
-    }
-
-    function resetProcessingUI() {
-        stopProcessingTimer();
-
-        const timerEl = document.getElementById('processing-timer');
-        const stallWarning = document.getElementById('stall-warning');
-        const cancelBtn = document.getElementById('cancel-btn');
-        const timerValue = document.getElementById('timer-value');
-
-        if (timerEl) timerEl.classList.remove('visible');
-        if (stallWarning) stallWarning.classList.remove('visible');
-        if (cancelBtn) cancelBtn.classList.remove('visible');
-        if (timerValue) timerValue.textContent = '0s';
-
-        processBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Analyze (Preview)';
-        processBtn.disabled = false;
-        currentAbortController = null;
-    }
-
-    function showRateLimitBanner(waitSeconds = 5) {
-        const banner = document.getElementById('rate-limit-banner');
-        const countdown = document.getElementById('rate-limit-countdown');
-
-        if (!banner) return;
-
-        banner.classList.add('visible');
-        let remaining = waitSeconds;
-
-        if (countdown) countdown.textContent = remaining;
-
-        // Clear any existing cooldown interval
-        if (rateLimitCooldown) clearInterval(rateLimitCooldown);
-
-        rateLimitCooldown = setInterval(() => {
-            remaining--;
-            if (countdown) countdown.textContent = remaining;
-
-            if (remaining <= 0) {
-                clearInterval(rateLimitCooldown);
-                rateLimitCooldown = null;
-                banner.classList.remove('visible');
-            }
-        }, 1000);
-    }
-
-    if (processBtn && hl7Input) {
+    // Process Button Logic
+    if (processBtn) {
         processBtn.addEventListener('click', async () => {
-            const text = hl7Input.value.trim();
-            if (!text) {
-                showToast("Please paste an HL7 message first.", 'warning');
+            // Reset UI
+            if (resultsArea) resultsArea.classList.add('hidden');
+            if (saveBtn) {
+                saveBtn.classList.add('hidden');
+                saveBtn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm & Save';
+                saveBtn.disabled = false;
+            }
+
+            // Get Input
+            const hl7 = hl7Input ? hl7Input.value.trim() : '';
+            if (!hl7) {
+                showToast('Please enter an HL7 message.', 'warning');
                 return;
             }
 
-            // Check if we're in rate limit cooldown
-            if (rateLimitCooldown) {
-                showToast("Please wait for the cooldown to finish.", 'warning');
-                return;
-            }
-
-            // Cancel any existing request
-            if (currentAbortController) {
-                currentAbortController.abort();
-            }
-
-            // Create new abort controller
-            currentAbortController = new AbortController();
-            const signal = currentAbortController.signal;
-
-            // UI Loading state
-            const useAI = aiToggle ? aiToggle.checked : true;
-
-            if (useAI) {
-                processBtn.innerHTML = '<i class="fa-solid fa-brain fa-pulse"></i> Analyzing...';
-                startProcessingTimer();
-            } else {
-                processBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Analyzing...';
-            }
-
+            // Show Loading
+            processBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analying...';
             processBtn.disabled = true;
-            resultsArea.classList.add('hidden');
 
-            // Set up timeout
-            const timeoutId = setTimeout(() => {
-                if (currentAbortController) {
-                    currentAbortController.abort();
-                    showToast('Request timed out. Try disabling AI for faster processing.', 'error');
-                }
-            }, REQUEST_TIMEOUT);
+            // Timer / Stall Logic (Optional, simplified here)
+            const startTime = Date.now();
 
             try {
-                const response = await fetch('/oru/parse', {
+                // Construct payload
+                // We use parsing endpoint first
+                const useLLM = aiToggle && aiToggle.checked;
+                const url = `/oru/parse?persist=false&use_llm=${useLLM}`;
+
+                const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        hl7_text: text,
-                        use_llm: useAI,
-                        persist: false // Preview mode only
-                    }),
-                    signal: signal
+                        hl7_text: hl7,
+                        use_llm: useLLM,
+                        persist: false
+                    })
                 });
 
-                clearTimeout(timeoutId);
-
                 if (!response.ok) {
-                    const errData = await response.json().catch(() => ({}));
-
-                    // Handle rate limiting specifically
-                    if (response.status === 429) {
-                        showRateLimitBanner(5);
-                        showToast('Too many requests. Please wait a few seconds.', 'warning');
-                        resetProcessingUI();
-                        return;
-                    }
-
-                    throw new Error(errData.detail || `Server Error: ${response.status}`);
+                    throw new Error(await response.text());
                 }
 
-                const data = await response.json();
-                currentAnalysisData = { ...data, raw_hl7: text }; // Store for saving later logic
-                renderResults(data);
-                resultsArea.classList.remove('hidden');
+                currentAnalysisData = await response.json();
+
+                // Render
+                renderResults(currentAnalysisData);
+                if (resultsArea) resultsArea.classList.remove('hidden');
 
                 // Show Save Button
-                if (saveBtn) {
-                    saveBtn.classList.remove('hidden');
-                    saveBtn.disabled = false;
-                    saveBtn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm & Save';
-                }
+                if (saveBtn) saveBtn.classList.remove('hidden');
 
-                // Show success toast
-                const processingTime = processingStartTime ?
-                    Math.round((Date.now() - processingStartTime) / 1000) : 0;
-                if (processingTime > 0) {
-                    showToast(`Processed in ${processingTime}s`, 'success');
-                }
-
-                // Scroll to results
-                resultsArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                showToast('Analysis complete.', 'success');
 
             } catch (err) {
-                clearTimeout(timeoutId);
-
-                if (err.name === 'AbortError') {
-                    // Request was cancelled - don't show additional error
-                    console.log('Request aborted');
-                } else {
-                    console.error(err);
-
-                    // Provide helpful error messages
-                    let errorMessage = err.message;
-                    if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
-                        errorMessage = 'Network error. Please check if the server is running.';
-                    } else if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
-                        errorMessage = 'Request timed out. The AI service may be overloaded.';
-                    }
-
-                    showToast(`Error: ${errorMessage}`, 'error');
-                }
+                console.error(err);
+                showToast('Analysis failed: ' + err.message, 'error');
             } finally {
-                resetProcessingUI();
+                processBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Analyze (Preview)';
+                processBtn.disabled = false;
             }
         });
+    }
+
+    // Event Delegation for Add Row (More Robust)
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('#add-row-btn');
+        if (btn) {
+            e.preventDefault(); // Prevent any default form actions
+            console.log("Add Row Clicked");
+            addNewObservationRow();
+        }
+    });
+
+    function createObservationRow(o, index) {
+        const tr = document.createElement('tr');
+
+        // Source Badge
+        const isAi = o.source === 'AI_EXTRACTED';
+        const isManual = o.source === 'MANUAL';
+        let sourceHtml = '<span style="color:var(--text-muted);"><i class="fa-solid fa-file-code"></i> HL7</span>';
+
+        if (isAi) {
+            tr.style.backgroundColor = "rgba(0, 242, 255, 0.05)";
+            sourceHtml = '<span style="color:var(--secondary); font-weight:bold;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI</span>';
+        } else if (isManual) {
+            tr.style.backgroundColor = "rgba(42, 252, 152, 0.05)";
+            sourceHtml = '<span style="color:var(--success); font-weight:bold;"><i class="fa-solid fa-user-pen"></i> User</span>';
+        }
+
+        // Flag Logic
+        let flagHtml = '';
+        if (o.flag) {
+            const f = o.flag.toUpperCase();
+            let cls = 'flag-normal';
+            if (['H', 'HH', '>'].some(x => f.includes(x))) cls = 'flag-high';
+            if (['L', 'LL', '<'].some(x => f.includes(x))) cls = 'flag-low';
+            flagHtml = `<span class="obs-flag ${cls}">${f}</span>`;
+        }
+
+        const ref = (o.reference_low && o.reference_high)
+            ? `${o.reference_low} - ${o.reference_high}`
+            : (o.reference_low || o.reference_high || '--');
+
+        const codeDisplay = o.code && o.code !== 'UNKNOWN' ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Code: ${o.code}</div>` : '';
+
+        // Safely handle nulls
+        const displayVal = o.display || (isManual ? '' : (o.code || ''));
+        const valVal = o.value !== null ? o.value : '';
+        const unitVal = o.unit || '';
+
+        tr.innerHTML = `
+            <td><input type="checkbox" class="obs-check" checked></td>
+            <td>${sourceHtml}</td>
+            <td class="editable-cell">
+                <input type="text" class="edit-input test-name-input" value="${displayVal}" placeholder="Test Name" style="width:100%; font-weight:500;">
+                ${codeDisplay}
+                <input type="hidden" class="code-hidden" value="${o.code || ''}">
+            </td>
+            <td class="editable-cell">
+                <input type="text" class="edit-input value-input" value="${valVal}" placeholder="Value">
+            </td>
+            <td class="editable-cell">
+                 <input type="text" class="edit-input unit-input" value="${unitVal}" placeholder="Unit" style="width:60px;">
+            </td>
+            <td>${flagHtml}</td>
+            <td>${ref}</td>
+        `;
+        return tr;
+    }
+
+    function addNewObservationRow() {
+        const obsBody = document.getElementById('res-obs-body');
+        // Clear "No observations" message if present
+        if (obsBody.innerHTML.includes('No observations found')) {
+            obsBody.innerHTML = '';
+        }
+
+        const newObs = {
+            source: 'MANUAL',
+            code: '',
+            display: '',
+            value: '',
+            unit: '',
+            flag: '',
+            reference_low: '',
+            reference_high: ''
+        };
+
+        const tr = createObservationRow(newObs, -1);
+
+        // Add delete button for manual rows? For now, just add.
+        obsBody.appendChild(tr);
+
+        // Focus the name input
+        const inputs = tr.querySelectorAll('input');
+        if (inputs[1]) inputs[1].focus();
     }
 
     function renderResults(data) {
@@ -546,45 +419,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const obs = data.structured_observations || [];
 
         if (obs.length === 0) {
-            obsBody.innerHTML = '<tr><td colspan="6" style="text-align:center; opacity:0.6;">No observations found.</td></tr>';
+            obsBody.innerHTML = '<tr><td colspan="7" style="text-align:center; opacity:0.6;">No observations found.</td></tr>';
         } else {
             obs.forEach((o, index) => {
-                const tr = document.createElement('tr');
-
-                // Source Badge
-                const isAi = o.source === 'AI_EXTRACTED';
-                const sourceHtml = isAi
-                    ? '<span style="color:var(--secondary); font-weight:bold;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI</span>'
-                    : '<span style="color:var(--text-muted);"><i class="fa-solid fa-file-code"></i> HL7</span>';
-
-                if (isAi) tr.style.backgroundColor = "rgba(0, 242, 255, 0.05)";
-
-                // Flag Logic
-                let flagHtml = '';
-                if (o.flag) {
-                    const f = o.flag.toUpperCase();
-                    let cls = 'flag-normal';
-                    if (['H', 'HH', '>'].some(x => f.includes(x))) cls = 'flag-high';
-                    if (['L', 'LL', '<'].some(x => f.includes(x))) cls = 'flag-low';
-                    flagHtml = `<span class="obs-flag ${cls}">${f}</span>`;
-                }
-
-                const ref = (o.reference_low && o.reference_high)
-                    ? `${o.reference_low} - ${o.reference_high}`
-                    : (o.reference_low || o.reference_high || '--');
-
-                tr.innerHTML = `
-                    <td><input type="checkbox" class="obs-check" data-index="${index}" checked></td>
-                    <td>${sourceHtml}</td>
-                    <td>${o.display || o.code}</td>
-                    <td class="editable-cell">
-                        <input type="text" class="edit-input value-input" value="${o.value !== null ? o.value : ''}" placeholder="Value">
-                        <input type="text" class="edit-input unit-input" value="${o.unit || ''}" placeholder="Unit" style="width:60px; margin-left:5px;">
-                    </td>
-                    <td>${flagHtml}</td>
-                    <td>${ref}</td>
-                `;
-                obsBody.appendChild(tr);
+                obsBody.appendChild(createObservationRow(o, index));
             });
         }
 
@@ -622,36 +460,48 @@ document.addEventListener('DOMContentLoaded', () => {
         saveBtn.addEventListener('click', async () => {
             if (!currentAnalysisData) return;
 
-            // Gather verified data
+            // Gather verified data from DOM
             const verifiedObs = [];
-            const checkboxes = document.querySelectorAll('.obs-check');
-            let hasChanges = false;
+            const rows = document.querySelectorAll('#res-obs-body tr');
 
-            checkboxes.forEach(cb => {
-                if (cb.checked) {
-                    const idx = parseInt(cb.getAttribute('data-index'));
-                    const row = cb.closest('tr');
+            rows.forEach(row => {
+                const cb = row.querySelector('.obs-check');
+                if (cb && cb.checked) {
+                    const testNameInput = row.querySelector('.test-name-input');
+                    const codeHidden = row.querySelector('.code-hidden');
                     const valInput = row.querySelector('.value-input');
                     const unitInput = row.querySelector('.unit-input');
 
-                    const original = currentAnalysisData.structured_observations[idx];
+                    // Determine source from badge text
+                    const sourceText = row.querySelector('td:nth-child(2)').innerText;
+                    let source = 'HL7';
+                    if (sourceText.includes('AI')) source = 'AI_EXTRACTED';
+                    if (sourceText.includes('User')) source = 'MANUAL';
 
-                    // Use input values
-                    const newVal = valInput ? valInput.value : original.value;
-                    const newUnit = unitInput ? unitInput.value : original.unit;
+                    // Determine Display Name (fallback to text if input is empty/missing? No, input should govern)
+                    const display = testNameInput ? testNameInput.value : '';
 
                     verifiedObs.push({
-                        ...original,
-                        value: newVal,
-                        unit: newUnit
+                        display: display,
+                        code: codeHidden ? codeHidden.value : '',
+                        value: valInput ? valInput.value : '',
+                        unit: unitInput ? unitInput.value : '',
+                        source: source,
+                        // Preserve other fields if possible? 
+                        // For simplicity, we just save what's visible + source. 
+                        // The backend will persist this list.
+                        flag: row.querySelector('.obs-flag') ? row.querySelector('.obs-flag').innerText : ''
                     });
                 }
             });
 
             // Construct payload
+            // We use currentAnalysisData for the patient info, but REPLACE observations
+            // AND we must ensure raw_hl7 is present (it's required by backend but missing from parse response)
             const payload = {
                 ...currentAnalysisData,
-                structured_observations: verifiedObs
+                structured_observations: verifiedObs,
+                raw_hl7: hl7Input ? hl7Input.value.trim() : ''
             };
 
             saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';

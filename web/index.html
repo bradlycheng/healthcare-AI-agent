@@ -134,10 +134,9 @@ OBX|1|NM|GLUCOSE||105|...</code></pre>
                     placeholder="Paste your HL7 message here...">MSH|^~\&|HIS|MedCenter|LIS|LAB|202412271200||ORU^R01|MSG001|P|2.5
 PID|1||99001||SMITH^JOHN||19800515|M
 OBR|1|ORD001|RES001|CBC^Complete Blood Count|||202412271200
-OBX|1|NM|2345-7^GLUCOSE||105|mg/dL|70-100|N|||F
-OBX|2|NM|718-7^HEMOGLOBIN||14.2|g/dL|13.5-17.5|N|||F
-OBX|3|NM|6690-2^WBC||7200|/uL|4500-11000|N|||F
-OBX|4|TX|NOTE^Clinical Note||Patient reports non-fasting status. Glucose slightly elevated but consistent with post-prandial state.||||||F</textarea>
+OBX|1|NM|718-7^HEMOGLOBIN||14.2|g/dL|13.5-17.5|N|||F
+OBX|2|NM|6690-2^WBC||7200|/uL|4500-11000|N|||F
+OBX|3|TX|NOTE^Clinical Note||Patient reports recent fasting blood glucose of 145 mg/dL from home monitor. History of hypertension, BP 138/88 at last visit.||||||F</textarea>
                 <div class="action-buttons">
                     <button id="process-btn" class="btn-primary">
                         <i class="fa-solid fa-bolt"></i> Analyze (Preview)
@@ -180,15 +179,21 @@ OBX|4|TX|NOTE^Clinical Note||Patient reports non-fasting status. Glucose slightl
                                         <!-- Select All Checkbox -->
                                         <th style="width: 40px;"><input type="checkbox" id="select-all" checked></th>
                                         <th style="width: 80px;">Source</th>
-                                        <th>Test</th>
-                                        <th>Value (Edit)</th>
-                                        <th>Flag</th>
+                                        <th>Test Name / Code</th>
+                                        <th style="width: 100px;">Value</th>
+                                        <th style="width: 80px;">Unit</th>
+                                        <th style="width: 60px;">Flag</th>
                                         <th>Ref Range</th>
                                     </tr>
                                 </thead>
                                 <tbody id="res-obs-body">
                                 </tbody>
                             </table>
+                            <div class="table-actions">
+                                <button id="add-row-btn" class="btn-secondary small">
+                                    <i class="fa-solid fa-plus"></i> Add Observation
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div class="tab-content" id="tab-fhir">
