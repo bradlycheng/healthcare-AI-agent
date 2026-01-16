@@ -304,7 +304,17 @@ NOTES (Free Text):
 {notes_block}
 
 TASK:
-Return a SINGLE JSON object with ALL of the following keysINSTRUCTIONS:
+Return a SINGLE JSON object with ALL of the following keys
+
+LOINC CODE REFERENCE (use these exact codes for extracted observations):
+- Glucose: code="2345-7", unit="mg/dL"
+- Hemoglobin: code="718-7", unit="g/dL"
+- WBC: code="6690-2", unit="/uL"
+- Blood Pressure Systolic: code="8480-6", unit="mmHg"
+- Blood Pressure Diastolic: code="8462-4", unit="mmHg"
+- Heart Rate: code="8867-4", unit="bpm"
+
+INSTRUCTIONS:
 1. Start with the "OBSERVATIONS (Structured)" list effectively.
 2. CHECK the "NOTES (Free Text)" section carefully.
    - If you see a quantitative test result in the notes (like "glucose 145", "BP 120/80") that is NOT in the structured list, you MUST extract it.
@@ -392,6 +402,37 @@ def _ensure_obs_fields(obs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return fixed
 
 
+# LOINC code normalization - order matters (more specific patterns first)
+LOINC_LOOKUP = [
+    ("diastolic", "8462-4", "mmHg"),
+    ("systolic", "8480-6", "mmHg"),
+    ("blood pressure", "8480-6", "mmHg"),
+    ("glucose", "2345-7", "mg/dL"),
+    ("hemoglobin", "718-7", "g/dL"),
+    ("wbc", "6690-2", "/uL"),
+    ("white blood cell", "6690-2", "/uL"),
+    ("heart rate", "8867-4", "bpm"),
+    ("pulse", "8867-4", "bpm"),
+    ("creatinine", "2160-0", "mg/dL"),
+]
+
+
+def _normalize_loinc_codes(obs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Normalize LOINC codes and units for known observation types."""
+    normalized = []
+    for o in obs:
+        display = (o.get("display") or "").lower()
+        for pattern, loinc_code, default_unit in LOINC_LOOKUP:
+            if pattern in display:
+                if o.get("code") != loinc_code:
+                    o["code"] = loinc_code
+                if not o.get("unit"):
+                    o["unit"] = default_unit
+                break
+        normalized.append(o)
+    return normalized
+
+
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
@@ -453,6 +494,12 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
                 o for o in structured_observations 
                 if not (o.get("code") == "NOTE" or o.get("display") == "Clinical Note")
             ]
+        
+        # Normalize LOINC codes and units
+        structured_observations = _normalize_loinc_codes(structured_observations)
+        
+        # Regenerate FHIR bundle with corrected codes
+        fhir_bundle = _build_fhir_bundle(patient, structured_observations)
 
     # 5) Persist (Optional)
     if persist:
