@@ -186,19 +186,17 @@ Remember: output JSON ONLY.
 
 def _strip_markdown_fences(content: str) -> str:
     """
-    Remove ```json ... ``` wrappers if present.
+    Robustly extract JSON object from LLM response.
+    Finds the first '{' and the last '}'.
     """
     text = content.strip()
-    if not text.startswith("```"):
-        return text
-
-    # Strip leading/trailing backticks
-    text = text.strip("`").strip()
-    # Drop a leading 'json' or 'JSON' token if present
-    lowered = text.lower()
-    if lowered.startswith("json"):
-        text = text[4:].lstrip()
-
+    
+    start_idx = text.find("{")
+    end_idx = text.rfind("}")
+    
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        return text[start_idx : end_idx + 1]
+        
     return text
 
 
@@ -233,7 +231,7 @@ def call_llm_for_json(prompt: str) -> Dict[str, Any]:
     payload = {
         "prompt": f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
         "max_gen_len": 2048,
-        "temperature": 0.1,
+        "temperature": 0.3,
         "top_p": 0.9
     }
 

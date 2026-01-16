@@ -226,9 +226,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Live Demo Logic ---
     const processBtn = document.getElementById('process-btn');
+    const saveBtn = document.getElementById('save-btn');
     const hl7Input = document.getElementById('hl7-input');
     const resultsArea = document.getElementById('results-area');
     const aiToggle = document.getElementById('ai-toggle');
+    const selectAllCheck = document.getElementById('select-all');
+
+    let currentAnalysisData = null;
 
     // Track current request state
     let currentAbortController = null;
@@ -369,7 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cancelBtn) cancelBtn.classList.remove('visible');
         if (timerValue) timerValue.textContent = '0s';
 
-        processBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Process Message';
+        processBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Analyze (Preview)';
         processBtn.disabled = false;
         currentAbortController = null;
     }
@@ -427,10 +431,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const useAI = aiToggle ? aiToggle.checked : true;
 
             if (useAI) {
-                processBtn.innerHTML = '<i class="fa-solid fa-brain fa-pulse"></i> AI Analyzing...';
+                processBtn.innerHTML = '<i class="fa-solid fa-brain fa-pulse"></i> Analyzing...';
                 startProcessingTimer();
             } else {
-                processBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+                processBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Analyzing...';
             }
 
             processBtn.disabled = true;
@@ -450,7 +454,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         hl7_text: text,
-                        use_llm: useAI
+                        use_llm: useAI,
+                        persist: false // Preview mode only
                     }),
                     signal: signal
                 });
@@ -472,8 +477,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const data = await response.json();
+                currentAnalysisData = { ...data, raw_hl7: text }; // Store for saving later logic
                 renderResults(data);
                 resultsArea.classList.remove('hidden');
+
+                // Show Save Button
+                if (saveBtn) {
+                    saveBtn.classList.remove('hidden');
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm & Save';
+                }
 
                 // Show success toast
                 const processingTime = processingStartTime ?
@@ -533,12 +546,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const obs = data.structured_observations || [];
 
         if (obs.length === 0) {
-            obsBody.innerHTML = '<tr><td colspan="4" style="text-align:center; opacity:0.6;">No observations found.</td></tr>';
+            obsBody.innerHTML = '<tr><td colspan="6" style="text-align:center; opacity:0.6;">No observations found.</td></tr>';
         } else {
-            obs.forEach(o => {
+            obs.forEach((o, index) => {
                 const tr = document.createElement('tr');
 
-                // Format flag
+                // Source Badge
+                const isAi = o.source === 'AI_EXTRACTED';
+                const sourceHtml = isAi
+                    ? '<span style="color:var(--secondary); font-weight:bold;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI</span>'
+                    : '<span style="color:var(--text-muted);"><i class="fa-solid fa-file-code"></i> HL7</span>';
+
+                if (isAi) tr.style.backgroundColor = "rgba(0, 242, 255, 0.05)";
+
+                // Flag Logic
                 let flagHtml = '';
                 if (o.flag) {
                     const f = o.flag.toUpperCase();
@@ -553,8 +574,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     : (o.reference_low || o.reference_high || '--');
 
                 tr.innerHTML = `
+                    <td><input type="checkbox" class="obs-check" data-index="${index}" checked></td>
+                    <td>${sourceHtml}</td>
                     <td>${o.display || o.code}</td>
-                    <td><strong>${o.value || ''}</strong> <small class="text-muted">${o.unit || ''}</small></td>
+                    <td class="editable-cell">
+                        <input type="text" class="edit-input value-input" value="${o.value !== null ? o.value : ''}" placeholder="Value">
+                        <input type="text" class="edit-input unit-input" value="${o.unit || ''}" placeholder="Unit" style="width:60px; margin-left:5px;">
+                    </td>
                     <td>${flagHtml}</td>
                     <td>${ref}</td>
                 `;
@@ -583,5 +609,73 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById(targetId).classList.add('active');
         });
     });
+
+    // Select All Logic
+    if (selectAllCheck) {
+        selectAllCheck.addEventListener('change', (e) => {
+            document.querySelectorAll('.obs-check').forEach(cb => cb.checked = e.target.checked);
+        });
+    }
+
+    // Confirm & Save Logic
+    if (saveBtn) {
+        saveBtn.addEventListener('click', async () => {
+            if (!currentAnalysisData) return;
+
+            // Gather verified data
+            const verifiedObs = [];
+            const checkboxes = document.querySelectorAll('.obs-check');
+            let hasChanges = false;
+
+            checkboxes.forEach(cb => {
+                if (cb.checked) {
+                    const idx = parseInt(cb.getAttribute('data-index'));
+                    const row = cb.closest('tr');
+                    const valInput = row.querySelector('.value-input');
+                    const unitInput = row.querySelector('.unit-input');
+
+                    const original = currentAnalysisData.structured_observations[idx];
+
+                    // Use input values
+                    const newVal = valInput ? valInput.value : original.value;
+                    const newUnit = unitInput ? unitInput.value : original.unit;
+
+                    verifiedObs.push({
+                        ...original,
+                        value: newVal,
+                        unit: newUnit
+                    });
+                }
+            });
+
+            // Construct payload
+            const payload = {
+                ...currentAnalysisData,
+                structured_observations: verifiedObs
+            };
+
+            saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+            saveBtn.disabled = true;
+
+            try {
+                const response = await fetch('/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error('Failed to save message');
+
+                showToast(`Saved ${verifiedObs.length} observations successfully!`, 'success');
+                saveBtn.classList.add('hidden');
+
+            } catch (err) {
+                console.error(err);
+                showToast('Failed to save: ' + err.message, 'error');
+                saveBtn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm & Save';
+                saveBtn.disabled = false;
+            }
+        });
+    }
 
 });

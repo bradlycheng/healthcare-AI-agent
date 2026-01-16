@@ -278,35 +278,62 @@ def _build_llm_prompt(
 
     patient_json = _json.dumps(patient, indent=2)
     obs_json = _json.dumps(structured_observations, indent=2)
+    
+    # Extract all notes for explicit prompting
+    all_notes = []
+    for o in structured_observations:
+        if "notes" in o and o["notes"]:
+            for n in o["notes"]:
+                all_notes.append(f"- Note attached to {o.get('display', 'observation')}: {n}")
+    
+    notes_block = ""
+    if all_notes:
+        notes_block = "CLINICAL NOTES FOUND IN INPUT:\n" + "\n".join(all_notes) + "\n\n"
+
 
     return f"""
-You are a clinical data transformer.
+You are a smart clinical assistant. Your PRIMARY goal is to extract clinical values from free-text notes.
 
-INPUT:
-- Patient (parsed from HL7 PID):
-{patient_json}
-
-- Observations (parsed from HL7 OBX):
-{obs_json}
+INPUT DATA:
+---
+PATIENT: {patient_json}
+---
+OBSERVATIONS (Structured): {obs_json}
+---
+NOTES (Free Text):
+{notes_block}
 
 TASK:
-Return a SINGLE JSON object with ALL of the following keys:
+Return a SINGLE JSON object with ALL of the following keysINSTRUCTIONS:
+1. Start with the "OBSERVATIONS (Structured)" list effectively.
+2. CHECK the "NOTES (Free Text)" section carefully.
+   - If you see a quantitative test result in the notes (like "glucose 145", "BP 120/80") that is NOT in the structured list, you MUST extract it.
+   - **IMPORTANT: Even if the note says "Patient reports", TREAT THIS AS A VALID FINDING for this extraction.**
+   - Example matches: "patient reports glucose 145", "fasting blood glucose of 145", "last visit glucose 145".
+   - For extracted items, set "source": "AI_EXTRACTED".
+   - For original items, set "source": "HL7".
+3. Generate a "clinical_summary" of the findings.
+4. Generate a valid "fhir_bundle".
 
-- "patient": a cleaned version of the patient object (same shape, but you may normalize fields).
-- "clinical_summary": a short, clinician-facing English summary (1–3 sentences) of key abnormal findings and what they might imply.
-- "structured_observations": an improved version of the input observations (fix obvious units, reference ranges, flags, etc. if needed).
-- "fhir_bundle": a valid FHIR Bundle representing the patient and these observations,
-  consistent with FHIR R4 Observation + Patient resources.
+OUTPUT JSON FORMAT:
+{{
+  "patient": {{...}},
+  "clinical_summary": "...",
+  "notes_analysis": "EXTRACTED: [Value] from [Snippet] | SKIPPED: [Reason]",
+  "structured_observations": [
+    {{
+      "code": "...",
+      "display": "...",
+      "value": ...,
+      "unit": "...",
+      "flag": "...",
+      "source": "HL7" | "AI_EXTRACTED"
+    }}
+  ],
+  "fhir_bundle": {{...}}
+}}
 
-REQUIREMENTS:
-- Output MUST be valid JSON.
-- DO NOT include any explanation outside of the JSON.
-- patient: {{ "id": str, "first_name": str, "last_name": str, "dob": str, "sex": str }}
-- structured_observations: list of objects with keys
-    ["code","display","value","unit","reference_low","reference_high","flag","observation_datetime","status"]
-- fhir_bundle: FHIR Bundle JSON with "resourceType": "Bundle".
-
-Return only the JSON object.
+Return ONLY valid JSON.
 """.strip()
 
 
@@ -329,6 +356,7 @@ def _merge_llm_output(
         summary = llm_raw["clinical_summary"]
 
     if isinstance(llm_raw.get("structured_observations"), list):
+        # The LLM returns the FULL list (merged), so we trust its deduplication logic
         structured_observations = llm_raw["structured_observations"]
 
     if isinstance(llm_raw.get("fhir_bundle"), dict):
@@ -356,6 +384,7 @@ def _ensure_obs_fields(obs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "flag": o.get("flag", "") or "",
                 "observation_datetime": o.get("observation_datetime", "") or "",
                 "status": o.get("status", "") or "",
+                "source": o.get("source", "HL7"),  # Default source
             }
         )
     return fixed
@@ -365,18 +394,25 @@ def _ensure_obs_fields(obs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def run_oru_pipeline(hl7_text: str, use_llm: bool = True) -> Dict[str, Any]:
+def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) -> Dict[str, Any]:
+    print(f"DEBUG: Entering run_oru_pipeline. use_llm={use_llm}, USE_LLM={USE_LLM}", flush=True)
     """
     Main pipeline:
 
     1. parse_oru -> (patient, structured_observations)
     2. deterministic clinical summary
     3. build local FHIR Bundle
-    4. (optional) call local LLM to refine / enrich
-    5. persist to sqlite (dedupe supported via db.py)
+    4. (optional) call local LLM to refine / enrich / extract from notes
+    5. (optional) persist to sqlite (preview mode skips this)
     """
     # 1) HL7 -> patient + observations
     patient, structured_observations = parse_oru(hl7_text)
+    print(f"DEBUG: Parsed observations: {structured_observations}", flush=True)
+    
+    # Pre-mark HL7 source
+    for ob in structured_observations:
+        ob["source"] = "HL7"
+        
     structured_observations = _ensure_obs_fields(structured_observations)
 
     # 2) Local summary
@@ -385,12 +421,12 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True) -> Dict[str, Any]:
     # 3) Local FHIR Bundle
     fhir_bundle = _build_fhir_bundle(patient, structured_observations)
 
-    # 4) Optional LLM enrichment (never let it crash ingestion)
-    # Only run if globally enabled AND requested by caller
+    # 4) Optional LLM enrichment
     if USE_LLM and use_llm:
         try:
             prompt = _build_llm_prompt(patient, structured_observations)
             llm_raw = call_llm_for_json(prompt)
+            print(f"DEBUG LLM RAW: {llm_raw}")
 
             patient, clinical_summary, structured_observations, fhir_bundle = _merge_llm_output(
                 patient,
@@ -400,27 +436,29 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True) -> Dict[str, Any]:
                 llm_raw,
             )
             structured_observations = _ensure_obs_fields(structured_observations)
-        except LLMError:
+        except LLMError as e:
+            print(f"DEBUG LLM ERROR: {e}")
             pass
-        except Exception:
-            # Keep pipeline resilient even if something else goes weird
+        except Exception as e:
+            print(f"DEBUG UNEXPECTED ERROR: {e}")
             pass
 
-    # 5) Persist (also resilient; never break response)
-    try:
-        init_db()
-        msh_obj = parse_msh(hl7_text)
-        msh_dict = msh_obj.__dict__ if msh_obj else {}
-        insert_message_and_observations(
-            received_at=str(datetime.utcnow()),
-            raw_hl7=hl7_text,
-            patient=patient,
-            observations=structured_observations,
-            fhir_bundle=fhir_bundle,
-            msh=msh_dict,
-        )
-    except Exception:
-        pass
+    # 5) Persist (Optional)
+    if persist:
+        try:
+            init_db()
+            msh_obj = parse_msh(hl7_text)
+            msh_dict = msh_obj.__dict__ if msh_obj else {}
+            insert_message_and_observations(
+                received_at=str(datetime.utcnow()),
+                raw_hl7=hl7_text,
+                patient=patient,
+                observations=structured_observations,
+                fhir_bundle=fhir_bundle,
+                msh=msh_dict,
+            )
+        except Exception:
+            pass
 
     return {
         "patient": patient,

@@ -130,15 +130,22 @@ OBX|1|NM|GLUCOSE||105|...</code></pre>
                         <span class="toggle-label">Enable AI Analysis</span>
                     </div>
                 </div>
-                <textarea id="hl7-input" placeholder="Paste your HL7 message here...">MSH|^~\&|HIS|MedCenter|LIS|LAB|202412271200||ORU^R01|MSG001|P|2.5
+                <textarea id="hl7-input"
+                    placeholder="Paste your HL7 message here...">MSH|^~\&|HIS|MedCenter|LIS|LAB|202412271200||ORU^R01|MSG001|P|2.5
 PID|1||99001||SMITH^JOHN||19800515|M
 OBR|1|ORD001|RES001|CBC^Complete Blood Count|||202412271200
 OBX|1|NM|2345-7^GLUCOSE||105|mg/dL|70-100|N|||F
 OBX|2|NM|718-7^HEMOGLOBIN||14.2|g/dL|13.5-17.5|N|||F
-OBX|3|NM|6690-2^WBC||7200|/uL|4500-11000|N|||F</textarea>
-                <button id="process-btn" class="btn-primary full-width">
-                    <i class="fa-solid fa-bolt"></i> Process Message
-                </button>
+OBX|3|NM|6690-2^WBC||7200|/uL|4500-11000|N|||F
+OBX|4|TX|NOTE^Clinical Note||Patient reports non-fasting status. Glucose slightly elevated but consistent with post-prandial state.||||||F</textarea>
+                <div class="action-buttons">
+                    <button id="process-btn" class="btn-primary">
+                        <i class="fa-solid fa-bolt"></i> Analyze (Preview)
+                    </button>
+                    <button id="save-btn" class="btn-success hidden">
+                        <i class="fa-solid fa-check"></i> Confirm & Save
+                    </button>
+                </div>
             </div>
 
             <div class="demo-results hidden" id="results-area">
@@ -170,8 +177,11 @@ OBX|3|NM|6690-2^WBC||7200|/uL|4500-11000|N|||F</textarea>
                             <table class="obs-table">
                                 <thead>
                                     <tr>
+                                        <!-- Select All Checkbox -->
+                                        <th style="width: 40px;"><input type="checkbox" id="select-all" checked></th>
+                                        <th style="width: 80px;">Source</th>
                                         <th>Test</th>
-                                        <th>Value</th>
+                                        <th>Value (Edit)</th>
                                         <th>Flag</th>
                                         <th>Ref Range</th>
                                     </tr>

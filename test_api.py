@@ -1,7 +1,7 @@
 import requests
 import json
 
-url = "http://localhost:8080/oru/parse"
+url = "http://localhost:8000/oru/parse"
 hl7_data = """MSH|^~\\&|HIS|MedCenter|LIS|LocalLab|202405021000||ORU^R01|MSG1001|P|2.3
 PID|1||123456^^^MRN||DOE^JOHN||19800101|M
 OBR|1|||BASIC_PANEL

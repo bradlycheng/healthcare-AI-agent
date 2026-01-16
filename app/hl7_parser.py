@@ -178,6 +178,23 @@ def _parse_observations(msg: Message) -> List[Dict[str, Any]]:
     observations: List[Dict[str, Any]] = []
 
     for child in msg.children:
+        if child.name == "NTE":
+            # Attach note to the last observation if exists
+            if observations:
+                last_obs = observations[-1]
+                note_text = ""
+                try:
+                    # NTE-3 is the comment
+                    note_text = _safe_value(child.nte_3)
+                except Exception:
+                    pass
+                
+                if note_text:
+                    if "notes" not in last_obs:
+                        last_obs["notes"] = []
+                    last_obs["notes"].append(note_text)
+            continue
+
         if child.name != "OBX":
             continue
         obx = child
@@ -256,6 +273,8 @@ def _parse_observations(msg: Message) -> List[Dict[str, Any]]:
                 "flag": flag,
                 "observation_datetime": obs_dt,
                 "status": status,
+                "notes": [], # Initialize empty notes list
+                "source": "HL7", # Explicitly mark HL7 source for clarity
             }
         )
 

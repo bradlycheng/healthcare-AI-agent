@@ -30,6 +30,13 @@ document.addEventListener('DOMContentLoaded', () => {
         filterFlag.addEventListener('change', applyFilters);
         filterDate.addEventListener('change', applyFilters);
         refreshBtn.addEventListener('click', loadMessages);
+
+        // Add delete button listener if it exists (or will exist)
+        const deleteBtn = document.getElementById('delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', confirmDelete);
+        }
+
         prevPageBtn.addEventListener('click', () => changePage(-1));
         nextPageBtn.addEventListener('click', () => changePage(1));
         closeModal.addEventListener('click', hideModal);
@@ -46,6 +53,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById(tab.dataset.tab).classList.add('active');
             });
         });
+    }
+
+    async function confirmDelete() {
+        if (confirm('Are you sure you want to RESET the database? This will delete all current messages and restore the 8 sample patients.')) {
+            try {
+                const response = await fetch('/messages', { method: 'DELETE' });
+                if (!response.ok) throw new Error('Failed to reset messages');
+                showToast('Database reset to sample data', 'success');
+                loadMessages(); // Refresh list to show empty state
+            } catch (err) {
+                console.error('Error resetting messages:', err);
+                showToast('Failed to reset messages', 'error');
+            }
+        }
     }
 
     async function loadMessages() {

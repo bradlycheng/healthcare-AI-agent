@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Tuple, Optional
 
 import os
@@ -55,6 +55,52 @@ def init_db(db_path: str = DB_PATH) -> None:
             );
             """
         )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def prune_messages(days_to_keep: int = 2, db_path: str = DB_PATH) -> int:
+    """
+    Delete messages and observations older than `days_to_keep`.
+    Returns the number of messages deleted.
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        # Calculate retention cutoff
+        cutoff = (datetime.utcnow() - timedelta(days=days_to_keep)).isoformat()
+        
+        # 1. Find IDs to delete
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM hl7_messages WHERE received_at < ?", (cutoff,))
+        rows = cur.fetchall()
+        if not rows:
+            return 0
+        
+        ids_to_delete = [str(r[0]) for r in rows]
+        id_list_str = ",".join(ids_to_delete)
+        
+        # 2. Delete observations (if cascading delete isn't enabled)
+        if id_list_str:
+             cur.execute(f"DELETE FROM observations WHERE message_id IN ({id_list_str})")
+             # 3. Delete messages
+             cur.execute(f"DELETE FROM hl7_messages WHERE id IN ({id_list_str})")
+        
+        conn.commit()
+        return len(ids_to_delete)
+    finally:
+        conn.close()
+
+
+def delete_all_messages(db_path: str = DB_PATH) -> None:
+    """
+    Clear all data from the database.
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM observations")
+        cur.execute("DELETE FROM hl7_messages")
         conn.commit()
     finally:
         conn.close()

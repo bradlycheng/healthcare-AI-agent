@@ -8,9 +8,14 @@ from typing import Any, Dict, List, Optional
 
 from .agent import run_oru_pipeline
 
+import sys
+# Force unbuffered stdout
+sys.stdout.reconfigure(encoding='utf-8')
+
 import os
 from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel
+print("DEBUG: API MODULE LOADED", flush=True)
 
 DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
 # AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
@@ -38,6 +43,7 @@ async def add_process_time_header(request: Request, call_next):
 class ORUParseRequest(BaseModel):
     hl7_text: str
     use_llm: bool = True
+    persist: bool = True
 
 
 class PatientOut(BaseModel):
@@ -58,6 +64,7 @@ class ObservationOut(BaseModel):
     flag: str = ""
     observation_datetime: str = ""
     status: str = ""
+    source: str = "HL7"
 
 
 class ORUParseResponse(BaseModel):
@@ -65,6 +72,14 @@ class ORUParseResponse(BaseModel):
     clinical_summary: str
     structured_observations: List[ObservationOut]
     fhir_bundle: Dict[str, Any]
+
+
+class SaveMessageRequest(BaseModel):
+    patient: PatientOut
+    clinical_summary: str
+    structured_observations: List[ObservationOut]
+    fhir_bundle: Dict[str, Any]
+    raw_hl7: str
 
 
 class MessageListItem(BaseModel):
@@ -127,37 +142,90 @@ def _obs_value(row: sqlite3.Row) -> Any:
 # ---------- Routes ----------
 
 from fastapi import Request
+from datetime import datetime
+
+@app.on_event("startup")
+async def startup_event():
+    # Prune old messages on startup
+    from .db import prune_messages
+    try:
+        deleted = prune_messages(days_to_keep=2)
+        if deleted > 0:
+            print(f"Pruned {deleted} old messages on startup.")
+    except Exception as e:
+        print(f"Startup pruning failed: {e}")
+
 
 @app.get("/health")
 def health_check() -> Dict[str, str]:
     return {"status": "ok"}
+    
+
+@app.delete("/messages", status_code=204)
+def clear_all_messages_endpoint():
+    """
+    Reset database to original sample data.
+    """
+    from .db import delete_all_messages
+    from .seed import seed_database
+    
+    try:
+        # 1. Wipe everything
+        delete_all_messages()
+        
+        # 2. Re-seed default data
+        seed_database(verbose=False)
+        return
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reset database: {e}")
+
+
+@app.post("/messages", status_code=201)
+def save_message_endpoint(req: SaveMessageRequest):
+    """
+    Save a fully verified message (patient + obs) to the DB.
+    """
+    from .db import insert_message_and_observations, init_db
+    from .hl7_msh import parse_msh
+
+    try:
+        init_db()
+        msh_obj = parse_msh(req.raw_hl7)
+        msh_dict = msh_obj.__dict__ if msh_obj else {}
+
+        insert_message_and_observations(
+            received_at=str(datetime.utcnow()),
+            raw_hl7=req.raw_hl7,
+            patient=req.patient.dict(),
+            observations=[o.dict() for o in req.structured_observations],
+            fhir_bundle=req.fhir_bundle,
+            msh=msh_dict,
+        )
+        return {"status": "saved"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save message: {e}")
 
 
 @app.post("/oru/parse", response_model=ORUParseResponse)
 def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseResponse:
     """
     Run the ORU pipeline and return the result.
-
-    Note: run_oru_pipeline() should also persist to SQLite if your agent does that.
+    If persist=False, it's a dry-run (preview).
     """
     # Rate limit check if requesting LLM
     if req.use_llm:
+        print(f"DEBUG: API /oru/parse called. persist={req.persist}, use_llm={req.use_llm}", flush=True)
         client_ip = request.client.host if request.client else "unknown"
         now_ts = __import__("time").time()
         last_ts = _RATE_LIMIT_STORE.get(client_ip, 0.0)
         
         if now_ts - last_ts < RATE_LIMIT_SECONDS:
-            # Too many requests - fallback to NO LLM to be nice, 
-            # or could raise 429. Let's just disable LLM for this run so it's fast.
-            # req.use_llm = False
-            # Actually, per user request, let's strict limit it or raise exception.
-            # But making it just disable LLM is a better UX for a demo so it doesn't crash.
-            # Let's raise 429 so the UI knows to tell them "Slow down".
             raise HTTPException(status_code=429, detail="Too many AI requests. Please wait a few seconds.")
 
         _RATE_LIMIT_STORE[client_ip] = now_ts
 
-    result: Dict[str, Any] = run_oru_pipeline(req.hl7_text, use_llm=req.use_llm)
+    # Pass persist flag to pipeline
+    result: Dict[str, Any] = run_oru_pipeline(req.hl7_text, use_llm=req.use_llm, persist=req.persist)
 
     patient_dict = result.get("patient", {}) or {}
     clinical_summary = result.get("clinical_summary", "") or ""
@@ -185,6 +253,7 @@ def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseRespon
                 flag=o.get("flag", "") or "",
                 observation_datetime=o.get("observation_datetime", "") or "",
                 status=o.get("status", "") or "",
+                source=o.get("source", "HL7"),
             )
         )
 
