@@ -15,7 +15,7 @@ COPY app/ ./app
 COPY web/ ./web
 COPY agent.db .
 COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh
+RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 
 # Expose the port the app runs on
 EXPOSE 8080
