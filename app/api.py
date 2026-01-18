@@ -112,6 +112,19 @@ class ObservationListResponse(BaseModel):
     items: List[ObservationOut]
 
 
+class QueryRequest(BaseModel):
+    question: str
+
+
+class QueryResponse(BaseModel):
+    success: bool
+    answer: str
+    highlights: List[str] = []
+    sql_used: str = ""
+    row_count: int = 0
+    error: Optional[str] = None
+
+
 # ---------- DB Helpers ----------
 
 def _conn() -> sqlite3.Connection:
@@ -159,6 +172,37 @@ async def startup_event():
 @app.get("/health")
 def health_check() -> Dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/api/query", response_model=QueryResponse)
+def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryResponse:
+    """
+    Natural language query endpoint.
+    Translates questions to SQL, executes safely, returns formatted response.
+    """
+    from .query_assistant import process_query
+    
+    # Rate limit check (reuse existing mechanism)
+    client_ip = request.client.host if request.client else "unknown"
+    now_ts = __import__("time").time()
+    last_ts = _RATE_LIMIT_STORE.get(client_ip, 0.0)
+    
+    if now_ts - last_ts < RATE_LIMIT_SECONDS:
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait a few seconds.")
+    
+    _RATE_LIMIT_STORE[client_ip] = now_ts
+    
+    # Process the query
+    result = process_query(req.question)
+    
+    return QueryResponse(
+        success=result.get("success", False),
+        answer=result.get("answer", "Sorry, I couldn't process that."),
+        highlights=result.get("highlights", []),
+        sql_used=result.get("sql_used", ""),
+        row_count=result.get("row_count", 0),
+        error=result.get("error")
+    )
     
 
 @app.delete("/messages", status_code=204)

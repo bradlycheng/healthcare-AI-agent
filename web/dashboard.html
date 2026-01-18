@@ -88,6 +88,45 @@
             </div>
         </section>
 
+        <!-- AI Query Assistant -->
+        <section class="query-section">
+            <div class="query-container">
+                <div class="query-header">
+                    <div class="query-title">
+                        <i class="fa-solid fa-robot"></i>
+                        <span>AI Assistant</span>
+                    </div>
+                    <span class="query-badge">Powered by Llama 3</span>
+                </div>
+                <div class="query-messages" id="query-messages">
+                    <div class="message message-ai">
+                        <div class="message-avatar">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div class="message-content">
+                            <p>Hi! I can help you explore your patient data. Try asking:</p>
+                            <ul class="message-examples">
+                                <li>"Show all patients"</li>
+                                <li>"What are Maria Garcia's lab results?"</li>
+                                <li>"Which patients have abnormal glucose?"</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="query-input-row">
+                    <input type="text" id="query-input" placeholder="Ask about your patient data...">
+                    <button id="query-submit" class="btn-query-submit">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="query-suggestions">
+                    <button class="suggestion-chip" data-query="Show all patients">All patients</button>
+                    <button class="suggestion-chip" data-query="Show abnormal results">Abnormal results</button>
+                    <button class="suggestion-chip" data-query="Recent messages this week">Recent messages</button>
+                </div>
+            </div>
+        </section>
+
         <!-- Filters -->
         <section class="filters-bar">
             <div class="search-box">

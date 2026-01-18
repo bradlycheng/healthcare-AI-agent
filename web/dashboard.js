@@ -442,4 +442,166 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
+
+    // ============================================
+    // AI Query Assistant
+    // ============================================
+
+    const queryInput = document.getElementById('query-input');
+    const querySubmit = document.getElementById('query-submit');
+    const queryMessages = document.getElementById('query-messages');
+    const suggestionChips = document.querySelectorAll('.suggestion-chip');
+
+    // Set up query assistant event listeners
+    if (queryInput && querySubmit) {
+        querySubmit.addEventListener('click', () => {
+            const question = queryInput.value.trim();
+            if (question) sendQuery(question);
+        });
+
+        queryInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const question = queryInput.value.trim();
+                if (question) sendQuery(question);
+            }
+        });
+    }
+
+    // Suggestion chips
+    suggestionChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            const query = chip.dataset.query;
+            if (query) {
+                queryInput.value = query;
+                sendQuery(query);
+            }
+        });
+    });
+
+    async function sendQuery(question) {
+        if (!question.trim()) return;
+
+        // Clear input
+        queryInput.value = '';
+        querySubmit.disabled = true;
+
+        // Add user message
+        addMessage(question, 'user');
+
+        // Add loading indicator
+        const loadingId = addLoadingMessage();
+
+        try {
+            const response = await fetch('/api/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question })
+            });
+
+            // Remove loading message
+            removeMessage(loadingId);
+
+            if (response.status === 429) {
+                addMessage('Please wait a moment before asking another question.', 'ai', { isError: true });
+                return;
+            }
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || 'Failed to process query');
+            }
+
+            const data = await response.json();
+
+            if (data.success) {
+                addMessage(data.answer, 'ai', {
+                    highlights: data.highlights,
+                    sql: data.sql_used,
+                    rowCount: data.row_count
+                });
+            } else {
+                addMessage(data.answer || 'Sorry, I couldn\'t process that question.', 'ai', { isError: true });
+            }
+
+        } catch (err) {
+            removeMessage(loadingId);
+            console.error('Query error:', err);
+            addMessage('Sorry, something went wrong. Please try again.', 'ai', { isError: true });
+        } finally {
+            querySubmit.disabled = false;
+            queryInput.focus();
+        }
+    }
+
+    function addMessage(text, sender, options = {}) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message message-${sender}`;
+        messageDiv.id = `msg-${Date.now()}`;
+
+        const avatarIcon = sender === 'ai' ? 'fa-robot' : 'fa-user';
+
+        let contentHtml = `<p>${escapeHtml(text)}</p>`;
+
+        // Add highlights if present
+        if (options.highlights && options.highlights.length > 0) {
+            contentHtml += '<ul class="message-highlights">';
+            options.highlights.forEach(h => {
+                contentHtml += `<li>${escapeHtml(h)}</li>`;
+            });
+            contentHtml += '</ul>';
+        }
+
+        // Add SQL preview (collapsed by default)
+        if (options.sql) {
+            contentHtml += `<div class="message-sql" title="Generated SQL">${escapeHtml(options.sql)}</div>`;
+        }
+
+        // Add error styling
+        if (options.isError) {
+            messageDiv.classList.add('message-error');
+        }
+
+        messageDiv.innerHTML = `
+            <div class="message-avatar">
+                <i class="fa-solid ${avatarIcon}"></i>
+            </div>
+            <div class="message-content">
+                ${contentHtml}
+            </div>
+        `;
+
+        queryMessages.appendChild(messageDiv);
+        queryMessages.scrollTop = queryMessages.scrollHeight;
+
+        return messageDiv.id;
+    }
+
+    function addLoadingMessage() {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message message-ai';
+        messageDiv.id = `loading-${Date.now()}`;
+
+        messageDiv.innerHTML = `
+            <div class="message-avatar">
+                <i class="fa-solid fa-robot"></i>
+            </div>
+            <div class="message-content">
+                <div class="message-loading">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        `;
+
+        queryMessages.appendChild(messageDiv);
+        queryMessages.scrollTop = queryMessages.scrollHeight;
+
+        return messageDiv.id;
+    }
+
+    function removeMessage(id) {
+        const msg = document.getElementById(id);
+        if (msg) msg.remove();
+    }
 });
