@@ -364,7 +364,14 @@ document.addEventListener('DOMContentLoaded', () => {
             </td>
             <td>${flagHtml}</td>
             <td>${ref}</td>
+            <td><button class="btn-delete-row" title="Delete row" style="background:transparent; border:none; color:var(--danger-color); cursor:pointer; font-size:1.1rem;"><i class="fa-solid fa-trash"></i></button></td>
         `;
+
+        // Add delete handler
+        tr.querySelector('.btn-delete-row').addEventListener('click', () => {
+            tr.remove();
+        });
+
         return tr;
     }
 
@@ -498,9 +505,20 @@ document.addEventListener('DOMContentLoaded', () => {
             // Construct payload
             // We use currentAnalysisData for the patient info, but REPLACE observations
             // AND we must ensure raw_hl7 is present (it's required by backend but missing from parse response)
+
+            // Filter out empty observations (must have display/code AND value)
+            const validObs = verifiedObs.filter(o =>
+                (o.display || o.code) && (o.value !== '' && o.value !== null && o.value !== undefined)
+            );
+
+            if (validObs.length === 0) {
+                showToast('No valid observations to save. Each row needs a test name and value.', 'warning');
+                return;
+            }
+
             const payload = {
                 ...currentAnalysisData,
-                structured_observations: verifiedObs,
+                structured_observations: validObs,
                 raw_hl7: hl7Input ? hl7Input.value.trim() : ''
             };
 

@@ -498,6 +498,12 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
         # Normalize LOINC codes and units
         structured_observations = _normalize_loinc_codes(structured_observations)
         
+        # Filter out AI-generated observations with blank values (bad AI output)
+        structured_observations = [
+            o for o in structured_observations
+            if not (o.get("source") == "AI_EXTRACTED" and (o.get("value") == "" or o.get("value") is None))
+        ]
+        
         # Regenerate FHIR bundle with corrected codes
         fhir_bundle = _build_fhir_bundle(patient, structured_observations)
 
