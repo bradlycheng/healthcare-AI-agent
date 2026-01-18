@@ -199,6 +199,13 @@ def _parse_observations(msg: Message) -> List[Dict[str, Any]]:
             continue
         obx = child
 
+        # Extract OBX-2 (Value Type) - determines if numeric (NM) or text (TX/FT/ED)
+        value_type = ""
+        try:
+            value_type = _safe_value(obx.obx_2).strip().upper()
+        except Exception:
+            pass
+
         code = ""
         display = ""
         try:
@@ -268,6 +275,7 @@ def _parse_observations(msg: Message) -> List[Dict[str, Any]]:
                 "display": display,
                 "value": value_parsed,
                 "unit": unit,
+                "value_type": value_type,  # OBX-2: NM=numeric, TX/FT/ED=text
                 "reference_low": ref_low,
                 "reference_high": ref_high,
                 "flag": flag,

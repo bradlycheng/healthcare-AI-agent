@@ -13,6 +13,34 @@ from .llm_client import LLMError, call_llm_for_json
 # Toggle this if/when you want to actually use Ollama for enrichment.
 USE_LLM = True
 
+# Text-based OBX-2 value types that need AI analysis (per HL7 v2 spec)
+TEXT_VALUE_TYPES = {"TX", "FT", "ED", "ST"}
+
+
+def _needs_ai_analysis(observations: List[Dict[str, Any]]) -> bool:
+    """
+    Check if message contains clinical notes requiring AI processing.
+    
+    Returns True if:
+    - Any observation has NTE notes (free-text comments)
+    - Any observation has text-based OBX-2 value type (TX, FT, ED, ST)
+    
+    Returns False for pure numeric data (OBX-2 = NM, SN, CE) which can be
+    processed deterministically without LLM.
+    """
+    for obs in observations:
+        # Check for NTE notes attached to observation
+        notes = obs.get("notes", [])
+        if notes and any(n.strip() for n in notes):
+            return True
+        
+        # Check OBX-2 value type - text types need AI
+        vtype = obs.get("value_type", "").upper()
+        if vtype in TEXT_VALUE_TYPES:
+            return True
+    
+    return False
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -464,8 +492,11 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
     # 3) Local FHIR Bundle
     fhir_bundle = _build_fhir_bundle(patient, structured_observations)
 
-    # 4) Optional LLM enrichment
-    if USE_LLM and use_llm:
+    # 4) Optional LLM enrichment - only when clinical notes are present
+    needs_ai = _needs_ai_analysis(structured_observations)
+    
+    if USE_LLM and use_llm and needs_ai:
+        print("DEBUG: Clinical notes detected (NTE or TX/FT values), using LLM", flush=True)
         try:
             prompt = _build_llm_prompt(patient, structured_observations)
             llm_raw = call_llm_for_json(prompt)
@@ -506,6 +537,8 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
         
         # Regenerate FHIR bundle with corrected codes
         fhir_bundle = _build_fhir_bundle(patient, structured_observations)
+    elif USE_LLM and use_llm:
+        print("DEBUG: Structured numeric data only, skipping LLM for faster processing", flush=True)
 
     # 5) Persist (Optional)
     if persist:
