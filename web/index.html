@@ -168,6 +168,7 @@ OBX|3|TX|NOTE^Clinical Note||Patient reports recent fasting blood glucose of 145
                     <div class="tab-header">
                         <button class="tab-btn active" data-tab="tab-obs">Observations</button>
                         <button class="tab-btn" data-tab="tab-fhir">FHIR JSON</button>
+                        <button class="tab-btn" data-tab="tab-ack">HL7 ACK</button>
                     </div>
                     <div class="tab-content active" id="tab-obs">
                         <div class="table-responsive">
@@ -199,6 +200,9 @@ OBX|3|TX|NOTE^Clinical Note||Patient reports recent fasting blood glucose of 145
                     </div>
                     <div class="tab-content" id="tab-fhir">
                         <pre><code id="res-fhir"></code></pre>
+                    </div>
+                    <div class="tab-content" id="tab-ack">
+                        <pre><code id="res-ack" style="color:var(--success);"></code></pre>
                     </div>
                 </div>
             </div>

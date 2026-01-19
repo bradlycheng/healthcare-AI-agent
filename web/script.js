@@ -436,6 +436,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // FHIR Bundle
         const fhirCode = document.getElementById('res-fhir');
         fhirCode.textContent = JSON.stringify(data.fhir_bundle, null, 2);
+
+        // HL7 ACK
+        const ackCode = document.getElementById('res-ack');
+        if (ackCode) {
+            ackCode.textContent = data.hl7_ack || "No ACK generated.";
+        }
     }
 
     // Tabs Logic

@@ -9,8 +9,11 @@ An intelligent healthcare interoperability agent that parses HL7 v2 ORU messages
 | Feature | Description |
 |---------|-------------|
 | **HL7 Parsing** | Parses ORU^R01 messages with PID, OBR, OBX segments |
+| **Input Validation** | Rejects invalid/malformed messages (non-ORU) with HTTP 400 |
+| **ACK Generation** | Automatically generates HL7 v2 ACK (Acknowledgement) messages |
 | **FHIR Conversion** | Generates FHIR R4 Bundles (Patient + Observation resources) |
 | **AI Summaries** | AWS Bedrock LLM generates clinical summaries |
+| **Natural Language Query**| Ask questions like "Show patients with high glucose" (SQL Gen) |
 | **Web Dashboard** | Real-time monitoring of processed messages |
 | **Rate Limiting** | 5-second cooldown between LLM requests |
 
