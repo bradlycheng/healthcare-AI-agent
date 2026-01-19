@@ -255,12 +255,12 @@ def call_llm_for_json(prompt: str) -> Dict[str, Any]:
     content = _strip_markdown_fences(generation)
 
     try:
-        parsed = json.loads(content)
+        parsed = json.loads(content, strict=False)
     except json.JSONDecodeError as e:
         repaired = _try_repair_json(content)
         if repaired != content:
             try:
-                parsed = json.loads(repaired)
+                parsed = json.loads(repaired, strict=False)
             except json.JSONDecodeError as e2:
                 raise LLMError(f"Failed to parse LLM JSON after repair: {e2}\nRaw: {content}") from e2
         else:

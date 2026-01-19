@@ -5,6 +5,7 @@ services:
       - "8080:8080"
     volumes:
       - sqlite_data:/data
+      - ~/.aws:/root/.aws:ro # Mount AWS credentials for Bedrock access
     environment:
       - DATABASE_PATH=/data/agent.db
       - AWS_REGION=us-east-1

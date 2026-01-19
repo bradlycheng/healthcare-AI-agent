@@ -477,7 +477,11 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
     5. (optional) persist to sqlite (preview mode skips this)
     """
     # 1) HL7 -> patient + observations
-    patient, structured_observations = parse_oru(hl7_text)
+    try:
+        patient, structured_observations = parse_oru(hl7_text)
+    except Exception as e:
+        print(f"DEBUG: parse_oru failed: {e}", flush=True)
+        raise ValueError(f"Invalid HL7 Message: {e}")
     print(f"DEBUG: Parsed observations: {structured_observations}", flush=True)
     
     # Pre-mark HL7 source
@@ -554,8 +558,8 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
                 fhir_bundle=fhir_bundle,
                 msh=msh_dict,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"DATABASE ERROR: {e}", flush=True)
 
     return {
         "patient": patient,

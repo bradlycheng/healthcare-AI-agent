@@ -9,7 +9,7 @@ SAMPLE_MESSAGES: List[str] = [
     """MSH|^~\\&|HIS|MedCenter|LIS|LAB|202412271200||ORU^R01|MSG001|P|2.5
 PID|1||99001||SMITH^JOHN||19800515|M
 OBR|1|ORD001|RES001|CBC^Complete Blood Count|||202412271200
-OBX|1|NM|2345-7^GLUCOSE||105|mg/dL|70-100|N|||F
+OBX|1|NM|2345-7^GLUCOSE||115|mg/dL|70-100|H|||F
 OBX|2|NM|718-7^HEMOGLOBIN||14.2|g/dL|13.5-17.5|N|||F
 OBX|3|NM|6690-2^WBC||7200|/uL|4500-11000|N|||F
 OBX|4|TX|NOTE^Clinical Note||Patient reports non-fasting status. Glucose slightly elevated but consistent with post-prandial state.||||||F""",

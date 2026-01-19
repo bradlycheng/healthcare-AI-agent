@@ -9,7 +9,7 @@ OBX|1|NM|718-7^HEMOGLOBIN||14.2|g/dL|13.5-17.5|N|||F
 NTE|1||Patient reports fasting glucose of 145 mg/dL. BP 138/88 mmHg.'''
 
 response = requests.post(
-    'http://localhost:8001/oru/parse',
+    'http://localhost:8080/oru/parse',
     json={'hl7_text': hl7, 'use_llm': True, 'persist': False}
 )
 

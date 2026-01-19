@@ -30,41 +30,70 @@ Table: hl7_messages
   - id (INTEGER PRIMARY KEY)
   - received_at (DATETIME) 
   - patient_id (VARCHAR)
-  - patient_first_name (VARCHAR)
-  - patient_last_name (VARCHAR)
+  - patient_first_name (VARCHAR) -- Stored in UPPERCASE
+  - patient_last_name (VARCHAR)  -- Stored in UPPERCASE
   - patient_dob (VARCHAR)
-  - patient_sex (VARCHAR)
+  - patient_sex (VARCHAR) -- 'M' or 'F'
 
 Table: observations
   - id (INTEGER PRIMARY KEY)
   - message_id (INTEGER, FK to hl7_messages.id)
-  - code (VARCHAR) - e.g., "2345-7" for glucose
-  - display (VARCHAR) - e.g., "Glucose"
-  - value_num (FLOAT) - numeric value
-  - value_raw (VARCHAR) - text value if not numeric
-  - unit (VARCHAR) - e.g., "mg/dL"
+  - code (VARCHAR) -- e.g., "2345-7" for glucose
+  - display (VARCHAR) -- e.g., "Glucose", "Creatinine", "Hemoglobin"
+  - value_num (FLOAT) -- numeric value
+  - value_raw (VARCHAR) -- text value
+  - unit (VARCHAR) -- e.g., "mg/dL"
   - reference_low (VARCHAR)
   - reference_high (VARCHAR)
-  - flag (VARCHAR) - 'H' for high, 'L' for low, 'N' for normal, '' for none
+  - flag (VARCHAR) -- 'H' (High), 'L' (Low), 'N' (Normal), or empty
   - observation_datetime (VARCHAR)
-  - status (VARCHAR)
 
 RULES:
-1. ONLY generate SELECT statements - never INSERT, UPDATE, DELETE, DROP, etc.
-2. Use LOWER() with LIKE for case-insensitive name searches
-3. For abnormal results, use: flag IN ('H', 'L')
-4. JOIN observations to hl7_messages using: observations.message_id = hl7_messages.id
-5. LIMIT results to 50 maximum
-6. Use readable column aliases
+1. ONLY generate SELECT statements.
+2. **CRITICAL**: All names in DB are UPPERCASE. Use `UPPER(col) = 'NAME'` or `UPPER(col) LIKE '%NAME%'`.
+3. For "abnormal" or "high/low" results, check `flag IN ('H', 'L')` or `flag = 'H'`.
+4. **NEVER** filter by `patient_sex` unless the user explicitly uses words like "male", "female", "men", "women".
+5. JOIN `observations` on `observations.message_id = hl7_messages.id`.
+6. For "recent" items, use `ORDER BY received_at DESC` or `ORDER BY observation_datetime DESC`.
+7. LIMIT results to 50.
+
+FEW SHOT EXAMPLES:
+
+User: "Show all patients"
+SQL: SELECT DISTINCT patient_id, patient_first_name, patient_last_name FROM hl7_messages LIMIT 50
+
+User: "What are John Smith's lab results?"
+SQL: SELECT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o.unit, o.flag FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE UPPER(h.patient_first_name) = 'JOHN' AND UPPER(h.patient_last_name) = 'SMITH'
+
+User: "Which patients have elevated glucose?"
+SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, o.value_num, o.unit FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE UPPER(o.display) LIKE '%GLUCOSE%' AND o.flag = 'H'
+-- NOTE: No patient_sex filter applied!
+
+User: "Show me the most recent messages"
+SQL: SELECT * FROM hl7_messages ORDER BY received_at DESC LIMIT 10
+
+User: "Which patients have high cholesterol and high triglycerides?"
+SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name FROM hl7_messages h JOIN observations o1 ON h.id = o1.message_id JOIN observations o2 ON h.id = o2.message_id WHERE (UPPER(o1.display) LIKE '%CHOLESTEROL%' AND o1.flag = 'H') AND (UPPER(o2.display) LIKE '%TRIGLYCERIDE%' AND o2.flag = 'H')
+
+User: "Who has kidney problems?"
+SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o.flag FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE (UPPER(o.display) LIKE '%CREATININE%' OR UPPER(o.display) LIKE '%BUN%' OR UPPER(o.display) LIKE '%GFR%') AND o.flag IN ('H', 'L')
+
+User: "Show me messages from today"
+SQL: SELECT * FROM hl7_messages WHERE DATE(received_at) = DATE('now') ORDER BY received_at DESC
+
+User: "Who has the highest glucose value?"
+SQL: SELECT h.patient_first_name, h.patient_last_name, o.value_num, o.unit FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE UPPER(o.display) LIKE '%GLUCOSE%' ORDER BY o.value_num DESC LIMIT 1
+
+User: "Which patients have NO abnormal observations?"
+SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name FROM hl7_messages h WHERE h.id NOT IN (SELECT message_id FROM observations WHERE flag IN ('H', 'L'))
 
 RESPONSE FORMAT:
 Return a JSON object with exactly this structure:
 {
-  "sql": "SELECT ... FROM ... WHERE ... LIMIT 50",
-  "explanation": "Brief explanation of what this query does"
+  "sql": "SELECT ...",
+  "explanation": "Brief explanation"
 }
-
-Output JSON ONLY, no markdown fences.
+Output JSON ONLY.
 """.strip()
 
 
@@ -183,6 +212,7 @@ def generate_sql_from_question(question: str) -> tuple[str, str, Optional[str]]:
 
 USER QUESTION: {question}
 
+IMPORTANT: Do not refuse to answer. You are a data query assistant. It is safe to query.
 Generate the SQL query now. Output JSON only.
 """
     
@@ -267,7 +297,7 @@ def process_query(question: str) -> Dict[str, Any]:
     if error:
         return {
             "success": False,
-            "answer": "I couldn't understand that question. Try asking something like 'Show all patients' or 'What are John Smith's lab results?'",
+            "answer": f"I couldn't understand that question. Error: {error}",
             "highlights": [],
             "sql_used": "",
             "row_count": 0,

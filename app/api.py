@@ -72,6 +72,7 @@ class ORUParseResponse(BaseModel):
     clinical_summary: str
     structured_observations: List[ObservationOut]
     fhir_bundle: Dict[str, Any]
+    hl7_ack: str = ""
 
 
 class SaveMessageRequest(BaseModel):
@@ -246,6 +247,8 @@ def save_message_endpoint(req: SaveMessageRequest):
             msh=msh_dict,
         )
         return {"status": "saved"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save message: {e}")
 
@@ -256,20 +259,46 @@ def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseRespon
     Run the ORU pipeline and return the result.
     If persist=False, it's a dry-run (preview).
     """
-    # Rate limit check if requesting LLM
-    if req.use_llm:
-        print(f"DEBUG: API /oru/parse called. persist={req.persist}, use_llm={req.use_llm}", flush=True)
-        client_ip = request.client.host if request.client else "unknown"
-        now_ts = __import__("time").time()
-        last_ts = _RATE_LIMIT_STORE.get(client_ip, 0.0)
+    # 0. Basic Validation
+    if not req.hl7_text or "MSH" not in req.hl7_text:
+        raise HTTPException(status_code=400, detail="Invalid HL7 message. Must start with MSH segment.")
+
+    # 1. Message Type Validation
+    from .hl7_msh import parse_msh, build_ack
+    msh = parse_msh(req.hl7_text)
+    
+    ack_message = ""
+    if msh:
+        # Generate positive ACK early
+        ack_message = build_ack(msh, ack_code="AA", text="Message Received")
         
-        if now_ts - last_ts < RATE_LIMIT_SECONDS:
-            raise HTTPException(status_code=429, detail="Too many AI requests. Please wait a few seconds.")
+        # Check MSH-9 (Message Type). Should contain ORU (e.g. ORU^R01)
+        if "ORU" not in (msh.message_type or "").upper():
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid Message Type: Expected ORU (Observation Result), received '{msh.message_type}'."
+            )
 
-        _RATE_LIMIT_STORE[client_ip] = now_ts
-
-    # Pass persist flag to pipeline
-    result: Dict[str, Any] = run_oru_pipeline(req.hl7_text, use_llm=req.use_llm, persist=req.persist)
+    try:
+        # Rate limit check if requesting LLM
+        if req.use_llm:
+            print(f"DEBUG: API /oru/parse called. persist={req.persist}, use_llm={req.use_llm}", flush=True)
+            client_ip = request.client.host if request.client else "unknown"
+            now_ts = __import__("time").time()
+            last_ts = _RATE_LIMIT_STORE.get(client_ip, 0.0)
+            
+            if now_ts - last_ts < RATE_LIMIT_SECONDS:
+                raise HTTPException(status_code=429, detail="Too many AI requests. Please wait a few seconds.")
+    
+            _RATE_LIMIT_STORE[client_ip] = now_ts
+    
+        # Pass persist flag to pipeline
+        result: Dict[str, Any] = run_oru_pipeline(req.hl7_text, use_llm=req.use_llm, persist=req.persist)
+    except Exception as e:
+        # Catch any parser errors (like hl7apy failures) and return 400 if it's a data issue
+        if "Msh missing" in str(e) or "Invalid" in str(e):
+             raise HTTPException(status_code=400, detail=f"Failed to parse HL7: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Processing Error: {str(e)}")
 
     patient_dict = result.get("patient", {}) or {}
     clinical_summary = result.get("clinical_summary", "") or ""
@@ -309,6 +338,7 @@ def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseRespon
         clinical_summary=clinical_summary,
         structured_observations=observations,
         fhir_bundle=fhir_bundle,
+        hl7_ack=ack_message,
     )
 
 
