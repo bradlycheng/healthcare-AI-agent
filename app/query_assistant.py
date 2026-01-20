@@ -32,7 +32,7 @@ Table: hl7_messages
   - patient_id (VARCHAR)
   - patient_first_name (VARCHAR) -- Stored in UPPERCASE
   - patient_last_name (VARCHAR)  -- Stored in UPPERCASE
-  - patient_dob (VARCHAR)
+  - patient_dob (VARCHAR) -- Stored as 'YYYYMMDD' string (e.g. '19800515')
   - patient_sex (VARCHAR) -- 'M' or 'F'
 
 Table: observations
@@ -56,6 +56,8 @@ RULES:
 5. JOIN `observations` on `observations.message_id = hl7_messages.id`.
 6. For "recent" items, use `ORDER BY received_at DESC` or `ORDER BY observation_datetime DESC`.
 7. LIMIT results to 50.
+8. **DO NOT** use `DATE(patient_dob)` as it is a custom string format. Sort directly on the string: `ORDER BY patient_dob ASC` (oldest) or `DESC` (youngest).
+9. If you need age, approximate it using `strftime('%Y', 'now') - substr(patient_dob, 1, 4)`.
 
 FEW SHOT EXAMPLES:
 
