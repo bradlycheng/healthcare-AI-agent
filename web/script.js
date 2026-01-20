@@ -540,9 +540,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (!response.ok) throw new Error('Failed to save message');
 
-                showToast(`Saved ${verifiedObs.length} observations successfully!`, 'success');
+                showToast(`Saved to database! Check the Dashboard to view the record.`, 'success');
                 saveBtn.classList.add('hidden');
-
             } catch (err) {
                 console.error(err);
                 showToast('Failed to save: ' + err.message, 'error');

@@ -885,8 +885,8 @@ input:checked+.slider:before {
 .tab-content {
     display: none;
     padding: 1.5rem;
-    max-height: 400px;
-    overflow-y: auto;
+    max-height: none;
+    overflow-y: visible;
 }
 
 .tab-content.active {
