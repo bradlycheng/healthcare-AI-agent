@@ -424,6 +424,8 @@ def _ensure_obs_fields(obs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "flag": o.get("flag", "") or "",
                 "observation_datetime": o.get("observation_datetime", "") or "",
                 "status": o.get("status", "") or "",
+                "notes": o.get("notes", []) or [],
+                "value_type": o.get("value_type", "") or "",
                 "source": o.get("source", "HL7"),  # Default source
             }
         )
