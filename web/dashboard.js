@@ -553,7 +553,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add SQL preview (collapsed by default)
         if (options.sql) {
-            contentHtml += `<div class="message-sql" title="Generated SQL">${escapeHtml(options.sql)}</div>`;
+            contentHtml += `
+            <details class="sql-details">
+                <summary style="cursor:pointer; font-size:0.75rem; color: #aaa; margin-top:8px;">
+                    <i class="fa-solid fa-code"></i> View Generated SQL
+                </summary>
+                <div class="message-sql" style="margin-top:5px; padding:8px; background:#1a1d21; border-radius:6px; font-family:monospace; font-size:0.8rem; overflow-x:auto;">
+                    ${escapeHtml(options.sql)}
+                </div>
+            </details>`;
         }
 
         // Add error styling
