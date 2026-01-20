@@ -57,14 +57,8 @@ You MUST:
 You MUST respond with a SINGLE JSON object of the exact form:
 
 {
-  "patient": {
-    "id": string,
-    "first_name": string,
-    "last_name": string,
-    "dob": string,
-    "sex": string
-  },
   "clinical_summary": string,
+  "notes_analysis": string,
   "structured_observations": [
     {
       "code": string,
@@ -74,75 +68,12 @@ You MUST respond with a SINGLE JSON object of the exact form:
       "reference_low": string or null,
       "reference_high": string or null,
       "flag": string,
-      "observation_datetime": string,
-      "status": string
+      "observation_datetime": string or null,
+      "status": string or null,
+      "source": "AI_EXTRACTED"
     },
     ...
-  ],
-  "fhir_bundle": {
-    "resourceType": "Bundle",
-    "type": "collection",
-    "entry": [
-      {
-        "fullUrl": string,
-        "resource": {
-          "resourceType": "Patient",
-          "id": string,
-          "name": [
-            {
-              "family": string,
-              "given": [string]
-            }
-          ],
-          "birthDate": string,
-          "gender": string
-        }
-      },
-      {
-        "fullUrl": string,
-        "resource": {
-          "resourceType": "Observation",
-          "id": string,
-          "status": string,
-          "code": {
-            "coding": [
-              {
-                "system": string,
-                "code": string,
-                "display": string
-              }
-            ],
-            "text": string
-          },
-          "subject": {
-            "reference": string
-          },
-          "valueQuantity": {
-            "value": number,
-            "unit": string
-          },
-          "effectiveDateTime": string,
-          "referenceRange": [
-            {
-              "low": { "value": number } OPTIONAL,
-              "high": { "value": number } OPTIONAL
-            }
-          ] OPTIONAL,
-          "interpretation": [
-            {
-              "coding": [
-                {
-                  "system": string,
-                  "code": string
-                }
-              ]
-            }
-          ] OPTIONAL
-        }
-      },
-      ...
-    ]
-  }
+  ]
 }
 
 Where OPTIONAL means the field may be omitted entirely if you have no data

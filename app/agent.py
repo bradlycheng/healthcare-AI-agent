@@ -390,18 +390,12 @@ def _merge_llm_output(
     structured_observations = base_structured_obs
     fhir_bundle = base_fhir_bundle
 
-    if isinstance(llm_raw.get("patient"), dict):
-        patient = llm_raw["patient"]
-
     if isinstance(llm_raw.get("clinical_summary"), str):
         summary = llm_raw["clinical_summary"]
 
     if isinstance(llm_raw.get("structured_observations"), list):
         # The LLM returns the FULL list (merged), so we trust its deduplication logic
         structured_observations = llm_raw["structured_observations"]
-
-    if isinstance(llm_raw.get("fhir_bundle"), dict):
-        fhir_bundle = llm_raw["fhir_bundle"]
 
     return patient, summary, structured_observations, fhir_bundle
 
