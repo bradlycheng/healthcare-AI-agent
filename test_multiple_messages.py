@@ -177,10 +177,10 @@ def print_analysis(analysis: Dict[str, Any]):
     print("=" * 70)
     
     if not analysis.get("success"):
-        print(f"❌ FAILED: {analysis.get('error')}")
+        print(f"[FAIL] FAILED: {analysis.get('error')}")
         return
     
-    print(f"✅ SUCCESS (Response Time: {analysis['elapsed_time']:.2f}s)")
+    print(f"[OK] SUCCESS (Response Time: {analysis['elapsed_time']:.2f}s)")
     
     # Patient Info
     patient = analysis.get("patient", {})
@@ -200,8 +200,8 @@ def print_analysis(analysis: Dict[str, Any]):
     obs = analysis.get("observations", {})
     print(f"\n🔬 OBSERVATIONS ({obs.get('count')} items):")
     for item in obs.get("items", []):
-        flag_emoji = "⬆️" if item['flag'] == 'H' else ("⬇️" if item['flag'] == 'L' else "✔️")
-        print(f"   {flag_emoji} {item['display']}: {item['value']} {item['unit']} [{item['flag'] or 'N'}]")
+        flag_marker = "^" if item['flag'] == 'H' else ("v" if item['flag'] == 'L' else "-")
+        print(f"   [{flag_marker}] {item['display']}: {item['value']} {item['unit']} [{item['flag'] or 'N'}]")
     
     # FHIR Bundle
     fhir = analysis.get("fhir_bundle", {})
@@ -255,10 +255,10 @@ def run_all_tests():
     total_time = sum(r.get("elapsed_time", 0) for r in results)
     avg_time = total_time / len(results) if results else 0
     
-    print(f"\n✅ Successful: {successful}/{len(results)}")
-    print(f"❌ Failed: {failed}/{len(results)}")
-    print(f"⏱️  Total Time: {total_time:.2f}s")
-    print(f"⏱️  Average Time: {avg_time:.2f}s per message")
+    print(f"\n[OK] Successful: {successful}/{len(results)}")
+    print(f"[X] Failed: {failed}/{len(results)}")
+    print(f"[TIME] Total Time: {total_time:.2f}s")
+    print(f"[TIME] Average Time: {avg_time:.2f}s per message")
     
     # Observation Statistics
     total_obs = sum(r.get("observations", {}).get("count", 0) for r in results if r.get("success"))

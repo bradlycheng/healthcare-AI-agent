@@ -85,6 +85,25 @@ OBR|1|ORD008|RES008|CARDIAC^Cardiac Markers|||202412201630
 OBX|1|NM|10839-9^TROPONIN_I||0.08|ng/mL|0.00-0.04|HH|||F
 OBX|2|NM|33762-6^NT_proBNP||450|pg/mL|0-125|H|||F
 OBX|3|NM|2157-6^CK_MB||8.5|ng/mL|0.0-5.0|H|||F""",
+
+    # Patient 9: Barbara Gordon - Severe Hypertension (Vitals)
+    """MSH|^~\\&|HIS|MedCenter|LIS|VITALS|202412270815||ORU^R01|MSG009|P|2.5
+PID|1||10009||GORDON^BARBARA||19600101|F
+OBR|1|ORD009|RES009|8716-3^VITAL SIGNS|||202412270815
+OBX|1|NM|8480-6^SYSTOLIC_BP||160|mmHg|90-120|HH|||F
+OBX|2|NM|8462-4^DIASTOLIC_BP||98|mmHg|60-80|H|||F
+OBX|3|NM|8867-4^HEART_RATE||88|bpm|60-100|N|||F
+OBX|4|TX|NOTE^Clinical Note||Uncontrolled Hypertension. Patient non-compliant with meds.||||||F""",
+
+    # Patient 10: Thomas Anderson - Sepsis Alert
+    """MSH|^~\\&|HIS|MedCenter|LIS|VITALS|202412271845||ORU^R01|MSG010|P|2.5
+PID|1||10010||ANDERSON^THOMAS||19850913|M
+OBR|1|ORD010|RES010|8716-3^VITAL SIGNS|||202412271845
+OBX|1|NM|8310-5^BODY_TEMP||103.2|degF|97.0-99.0|H|||F
+OBX|2|NM|8867-4^HEART_RATE||115|bpm|60-100|H|||F
+OBX|3|NM|8480-6^SYSTOLIC_BP||92|mmHg|90-120|L|||F
+OBX|4|NM|2708-6^O2_SAT||91|%|95-100|L|||F
+OBX|5|TX|NOTE^Clinical Note||POSSIBLE SEPSIS: Fever + Tachycardia + Hypotension. Protocol initiated.||||||F"""
 ]
 
 

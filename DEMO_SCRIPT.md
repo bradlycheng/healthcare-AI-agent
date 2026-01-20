@@ -12,21 +12,24 @@
 1.  Open the **Home Page**.
 2.  **Talking Point**: "Healthcare data is notoriously messy. We usually just parse it. But today I want to show you an agent that *understands* it."
 3.  Scroll to the **"Try It Live"** section.
-4.  Paste this **Messy/Real-world HL7 Message** (copy from below):
+4.  Paste this **Real-world Vitals Case (Hypertension)** (copy from below):
 
     ```text
-    MSH|^~\&|LAB|HOSPITAL|EHR|CLINIC|202501181200||ORU^R01|MSG999|P|2.5
-    PID|1||99999^^^MRN||Smith^John||19800101|M
-    OBR|1|||CBC_PANEL
-    OBX|1|NM|GLU^Glucose||245|mg/dL|70-100|H|||F
-    OBX|2|TX|NOTE^Clinical Note||Pt non-compliant with meds. Reports excessive thirst and fatigue.||||||F
+    MSH|^~\&|HIS|MedCenter|LIS|VITALS|202412270815||ORU^R01|MSG009|P|2.5
+    PID|1||10009||GORDON^BARBARA||19600101|F
+    OBR|1|ORD009|RES009|8716-3^VITAL SIGNS|||202412270815
+    OBX|1|NM|8480-6^SYSTOLIC_BP||160|mmHg|90-120|HH|||F
+    OBX|2|NM|8462-4^DIASTOLIC_BP||98|mmHg|60-80|H|||F
+    OBX|3|NM|8867-4^HEART_RATE||88|bpm|60-100|N|||F
+    OBX|4|TX|NOTE^Clinical Note||Uncontrolled Hypertension. Patient non-compliant with meds.||||||F
     ```
 
 5.  Click **"Process Message"**.
 6.  **Show the Result**:
-    *   Point to the **Clinical Summary**: "See? The AI spotted the high glucose *and* connected it to the 'non-compliant' note to identify uncontrolled diabetes."
-    *   Point to **FHIR Bundle**: "And here is the standardized JSON object ready for any app."
-    *   **NEW**: Scroll down to see the **HL7 ACK**. "It even generated a valid HL7 Acknowledgement to confirm receipt, just like a real hospital system."
+    *   **Context**: "This represents a patient with severe blood pressure issues coming in from a triage monitor."
+    *   Point to the **Clinical Summary**: "The AI sees the high BP values and the 'non-compliant' note, correctly identifying 'Uncontrolled Hypertension'."
+    *   Point to **FHIR Bundle**: "It standardizes these Vitals into a valid FHIR format."
+    *   **NEW**: Scroll down to see the **HL7 ACK**. "It generated a valid acknowledgement confirming receipt."
 
 ---
 
