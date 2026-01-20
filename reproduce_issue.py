@@ -25,6 +25,10 @@ def test_reproduction():
     summary = result.get("clinical_summary", "")
     print("\n--- SUMMARY RECEIVED ---")
     print(summary)
+    
+    print("\n--- STRUCTURED OBSERVATIONS ---")
+    import json
+    print(json.dumps(result.get("structured_observations", []), indent=2))
     print("------------------------")
     
     # Check for "Is" vs "Has a value of"
