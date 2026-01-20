@@ -12,6 +12,7 @@ from .llm_client import LLMError, call_llm_for_json
 
 # Toggle this if/when you want to actually use Ollama for enrichment.
 USE_LLM = True
+# Cache Buster: 2024-01-20 Updated Logic
 
 # Text-based OBX-2 value types that need AI analysis (per HL7 v2 spec)
 TEXT_VALUE_TYPES = {"TX", "FT", "ED", "ST"}

@@ -115,13 +115,13 @@ OBX|1|NM|GLUCOSE||105|...</code></pre>
     <section id="demo-live" class="demo-section">
         <div class="section-header">
             <h2>Live Demo</h2>
-            <p>Try it yourself. Paste a raw HL7 message below.</p>
+            <p>Try it yourself. Paste a raw HL7 (ORU) message below.</p>
         </div>
 
         <div class="demo-container">
             <div class="demo-input">
                 <div class="input-header">
-                    <label for="hl7-input">HL7 Input</label>
+                    <label for="hl7-input">Raw HL7 (ORU) Message</label>
                     <div class="input-controls">
                         <label class="toggle-switch">
                             <input type="checkbox" id="ai-toggle" checked>
@@ -131,12 +131,12 @@ OBX|1|NM|GLUCOSE||105|...</code></pre>
                     </div>
                 </div>
                 <textarea id="hl7-input"
-                    placeholder="Paste your HL7 message here...">MSH|^~\&|HIS|MedCenter|LIS|LAB|202412271200||ORU^R01|MSG001|P|2.5
-PID|1||99001||SMITH^JOHN||19800515|M
-OBR|1|ORD001|RES001|CBC^Complete Blood Count|||202412271200
+                    placeholder="Paste a raw HL7 (ORU) message here...">MSH|^~\&|HIS|MedCenter|LIS|LAB|202401201200||ORU^R01|MSG_REPRO|P|2.5
+PID|1||12345||TEST^PATIENT||19800101|M
+OBR|1|ORD123|RES123|CBC^Complete Blood Count|||202401201200
 OBX|1|NM|718-7^HEMOGLOBIN||14.2|g/dL|13.5-17.5|N|||F
 OBX|2|NM|6690-2^WBC||7200|/uL|4500-11000|N|||F
-OBX|3|TX|NOTE^Clinical Note||Patient reports recent fasting blood glucose of 145 mg/dL from home monitor. History of hypertension, BP 138/88 at last visit.||||||F</textarea>
+OBX|3|TX|NOTE^Clinical Note||Patient reports recent fasting blood glucose of 145 mg/dL from home monitor. History of hypertension, BP 138/88 at last visit..||||||F</textarea>
                 <div class="action-buttons">
                     <button id="process-btn" class="btn-primary">
                         <i class="fa-solid fa-bolt"></i> Analyze (Preview)
