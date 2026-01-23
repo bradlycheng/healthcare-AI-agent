@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Timeline | Health Data Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="dashboard-page">
+    <div class="background-glow"></div>
+
+    <nav class="navbar">
+        <a href="/" class="logo">
+            <i class="fa-solid fa-staff-snake"></i>
+            <span>Health Data Agent</span>
+        </a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/#demo-live">Live Demo</a>
+            <a href="/dashboard.html">Dashboard</a>
+            <a href="/about.html">About</a>
+        </div>
+        <a href="/docs" target="_blank" class="btn-primary">API Docs</a>
+    </nav>
+
+    <main class="dashboard-container">
+        <!-- Patient Header -->
+        <header class="patient-header">
+            <a href="/dashboard.html" class="back-link">
+                <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+            </a>
+            <div class="patient-info-card">
+                <div class="patient-avatar">
+                    <i class="fa-solid fa-user"></i>
+                </div>
+                <div class="patient-details">
+                    <h1 id="patient-name">Loading...</h1>
+                    <div class="patient-meta">
+                        <span><i class="fa-solid fa-id-card"></i> <span id="patient-id">--</span></span>
+                        <span><i class="fa-solid fa-cake-candles"></i> <span id="patient-dob">--</span></span>
+                        <span><i class="fa-solid fa-venus-mars"></i> <span id="patient-sex">--</span></span>
+                        <span><i class="fa-solid fa-calendar-check"></i> <span id="visit-count">--</span> visits</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- AI Summary Section -->
+        <section class="ai-summary-section">
+            <div class="summary-card">
+                <div class="summary-header">
+                    <i class="fa-solid fa-robot"></i>
+                    <span>AI Journey Summary</span>
+                    <button id="generate-summary-btn" class="btn-secondary small">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Generate
+                    </button>
+                </div>
+                <div class="summary-content" id="ai-summary">
+                    <p class="placeholder-text">Click "Generate" to create an AI-powered summary of this patient's
+                        healthcare journey.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Trend Chart -->
+        <section class="chart-section">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3><i class="fa-solid fa-chart-line"></i> Vital Signs Trend</h3>
+                    <select id="chart-metric">
+                        <option value="8480-6">Blood Pressure (Systolic)</option>
+                        <option value="8462-4">Blood Pressure (Diastolic)</option>
+                        <option value="2345-7">Glucose</option>
+                        <option value="718-7">Hemoglobin</option>
+                    </select>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="trend-chart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Visit Timeline -->
+        <section class="timeline-section">
+            <h2><i class="fa-solid fa-timeline"></i> Visit History</h2>
+            <div class="timeline-container" id="timeline-container">
+                <!-- Visit cards will be inserted here -->
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2024 Health Data Agent. Built with Python & DeepMind.</p>
+    </footer>
+
+    <script src="patient.js"></script>
+</body>
+
+</html>

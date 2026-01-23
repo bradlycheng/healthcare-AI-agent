@@ -126,6 +126,51 @@ class QueryResponse(BaseModel):
     error: Optional[str] = None
 
 
+# Patient Timeline Models
+class PatientListItem(BaseModel):
+    patient_id: str
+    first_name: str
+    last_name: str
+    dob: str
+    sex: str
+    visit_count: int
+    last_visit: str
+
+
+class PatientListResponse(BaseModel):
+    total: int
+    patients: List[PatientListItem]
+
+
+class VisitObservation(BaseModel):
+    code: str
+    display: str
+    value: Any
+    unit: str
+    reference_low: Optional[str] = None
+    reference_high: Optional[str] = None
+    flag: str = ""
+    observation_datetime: str = ""
+    status: str = ""
+
+
+class PatientVisit(BaseModel):
+    message_id: int
+    date: str
+    observations: List[VisitObservation]
+
+
+class PatientTimelineResponse(BaseModel):
+    patient: PatientOut
+    visits: List[PatientVisit]
+    visit_count: int
+
+
+class PatientSummaryResponse(BaseModel):
+    patient_id: str
+    summary: str
+
+
 # ---------- DB Helpers ----------
 
 def _conn() -> sqlite3.Connection:
@@ -205,6 +250,108 @@ def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryRespon
         error=result.get("error")
     )
     
+
+# ---------- Patient Timeline Routes ----------
+
+@app.get("/patients", response_model=PatientListResponse)
+def list_patients() -> PatientListResponse:
+    """
+    Get list of unique patients with visit counts.
+    """
+    from .patient_timeline import get_unique_patients
+    
+    patients = get_unique_patients()
+    items = [
+        PatientListItem(
+            patient_id=p["patient_id"],
+            first_name=p["first_name"],
+            last_name=p["last_name"],
+            dob=p["dob"],
+            sex=p["sex"],
+            visit_count=p["visit_count"],
+            last_visit=p["last_visit"],
+        )
+        for p in patients
+    ]
+    
+    return PatientListResponse(total=len(items), patients=items)
+
+
+@app.get("/patients/{patient_id}/timeline", response_model=PatientTimelineResponse)
+def get_patient_timeline_endpoint(patient_id: str) -> PatientTimelineResponse:
+    """
+    Get full timeline for a patient including all visits and observations.
+    """
+    from .patient_timeline import get_patient_timeline
+    
+    timeline = get_patient_timeline(patient_id)
+    
+    if not timeline:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    
+    patient = PatientOut(
+        id=timeline["patient"]["patient_id"],
+        first_name=timeline["patient"]["first_name"],
+        last_name=timeline["patient"]["last_name"],
+        dob=timeline["patient"]["dob"],
+        sex=timeline["patient"]["sex"],
+    )
+    
+    visits = []
+    for v in timeline["visits"]:
+        obs = [
+            VisitObservation(
+                code=o["code"],
+                display=o["display"],
+                value=o["value"],
+                unit=o["unit"],
+                reference_low=o.get("reference_low"),
+                reference_high=o.get("reference_high"),
+                flag=o.get("flag", ""),
+                observation_datetime=o.get("observation_datetime", ""),
+                status=o.get("status", ""),
+            )
+            for o in v["observations"]
+        ]
+        visits.append(PatientVisit(
+            message_id=v["message_id"],
+            date=v["date"],
+            observations=obs,
+        ))
+    
+    return PatientTimelineResponse(
+        patient=patient,
+        visits=visits,
+        visit_count=timeline["visit_count"],
+    )
+
+
+@app.get("/patients/{patient_id}/summary", response_model=PatientSummaryResponse)
+def get_patient_summary_endpoint(patient_id: str, request: Request) -> PatientSummaryResponse:
+    """
+    Get AI-generated journey summary for a patient.
+    """
+    from .patient_timeline import get_patient_timeline, generate_journey_summary
+    
+    # Rate limit check
+    client_ip = request.client.host if request.client else "unknown"
+    now_ts = __import__("time").time()
+    last_ts = _RATE_LIMIT_STORE.get(client_ip, 0.0)
+    
+    if now_ts - last_ts < RATE_LIMIT_SECONDS:
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait a few seconds.")
+    
+    _RATE_LIMIT_STORE[client_ip] = now_ts
+    
+    timeline = get_patient_timeline(patient_id)
+    
+    if not timeline:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    
+    summary = generate_journey_summary(timeline)
+    
+    return PatientSummaryResponse(patient_id=patient_id, summary=summary)
+
 
 @app.delete("/messages", status_code=204)
 def clear_all_messages_endpoint():
@@ -504,6 +651,11 @@ async def read_index():
 @app.get("/dashboard.html")
 async def read_dashboard():
     return FileResponse('web/dashboard.html')
+
+# Serve patient.html
+@app.get("/patient.html")
+async def read_patient():
+    return FileResponse('web/patient.html')
 
 # Mount the web directory for static assets (css, js)
 app.mount("/", StaticFiles(directory="web"), name="static")

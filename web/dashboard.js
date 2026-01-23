@@ -260,6 +260,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleString() : '--';
 
+        // Create patient timeline link
+        const patientLink = msg.patient_id
+            ? `/patient.html?id=${encodeURIComponent(msg.patient_id)}`
+            : '#';
+
         return `
             <tr>
                 <td class="expand-col">
@@ -268,7 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </button>
                 </td>
                 <td class="patient-cell">
-                    <span class="patient-name">${escapeHtml(name)}</span>
+                    <a href="${patientLink}" class="patient-name-link">${escapeHtml(name)}</a>
                 </td>
                 <td>${escapeHtml(msg.patient_id || '--')}</td>
                 <td>${formatDob(msg.dob)}</td>

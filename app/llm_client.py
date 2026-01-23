@@ -201,3 +201,36 @@ def call_llm_for_json(prompt: str) -> Dict[str, Any]:
         raise LLMError(f"LLM output is not a JSON object. Raw: {content}")
 
     return parsed
+
+
+def call_llm(prompt: str) -> str:
+    """
+    Call AWS Bedrock with a prompt and return plain text response.
+    Used for simple text generation (e.g., summaries).
+    """
+    if not bedrock_runtime:
+        raise LLMError("AWS Bedrock client is not initialized. Check your AWS credentials.")
+
+    payload = {
+        "prompt": f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+        "max_gen_len": 512,
+        "temperature": 0.5,
+        "top_p": 0.9
+    }
+
+    try:
+        response = bedrock_runtime.invoke_model(
+            modelId=BEDROCK_MODEL_ID,
+            contentType="application/json",
+            accept="application/json",
+            body=json.dumps(payload)
+        )
+        
+        response_body = json.loads(response.get("body").read())
+        generation = response_body.get("generation", "").strip()
+        return generation
+
+    except ClientError as e:
+        raise LLMError(f"AWS Bedrock Error: {e}")
+    except Exception as e:
+        raise LLMError(f"Unexpected error calling Bedrock: {e}")
