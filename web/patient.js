@@ -81,21 +81,40 @@ function formatSex(sex) {
     return map[sex?.toUpperCase()] || sex;
 }
 
+// Pagination State
+let visibleVisits = 10;
+const loadMoreBtn = document.getElementById('load-more-btn');
+
 // Render visit timeline
 function renderTimeline(visits) {
     if (!visits || visits.length === 0) {
         timelineContainer.innerHTML = '<p class="no-data">No visits recorded for this patient.</p>';
+        loadMoreBtn.parentElement.style.display = 'none';
         return;
     }
 
-    // Sort visits by date (newest first for display)
+    // Sort: newest first
     const sortedVisits = [...visits].reverse();
 
-    timelineContainer.innerHTML = sortedVisits.map((visit, index) => `
+    // Setup Load More button if needed
+    if (sortedVisits.length > visibleVisits) {
+        loadMoreBtn.parentElement.style.display = 'block';
+        loadMoreBtn.onclick = () => {
+            visibleVisits += 10;
+            renderTimeline(visits); // Re-render with new limit
+        };
+    } else {
+        loadMoreBtn.parentElement.style.display = 'none';
+    }
+
+    // Slice for pagination
+    const visitsToShow = sortedVisits.slice(0, visibleVisits);
+
+    timelineContainer.innerHTML = visitsToShow.map((visit, index) => `
         <div class="timeline-card ${index === 0 ? 'latest' : ''}">
             <div class="timeline-marker">
                 <div class="marker-dot"></div>
-                ${index < sortedVisits.length - 1 ? '<div class="marker-line"></div>' : ''}
+                ${index < visitsToShow.length - 1 ? '<div class="marker-line"></div>' : ''}
             </div>
             <div class="timeline-content">
                 <div class="timeline-header">
@@ -137,23 +156,16 @@ function initChart() {
         type: 'line',
         data: {
             labels: [],
-            datasets: [{
-                label: 'Value',
-                data: [],
-                borderColor: '#6366f1',
-                backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.3,
-                pointRadius: 4,
-                pointBackgroundColor: '#6366f1',
-            }]
+            datasets: []
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: false },
+                legend: {
+                    display: true, // Enable legend for multi-line support
+                    labels: { color: '#94a3b8' }
+                },
                 tooltip: {
                     backgroundColor: 'rgba(15, 23, 42, 0.9)',
                     titleColor: '#f8fafc',
@@ -178,20 +190,13 @@ function initChart() {
     updateChart();
 }
 
-// Update chart with selected metric
-function updateChart() {
-    if (!timelineData || !trendChart) return;
-
-    const selectedCode = chartMetricSelect.value;
-    const selectedLabel = chartMetricSelect.options[chartMetricSelect.selectedIndex].text;
-
-    // Collect data points from all visits
-    const dataPoints = [];
-
+// Helper to extract data points for a code
+function getPointsForCode(code) {
+    const points = [];
     for (const visit of timelineData.visits) {
         for (const obs of visit.observations) {
-            if (obs.code === selectedCode && typeof obs.value === 'number') {
-                dataPoints.push({
+            if (obs.code === code && typeof obs.value === 'number') {
+                points.push({
                     date: visit.date,
                     value: obs.value,
                     unit: obs.unit
@@ -199,22 +204,65 @@ function updateChart() {
             }
         }
     }
+    return points.sort((a, b) => new Date(a.date) - new Date(b.date));
+}
 
-    // Sort by date
-    dataPoints.sort((a, b) => new Date(a.date) - new Date(b.date));
+// Update chart with selected metric
+function updateChart() {
+    if (!timelineData || !trendChart) return;
 
-    // Update chart
-    trendChart.data.labels = dataPoints.map(d => formatDate(d.date));
-    trendChart.data.datasets[0].data = dataPoints.map(d => d.value);
-    trendChart.data.datasets[0].label = selectedLabel;
-    trendChart.update();
+    const selectedValue = chartMetricSelect.value;
+    const datasets = [];
+    let labels = [];
 
-    if (dataPoints.length === 0) {
-        // Show no data message
-        trendChart.data.labels = ['No Data'];
-        trendChart.data.datasets[0].data = [0];
-        trendChart.update();
+    if (selectedValue === 'BP_COMBINED') {
+        const sysPoints = getPointsForCode('8480-6');
+        const diaPoints = getPointsForCode('8462-4');
+
+        // Use systolic dates as master label source (usually same)
+        labels = sysPoints.map(d => formatDate(d.date));
+
+        datasets.push({
+            label: 'Systolic BP (mmHg)',
+            data: sysPoints.map(d => d.value),
+            borderColor: '#f43f5e', // Red/Pink
+            backgroundColor: 'rgba(244, 63, 94, 0.1)',
+            borderWidth: 2,
+            tension: 0.3,
+            pointRadius: 4
+        });
+
+        datasets.push({
+            label: 'Diastolic BP (mmHg)',
+            data: diaPoints.map(d => d.value),
+            borderColor: '#3b82f6', // Blue
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 2,
+            tension: 0.3,
+            pointRadius: 4
+        });
+
+    } else {
+        const points = getPointsForCode(selectedValue);
+        const label = chartMetricSelect.options[chartMetricSelect.selectedIndex].text;
+
+        labels = points.map(d => formatDate(d.date));
+
+        datasets.push({
+            label: label,
+            data: points.map(d => d.value),
+            borderColor: '#6366f1', // Indigo
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3,
+            pointRadius: 4
+        });
     }
+
+    trendChart.data.labels = labels;
+    trendChart.data.datasets = datasets;
+    trendChart.update();
 }
 
 // Generate AI summary

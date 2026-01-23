@@ -77,10 +77,10 @@
                 <div class="chart-header">
                     <h3><i class="fa-solid fa-chart-line"></i> Vital Signs Trend</h3>
                     <select id="chart-metric">
-                        <option value="8480-6">Blood Pressure (Systolic)</option>
-                        <option value="8462-4">Blood Pressure (Diastolic)</option>
+                        <option value="BP_COMBINED">Blood Pressure (Sys & Dia)</option>
                         <option value="2345-7">Glucose</option>
                         <option value="718-7">Hemoglobin</option>
+                        <option value="8867-4">Heart Rate (Pulse)</option>
                     </select>
                 </div>
                 <div class="chart-wrapper">
@@ -94,6 +94,9 @@
             <h2><i class="fa-solid fa-timeline"></i> Visit History</h2>
             <div class="timeline-container" id="timeline-container">
                 <!-- Visit cards will be inserted here -->
+            </div>
+            <div class="load-more-container" style="text-align: center; margin-top: 1.5rem; display: none;">
+                <button id="load-more-btn" class="btn-secondary">Load More Visits</button>
             </div>
         </section>
     </main>
