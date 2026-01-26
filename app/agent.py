@@ -9,6 +9,7 @@ from .db import init_db, insert_message_and_observations
 from .hl7_msh import parse_msh
 from .hl7_parser import parse_oru
 from .llm_client import LLMError, call_llm_for_json
+from .alerts import check_alert
 
 # Toggle this if/when you want to actually use Ollama for enrichment.
 USE_LLM = True
@@ -336,19 +337,19 @@ TASK:
 Return a SINGLE JSON object with ALL of the following keys
 
 LOINC CODE REFERENCE (use these exact codes for extracted observations):
-- Glucose: code="2345-7", unit="mg/dL"
 - Hemoglobin: code="718-7", unit="g/dL"
 - WBC: code="6690-2", unit="/uL"
 - Blood Pressure Systolic: code="8480-6", unit="mmHg"
 - Blood Pressure Diastolic: code="8462-4", unit="mmHg"
 - Heart Rate: code="8867-4", unit="bpm"
+- SpO2: code="59408-5", unit="%"
 
 INSTRUCTIONS:
 1. Start with the "OBSERVATIONS (Structured)" list effectively.
 2. CHECK the "NOTES (Free Text)" section carefully.
-   - If you see a quantitative test result in the notes (like "glucose 145", "BP 120/80") that is NOT in the structured list, you MUST extract it.
+   - If you see a quantitative test result in the notes (like "BP 130/80", "Pulse 90", "Temp 101.5") that is NOT in the structured list, you MUST extract it.
    - **IMPORTANT: Even if the note says "Patient reports", TREAT THIS AS A VALID FINDING for this extraction.**
-   - Example matches: "patient reports glucose 145", "fasting blood glucose of 145", "last visit glucose 145".
+   - Example matches: "patient reports BP 140/90", "heart rate 110", "O2 sat 98%".
    - **NAMING CONVENTION**: Use standard, concise display names (e.g., use "Glucose" instead of "Fasting Blood Glucose" if possible, or "Blood Pressure" instead of "BP").
    - For extracted items, set "source": "AI_EXTRACTED".
    - For original items, set "source": "HL7".
@@ -394,8 +395,18 @@ def _merge_llm_output(
         summary = llm_raw["clinical_summary"]
 
     if isinstance(llm_raw.get("structured_observations"), list):
-        # The LLM returns the FULL list (merged), so we trust its deduplication logic
-        structured_observations = llm_raw["structured_observations"]
+        # SAFER MERGE: 
+        # 1. Keep all original HL7 observations (ground truth).
+        # 2. Only add "AI_EXTRACTED" observations from the LLM.
+        # 3. This prevents the LLM from accidentally deleting or hallucinating modifications to raw data.
+        
+        llm_obs = llm_raw["structured_observations"]
+        
+        # Filter for only AI extracted items
+        ai_extracted = [o for o in llm_obs if o.get("source") == "AI_EXTRACTED"]
+        
+        # Combine: Base HL7 + AI Extracted
+        structured_observations = base_structured_obs + ai_extracted
 
     return patient, summary, structured_observations, fhir_bundle
 
@@ -462,6 +473,8 @@ def _normalize_loinc_codes(obs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # Public entry point
 # ---------------------------------------------------------------------------
 
+from .alerts import check_alert
+
 def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) -> Dict[str, Any]:
     print(f"DEBUG: Entering run_oru_pipeline. use_llm={use_llm}, USE_LLM={USE_LLM}", flush=True)
     """
@@ -471,7 +484,8 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
     2. deterministic clinical summary
     3. build local FHIR Bundle
     4. (optional) call local LLM to refine / enrich / extract from notes
-    5. (optional) persist to sqlite (preview mode skips this)
+    5. clinical alert check
+    6. (optional) persist to sqlite (preview mode skips this)
     """
     # 1) HL7 -> patient + observations
     try:
@@ -541,7 +555,29 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
     elif USE_LLM and use_llm:
         print("DEBUG: Structured numeric data only, skipping LLM for faster processing", flush=True)
 
-    # 5) Persist (Optional)
+    # 5) Clinical Alert Check (Real-Time Safety Net)
+    # Check every observation against the rules engine
+    alerts_triggered = []
+    for ob in structured_observations:
+        code = str(ob.get("code", "")).strip()
+        value = ob.get("value")
+        
+        alert = check_alert(code, value)
+        if alert:
+            ob["alert_level"] = alert["level"]
+            ob["alert_message"] = alert["message"]
+            alerts_triggered.append(f"{alert['level']}: {alert['message']}")
+            print(f"ALERT TRIGGERED: {alert}", flush=True)
+
+    # If alerts triggered, append to clinical summary for visibility
+    if alerts_triggered:
+        alert_summary = " ".join(alerts_triggered)
+        if clinical_summary != "No clinically meaningful observation values were parsed from the HL7 message.":
+            clinical_summary = f"{alert_summary} | {clinical_summary}"
+        else:
+            clinical_summary = alert_summary
+
+    # 6) Persist (Optional)
     if persist:
         try:
             init_db()

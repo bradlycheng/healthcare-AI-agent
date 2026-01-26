@@ -22,7 +22,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModal = document.getElementById('close-modal');
 
     // Initialize
-    console.log('Dashboard JS Loaded v2'); // verify script update
+    console.log('Dashboard JS Loaded v5 (Stable)');
+
+
+
+    // Determine API Base URL
+    // If running from file://, default to localhost:8080
+    // Otherwise (if served by Caddy or dev server), use relative path
+    const API_BASE = (window.location.protocol === 'file:')
+        ? 'http://localhost:8080'
+        : '';
+
+    console.log(`Determined API_BASE: "${API_BASE || '(Relative Path)'}"`);
+
     loadMessages();
     setupEventListeners();
 
@@ -65,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (true) {
             try {
                 console.log('Sending DELETE request...');
-                const response = await fetch('/messages', { method: 'DELETE' });
+                const response = await fetch(`${API_BASE}/messages`, { method: 'DELETE' });
                 console.log('Delete response:', response.status);
                 if (!response.ok) {
                     const txt = await response.text();
@@ -85,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshBtn.disabled = true;
 
         try {
-            const response = await fetch('/messages?limit=200');
+            const response = await fetch(`${API_BASE}/messages?limit=200`);
             if (!response.ok) throw new Error('Failed to fetch messages');
 
             const data = await response.json();
@@ -94,7 +106,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // Load observations for each message
             await loadAllObservations();
 
-            updateStats();
+            // Scan for active alerts to toggle banner
+            updateAlertBanner();
+
+            // Render table and stats (via filters)
             applyFilters();
         } catch (err) {
             console.error('Error loading messages:', err);
@@ -105,95 +120,70 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function loadAllObservations() {
-        // Load observations for all messages in parallel
-        const promises = allMessages.map(async (msg) => {
-            try {
-                const response = await fetch(`/messages/${msg.id}/observations`);
-                if (response.ok) {
-                    const data = await response.json();
-                    msg.observations = data.items || [];
-                    msg.hasAbnormal = msg.observations.some(o =>
-                        o.flag && ['H', 'HH', 'L', 'LL'].some(f => o.flag.toUpperCase().includes(f))
-                    );
-                }
-            } catch (e) {
-                msg.observations = [];
-                msg.hasAbnormal = false;
+    // New: Check for alerts and update banner
+    function updateAlertBanner() {
+        const alertBanner = document.getElementById('alerts-banner');
+        const alertCount = document.getElementById('alert-count');
+        if (!alertBanner) return; // Guard clause
+
+        // Check if any loaded message has a CRITICAL alert
+        let criticalCount = 0;
+        allMessages.forEach(msg => {
+            if (msg.observations) {
+                const hasCritical = msg.observations.some(o => o.alert_level === 'CRITICAL');
+                if (hasCritical) criticalCount++;
             }
         });
-        await Promise.all(promises);
-    }
 
-    function updateStats() {
-        const total = allMessages.length;
-        const uniquePatients = new Set(allMessages.map(m => m.patient_id)).size;
-        const abnormal = allMessages.filter(m => m.hasAbnormal).length;
+        if (criticalCount > 0) {
+            alertBanner.classList.remove('hidden');
+            // Add click-to-filter hint
+            alertBanner.title = "Click to show only critical patients";
+            alertBanner.style.cursor = "pointer";
 
-        // Recent (last 24 hours) - check timestamp
-        const now = new Date();
-        const oneDayAgo = new Date(now - 24 * 60 * 60 * 1000);
-        const recent = allMessages.filter(m => {
-            const msgDate = new Date(m.timestamp);
-            return msgDate >= oneDayAgo;
-        }).length;
+            if (alertCount) {
+                alertCount.textContent = criticalCount;
+            }
 
-        animateNumber('stat-total', total);
-        animateNumber('stat-patients', uniquePatients);
-        animateNumber('stat-abnormal', abnormal);
-        animateNumber('stat-recent', recent);
-    }
-
-    function animateNumber(elementId, target) {
-        const el = document.getElementById(elementId);
-        const start = parseInt(el.textContent) || 0;
-        const duration = 500;
-        const startTime = performance.now();
-
-        function update(currentTime) {
-            const elapsed = currentTime - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const current = Math.floor(start + (target - start) * easeOutQuad(progress));
-            el.textContent = current;
-            if (progress < 1) requestAnimationFrame(update);
+            // Add one-time click listener (or check if already added? simpler to just overwrite onclick or use named function)
+            alertBanner.onclick = () => {
+                const filterFlag = document.getElementById('filter-flag');
+                if (filterFlag) {
+                    filterFlag.value = 'critical';
+                    applyFilters();
+                }
+            };
+        } else {
+            alertBanner.classList.add('hidden');
         }
-        requestAnimationFrame(update);
-    }
-
-    function easeOutQuad(t) {
-        return t * (2 - t);
     }
 
     function applyFilters() {
-        const searchTerm = searchInput.value.toLowerCase().trim();
+        const query = searchInput.value.toLowerCase();
         const flagFilter = filterFlag.value;
         const dateFilter = filterDate.value;
 
         filteredMessages = allMessages.filter(msg => {
-            // Search filter
-            if (searchTerm) {
-                const searchableText = `${msg.first_name} ${msg.last_name} ${msg.patient_id}`.toLowerCase();
-                const obsText = (msg.observations || []).map(o => `${o.code} ${o.display}`).join(' ').toLowerCase();
-                if (!searchableText.includes(searchTerm) && !obsText.includes(searchTerm)) {
-                    return false;
-                }
-            }
+            // Search Text
+            const searchable = `${msg.first_name} ${msg.last_name} ${msg.patient_id} ${(msg.observations || []).map(o => o.display).join(' ')}`.toLowerCase();
+            if (query && !searchable.includes(query)) return false;
 
-            // Flag filter
+            // Flag Filter
             if (flagFilter === 'abnormal' && !msg.hasAbnormal) return false;
+            if (flagFilter === 'critical' && !msg.isCritical) return false;
             if (flagFilter === 'normal' && msg.hasAbnormal) return false;
 
-            // Date filter
+            // Date Filter
             if (dateFilter) {
                 const msgDate = new Date(msg.timestamp);
                 const now = new Date();
                 if (dateFilter === 'today') {
                     if (msgDate.toDateString() !== now.toDateString()) return false;
                 } else if (dateFilter === 'week') {
-                    const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+                    const weekAgo = new Date(now.setDate(now.getDate() - 7));
                     if (msgDate < weekAgo) return false;
                 } else if (dateFilter === 'month') {
-                    const monthAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+                    const monthAgo = new Date(now.setMonth(now.getMonth() - 1));
                     if (msgDate < monthAgo) return false;
                 }
             }
@@ -203,49 +193,105 @@ document.addEventListener('DOMContentLoaded', () => {
 
         currentPage = 1;
         renderTable();
+        updateStats();
+    }
+
+    function updateStats() {
+        // Total
+        const totalEl = document.getElementById('stat-total');
+        if (totalEl) totalEl.textContent = allMessages.length;
+
+        // Unique Patients
+        const patients = new Set(allMessages.map(m => m.patient_id));
+        const patientsEl = document.getElementById('stat-patients');
+        if (patientsEl) patientsEl.textContent = patients.size;
+
+        // Abnormal
+        const abnormalCount = allMessages.filter(m => m.hasAbnormal).length;
+        const abnormalEl = document.getElementById('stat-abnormal');
+        if (abnormalEl) abnormalEl.textContent = abnormalCount;
+
+        // Recent (24h)
+        const dayAgo = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
+        const recentCount = allMessages.filter(m => new Date(m.timestamp) > dayAgo).length;
+        const recentEl = document.getElementById('stat-recent');
+        if (recentEl) recentEl.textContent = recentCount;
     }
 
     function renderTable() {
+        messagesBody.innerHTML = '';
+
         const start = (currentPage - 1) * pageSize;
         const end = start + pageSize;
-        const pageMessages = filteredMessages.slice(start, end);
+        const pageData = filteredMessages.slice(start, end);
 
-        if (pageMessages.length === 0) {
-            messagesBody.innerHTML = `
-                <tr>
-                    <td colspan="8" class="empty-state">
-                        <i class="fa-solid fa-inbox"></i>
-                        <p>No messages found</p>
-                    </td>
-                </tr>
-            `;
+        if (pageData.length === 0) {
+            messagesBody.innerHTML = '<tr><td colspan="8" class="empty-state">No messages found</td></tr>';
         } else {
-            messagesBody.innerHTML = pageMessages.map(msg => createTableRow(msg)).join('');
+            pageData.forEach(msg => {
+                const rowHtml = createTableRow(msg);
+                messagesBody.insertAdjacentHTML('beforeend', rowHtml);
+            });
 
-            // Add click handlers for expand
-            messagesBody.querySelectorAll('.expand-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const msgId = parseInt(btn.dataset.id);
-                    showMessageDetail(msgId);
-                });
+            // Re-attach event listeners for newly created buttons
+            document.querySelectorAll('.expand-btn').forEach(btn => {
+                btn.addEventListener('click', () => showMessageDetail(parseInt(btn.dataset.id)));
             });
         }
 
-        // Update pagination
-        const totalPages = Math.ceil(filteredMessages.length / pageSize);
-        prevPageBtn.disabled = currentPage <= 1;
-        nextPageBtn.disabled = currentPage >= totalPages;
-        pageInfo.textContent = `Page ${currentPage} of ${totalPages || 1}`;
-        showingCount.textContent = `Showing ${pageMessages.length} of ${filteredMessages.length} messages`;
+        // Pagination
+        const total = filteredMessages.length;
+        const totalPages = Math.ceil(total / pageSize);
+
+        if (pageInfo) pageInfo.textContent = `Page ${currentPage} of ${totalPages || 1}`;
+        if (showingCount) showingCount.textContent = `Showing ${Math.min(start + 1, total)}-${Math.min(end, total)} of ${total} messages`;
+
+        if (prevPageBtn) prevPageBtn.disabled = currentPage <= 1;
+        if (nextPageBtn) nextPageBtn.disabled = currentPage >= totalPages;
     }
+
+    async function loadAllObservations() {
+        // Load observations for all messages in parallel
+        const promises = allMessages.map(async (msg) => {
+            try {
+                const response = await fetch(`${API_BASE}/messages/${msg.id}/observations`);
+                if (response.ok) {
+                    const data = await response.json();
+                    msg.observations = data.items || [];
+                    msg.hasAbnormal = msg.observations.some(o =>
+                        o.flag && ['H', 'HH', 'L', 'LL'].some(f => o.flag.toUpperCase().includes(f))
+                    );
+                    // Check for Alerts
+                    msg.hasAlert = msg.observations.some(o => o.alert_level === 'CRITICAL' || o.alert_level === 'WARNING');
+                    msg.isCritical = msg.observations.some(o => o.alert_level === 'CRITICAL');
+                }
+            } catch (e) {
+                msg.observations = [];
+                msg.hasAbnormal = false;
+            }
+        });
+        await Promise.all(promises);
+    }
+
+    // ... (updateStats remains same) ...
+
+    // ... (renderTable remains same) ...
 
     function createTableRow(msg) {
         const name = `${msg.first_name || ''} ${msg.last_name || ''}`.trim() || 'Unknown';
         const obsCount = (msg.observations || []).length;
-        const flags = (msg.observations || [])
-            .filter(o => o.flag && o.flag.trim())
+
+        // Custom Flag Rendering with Alerts priority
+        const obsWithFlags = (msg.observations || []).filter(o => (o.flag && o.flag.trim()) || o.alert_level);
+
+        const flags = obsWithFlags
             .map(o => {
-                const f = o.flag.toUpperCase();
+                // If Critical Alert, show that instead of just H/L
+                if (o.alert_level === 'CRITICAL') {
+                    return `<span class="alert-badge"><i class="fa-solid fa-triangle-exclamation"></i> CRITICAL</span>`;
+                }
+
+                const f = (o.flag || '').toUpperCase();
                 let cls = 'flag-normal';
                 if (['H', 'HH'].some(x => f.includes(x))) cls = 'flag-high';
                 if (['L', 'LL'].some(x => f.includes(x))) cls = 'flag-low';
@@ -254,8 +300,8 @@ document.addEventListener('DOMContentLoaded', () => {
             .slice(0, 3)
             .join('');
 
-        const moreFlags = (msg.observations || []).filter(o => o.flag && o.flag.trim()).length > 3
-            ? `<span class="flag-more">+${(msg.observations || []).filter(o => o.flag).length - 3}</span>`
+        const moreFlags = obsWithFlags.length > 3
+            ? `<span class="flag-more">+${obsWithFlags.length - 3}</span>`
             : '';
 
         const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleString() : '--';
@@ -265,8 +311,11 @@ document.addEventListener('DOMContentLoaded', () => {
             ? `/patient.html?id=${encodeURIComponent(msg.patient_id)}`
             : '#';
 
+        // Row Class for Critical items
+        const rowClass = msg.isCritical ? 'alert-row' : '';
+
         return `
-            <tr>
+            <tr class="${rowClass}">
                 <td class="expand-col">
                     <button class="expand-btn" data-id="${msg.id}">
                         <i class="fa-solid fa-eye"></i>
@@ -301,7 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Load full message detail
         try {
-            const response = await fetch(`/messages/${msgId}`);
+            const response = await fetch(`${API_BASE}/messages/${msgId}`);
             const detail = await response.json();
 
             // Populate modal
@@ -497,7 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const loadingId = addLoadingMessage();
 
         try {
-            const response = await fetch('/api/query', {
+            const response = await fetch(`${API_BASE}/api/query`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ question })

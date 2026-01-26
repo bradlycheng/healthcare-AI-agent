@@ -53,6 +53,11 @@ You MUST:
       clinical_summary.
 - You MUST NOT introduce any new codes, values, or dates that are not present
   in the input data.
+- For AI_EXTRACTED observations from clinical notes: ONLY extract values that 
+  have an EXPLICIT numeric value stated in the text. For example, "BP 160/95" 
+  can be extracted as Blood Pressure. But do NOT infer or assume values that 
+  are not explicitly written with a number. If glucose is not mentioned with 
+  a specific value like "glucose 120 mg/dL", do NOT add a glucose observation.
 
 You MUST respond with a SINGLE JSON object of the exact form:
 

@@ -14,6 +14,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 import os
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 print("DEBUG: API MODULE LOADED", flush=True)
 
@@ -22,6 +23,14 @@ DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
 # AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "healthcare2025")
 
 app = FastAPI(title="Healthcare HL7 → FHIR Agent API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # Simple in-memory rate limiter: keys=IP, values=timestamp of last LLM request
@@ -34,8 +43,8 @@ RATE_LIMIT_SECONDS = 5.0
 async def add_process_time_header(request: Request, call_next):
     response = await call_next(request)
     # Required for Godot 4 HTML5 export (SharedArrayBuffer)
-    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
-    response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
+    # response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    # response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
     return response
 
 # ---------- Pydantic Models ----------
@@ -65,6 +74,8 @@ class ObservationOut(BaseModel):
     observation_datetime: str = ""
     status: str = ""
     source: str = "HL7"
+    alert_level: str = ""
+    alert_message: str = ""
 
 
 class ORUParseResponse(BaseModel):
@@ -152,6 +163,8 @@ class VisitObservation(BaseModel):
     flag: str = ""
     observation_datetime: str = ""
     status: str = ""
+    alert_level: str = ""
+    alert_message: str = ""
 
 
 class PatientVisit(BaseModel):
@@ -310,6 +323,8 @@ def get_patient_timeline_endpoint(patient_id: str) -> PatientTimelineResponse:
                 flag=o.get("flag", ""),
                 observation_datetime=o.get("observation_datetime", ""),
                 status=o.get("status", ""),
+                alert_level=o.get("alert_level", ""),
+                alert_message=o.get("alert_message", ""),
             )
             for o in v["observations"]
         ]
@@ -474,6 +489,8 @@ def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseRespon
                 observation_datetime=o.get("observation_datetime", "") or "",
                 status=o.get("status", "") or "",
                 source=o.get("source", "HL7"),
+                alert_level=o.get("alert_level", "") or "",
+                alert_message=o.get("alert_message", "") or "",
             )
         )
 
@@ -609,7 +626,9 @@ def list_message_observations(message_id: int) -> ObservationListResponse:
               reference_high,
               flag,
               observation_datetime,
-              status
+              status,
+              alert_level,
+              alert_message
             FROM observations
             WHERE message_id = ?
             ORDER BY id ASC
@@ -619,6 +638,14 @@ def list_message_observations(message_id: int) -> ObservationListResponse:
 
         items: List[ObservationOut] = []
         for r in rows:
+            # Handle potential missing columns if DB wasn't fully migrated (safeguard)
+            try:
+                alert_lvl = str(r["alert_level"] or "")
+                alert_msg = str(r["alert_message"] or "")
+            except Exception:
+                alert_lvl = ""
+                alert_msg = ""
+
             items.append(
                 ObservationOut(
                     code=str(r["code"] or ""),
@@ -630,6 +657,8 @@ def list_message_observations(message_id: int) -> ObservationListResponse:
                     flag=str(r["flag"] or ""),
                     observation_datetime=str(r["observation_datetime"] or ""),
                     status=str(r["status"] or ""),
+                    alert_level=alert_lvl,
+                    alert_message=alert_msg,
                 )
             )
 
@@ -656,6 +685,29 @@ async def read_dashboard():
 @app.get("/patient.html")
 async def read_patient():
     return FileResponse('web/patient.html')
+
+
+# ---------- Admin Routes ----------
+
+@app.post("/admin/reset")
+async def reset_demo_data():
+    """
+    Reset database to initial demo state.
+    Deletes all messages and reseeds with sample data.
+    """
+    from .db import delete_all_messages
+    from .seed import seed_database
+    
+    try:
+        # Delete all existing messages
+        delete_all_messages()
+        
+        # Reseed with sample data
+        seed_database(verbose=False)
+        
+        return {"success": True, "message": "Database reset to demo state with 10 sample records."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Reset failed: {str(e)}")
 
 # Mount the web directory for static assets (css, js)
 app.mount("/", StaticFiles(directory="web"), name="static")

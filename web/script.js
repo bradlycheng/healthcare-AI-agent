@@ -355,6 +355,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <input type="text" class="edit-input test-name-input" value="${displayVal}" placeholder="Test Name" style="width:100%; font-weight:500;">
                 ${codeDisplay}
                 <input type="hidden" class="code-hidden" value="${o.code || ''}">
+                <input type="hidden" class="alert-level-hidden" value="${o.alert_level || ''}">
+                <input type="hidden" class="alert-message-hidden" value="${o.alert_message || ''}">
             </td>
             <td class="editable-cell">
                 <input type="text" class="edit-input value-input" value="${valVal}" placeholder="Value">
@@ -390,7 +392,9 @@ document.addEventListener('DOMContentLoaded', () => {
             unit: '',
             flag: '',
             reference_low: '',
-            reference_high: ''
+            reference_high: '',
+            alert_level: '',
+            alert_message: ''
         };
 
         const tr = createObservationRow(newObs, -1);
@@ -482,6 +486,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (cb && cb.checked) {
                     const testNameInput = row.querySelector('.test-name-input');
                     const codeHidden = row.querySelector('.code-hidden');
+                    const alertLevelHidden = row.querySelector('.alert-level-hidden');
+                    const alertMessageHidden = row.querySelector('.alert-message-hidden');
                     const valInput = row.querySelector('.value-input');
                     const unitInput = row.querySelector('.unit-input');
 
@@ -500,9 +506,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         value: valInput ? valInput.value : '',
                         unit: unitInput ? unitInput.value : '',
                         source: source,
-                        // Preserve other fields if possible? 
-                        // For simplicity, we just save what's visible + source. 
-                        // The backend will persist this list.
+                        // Preserve other fields
+                        alert_level: alertLevelHidden ? alertLevelHidden.value : '',
+                        alert_message: alertMessageHidden ? alertMessageHidden.value : '',
                         flag: row.querySelector('.obs-flag') ? row.querySelector('.obs-flag').innerText : ''
                     });
                 }

@@ -131,12 +131,12 @@ OBX|1|NM|GLUCOSE||105|...</code></pre>
                     </div>
                 </div>
                 <textarea id="hl7-input"
-                    placeholder="Paste a raw HL7 (ORU) message here...">MSH|^~\&|HIS|MedCenter|LIS|LAB|202401201200||ORU^R01|MSG_REPRO|P|2.5
-PID|1||12345||TEST^PATIENT||19800101|M
-OBR|1|ORD123|RES123|CBC^Complete Blood Count|||202401201200
-OBX|1|NM|718-7^HEMOGLOBIN||14.2|g/dL|13.5-17.5|N|||F
-OBX|2|NM|6690-2^WBC||7200|/uL|4500-11000|N|||F
-OBX|3|TX|NOTE^Clinical Note||Patient reports recent fasting blood glucose of 145 mg/dL from home monitor. History of hypertension, BP 138/88 at last visit..||||||F</textarea>
+                    placeholder="Paste a raw HL7 (ORU) message here...">MSH|^~\&|HIS|MedCenter|LIS|LAB|202401201200||ORU^R01|MSG_CARDIAC|P|2.5
+PID|1||12345||SMITH^JOHN||19750315|M
+OBR|1|ORD456|RES456|CARD-PANEL^Cardiac Panel|||202401201200
+OBX|1|NM|49563-0^TROPONIN I||0.12|ng/mL|0.00-0.04|HH|||F
+OBX|2|NM|2157-6^CK-MB||8.5|ng/mL|0.0-5.0|H|||F
+OBX|3|TX|NOTE^Clinical Note||50 y/o male presenting with crushing chest pain radiating to left arm x 2 hours. Diaphoretic, BP 160/95, HR 110, SpO2 94% on room air. History of HTN and hyperlipidemia. ECG shows ST elevation in leads V1-V4. Suspect STEMI. Cardiology consult requested. Started on aspirin, heparin, nitroglycerin drip.||||||F</textarea>
                 <div class="action-buttons">
                     <button id="process-btn" class="btn-primary">
                         <i class="fa-solid fa-bolt"></i> Analyze (Preview)

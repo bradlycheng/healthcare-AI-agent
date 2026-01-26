@@ -51,10 +51,24 @@ def init_db(db_path: str = DB_PATH) -> None:
               flag VARCHAR,
               observation_datetime VARCHAR,
               status VARCHAR,
+              alert_level VARCHAR,
+              alert_message VARCHAR,
               FOREIGN KEY(message_id) REFERENCES hl7_messages(id)
             );
             """
         )
+        
+        # Migration for existing tables
+        try:
+            conn.execute("ALTER TABLE observations ADD COLUMN alert_level VARCHAR")
+        except sqlite3.OperationalError:
+            pass # Column likely exists
+            
+        try:
+            conn.execute("ALTER TABLE observations ADD COLUMN alert_message VARCHAR")
+        except sqlite3.OperationalError:
+            pass # Column likely exists
+            
         conn.commit()
     finally:
         conn.close()
@@ -138,7 +152,6 @@ def _coerce_value(value: Any) -> Tuple[Optional[float], Optional[str]]:
     except ValueError:
         return None, s
 
-
 def insert_message_and_observations(
     raw_hl7: str = "",
     patient: Dict[str, Any] = None,
@@ -204,6 +217,10 @@ def insert_message_and_observations(
             flag = str(ob.get("flag") or "")
             obs_dt = str(ob.get("observation_datetime") or "")
             status = str(ob.get("status") or "")
+            alert_level = str(ob.get("alert_level") or "")
+            alert_msg = str(ob.get("alert_message") or "")
+            if alert_level:
+                print(f"DEBUG DB INSERT OBSERVATION: Code={code}, AlertLevel={alert_level}", flush=True)
 
             # Prefer explicit reference_low/high if provided; else try splitting a combined range (if any)
             ref_low = ob.get("reference_low")
@@ -229,8 +246,10 @@ def insert_message_and_observations(
                   reference_high,
                   flag,
                   observation_datetime,
-                  status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  status,
+                  alert_level,
+                  alert_message
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     message_id,
@@ -244,6 +263,8 @@ def insert_message_and_observations(
                     flag,
                     obs_dt,
                     status,
+                    alert_level,
+                    alert_msg
                 ),
             )
 

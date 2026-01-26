@@ -31,15 +31,6 @@
         <a href="/docs" target="_blank" class="btn-primary">API Docs</a>
     </nav>
 
-    <!-- Critical Alerts Banner -->
-    <div id="alerts-banner" class="alerts-banner hidden">
-        <div class="alerts-content">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <span><strong>CRITICAL ALERTS DETECTED</strong> - <span id="alert-count">0</span> patient(s) require
-                immediate attention</span>
-        </div>
-    </div>
-
     <main class="dashboard-container">
         <header class="dashboard-header">
             <div class="header-content">
@@ -154,7 +145,6 @@
                 <select id="filter-flag">
                     <option value="">All Results</option>
                     <option value="abnormal">Abnormal Only</option>
-                    <option value="critical">Critical Only</option>
                     <option value="normal">Normal Only</option>
                 </select>
                 <select id="filter-date">
@@ -258,7 +248,7 @@
         <p>&copy; 2024 Healthcare AI Agent. Built with Python & DeepMind.</p>
     </footer>
 
-    <script src="dashboard.js?v=5"></script>
+    <script src="dashboard.js?v=4"></script>
 </body>
 
 </html>

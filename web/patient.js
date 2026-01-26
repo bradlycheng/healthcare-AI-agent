@@ -1,6 +1,9 @@
 // patient.js - Patient Timeline Page
 
-const API_BASE = '';
+// Determine API Base URL for local file access vs server access
+const API_BASE = (window.location.protocol === 'file:')
+    ? 'http://localhost:8080'
+    : '';
 
 // Get patient ID from URL
 const urlParams = new URLSearchParams(window.location.search);

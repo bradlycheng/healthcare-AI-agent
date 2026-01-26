@@ -60,8 +60,8 @@ def test_features():
     conn = sqlite3.connect(DB_PATH)
     count = conn.execute("SELECT count(*) FROM hl7_messages").fetchone()[0]
     conn.close()
-    print(f"Final count: {count} (Expected 8)")
-    assert count == 8
+    print(f"Final count: {count} (Expected 10)")
+    assert count == 10
     print("Reset Demo Logic: PASS")
 
 if __name__ == "__main__":
