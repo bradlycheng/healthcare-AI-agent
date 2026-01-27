@@ -322,7 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </button>
                 </td>
                 <td class="patient-cell">
-                    <a href="${patientLink}" class="patient-name-link">${escapeHtml(name)}</a>
+                    <span class="patient-name-text">${escapeHtml(name)}</span>
                 </td>
                 <td>${escapeHtml(msg.patient_id || '--')}</td>
                 <td>${formatDob(msg.dob)}</td>
