@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadMessages(); // Refresh list to show empty state
             } catch (err) {
                 console.error('Error resetting messages:', err);
-                showToast('Failed to reset messages', 'error');
+                showToast('Failed: ' + err.message, 'error');
             }
         }
     }
