@@ -38,6 +38,8 @@ healthdataagent.com, www.healthdataagent.com {
         path /messages*
         path /patients*
         path /health
+        path /ping
+        path /admin/*
     }
     reverse_proxy @api app:8080
 
@@ -89,6 +91,8 @@ bradlycheng.com, www.bradlycheng.com {
         path /messages*
         path /patients*
         path /health
+        path /ping
+        path /admin/*
     }
     reverse_proxy @api app:8080
 
