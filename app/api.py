@@ -126,6 +126,7 @@ class ObservationListResponse(BaseModel):
 
 class QueryRequest(BaseModel):
     question: str
+    history: List[Dict[str, str]] = []
 
 
 class QueryResponse(BaseModel):
@@ -252,7 +253,7 @@ def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryRespon
     _RATE_LIMIT_STORE[client_ip] = now_ts
     
     # Process the query
-    result = process_query(req.question)
+    result = process_query(req.question, req.history)
     
     return QueryResponse(
         success=result.get("success", False),
@@ -676,6 +677,11 @@ from fastapi.responses import FileResponse
 async def read_index():
     return FileResponse('web/index.html')
 
+# Liveness check (no DB access)
+@app.get("/ping")
+async def ping():
+    return {"status": "ok"}
+
 # Serve dashboard.html
 @app.get("/dashboard.html")
 async def read_dashboard():
@@ -689,25 +695,36 @@ async def read_patient():
 
 # ---------- Admin Routes ----------
 
+# Global lock for reset operation
+import asyncio
+from asyncio import Lock
+reset_lock = Lock()
+
 @app.post("/admin/reset")
 async def reset_demo_data():
     """
     Reset database to initial demo state.
     Deletes all messages and reseeds with sample data.
     """
-    from .db import delete_all_messages
-    from .seed import seed_database
-    
-    try:
-        # Delete all existing messages
-        delete_all_messages()
-        
-        # Reseed with sample data
-        seed_database(verbose=False)
-        
-        return {"success": True, "message": "Database reset to demo state with 10 sample records."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Reset failed: {str(e)}")
+    if reset_lock.locked():
+        raise HTTPException(status_code=409, detail="Reset already in progress. Please wait.")
+
+    async with reset_lock:
+        try:
+            # Run blocking operations in a threadpool to keep the server responsive
+            loop = asyncio.get_running_loop()
+            
+            def _perform_reset():
+                from .db import delete_all_messages
+                from .seed import seed_database
+                delete_all_messages()
+                seed_database(verbose=False)
+                
+            await loop.run_in_executor(None, _perform_reset)
+            
+            return {"success": True, "message": "Database reset with 20 realistic patients and ~120 observations."}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Reset failed: {str(e)}")
 
 # Mount the web directory for static assets (css, js)
 app.mount("/", StaticFiles(directory="web"), name="static")

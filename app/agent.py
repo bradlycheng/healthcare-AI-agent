@@ -593,6 +593,7 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
             )
         except Exception as e:
             print(f"DATABASE ERROR: {e}", flush=True)
+            raise e
 
     return {
         "patient": patient,

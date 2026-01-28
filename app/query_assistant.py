@@ -39,7 +39,7 @@ Table: observations
   - id (INTEGER PRIMARY KEY)
   - message_id (INTEGER, FK to hl7_messages.id)
   - code (VARCHAR) -- e.g., "2345-7" for glucose
-  - display (VARCHAR) -- e.g., "Glucose", "Creatinine", "Hemoglobin"
+  - display (VARCHAR) -- e.g., "Glucose", "HEART_RATE", "SYSTOLIC_BP" (may use underscores instead of spaces)
   - value_num (FLOAT) -- numeric value
   - value_raw (VARCHAR) -- text value
   - unit (VARCHAR) -- e.g., "mg/dL"
@@ -47,6 +47,8 @@ Table: observations
   - reference_high (VARCHAR)
   - flag (VARCHAR) -- 'H' (High), 'L' (Low), 'N' (Normal), or empty
   - observation_datetime (VARCHAR)
+  - alert_level (VARCHAR) -- 'CRITICAL', 'WARNING', or empty
+  - alert_message (VARCHAR) -- Clinical explanation of the alert
 
 RULES:
 1. ONLY generate SELECT statements.
@@ -58,6 +60,24 @@ RULES:
 7. LIMIT results to 50.
 8. **DO NOT** use `DATE(patient_dob)` as it is a custom string format. Sort directly on the string: `ORDER BY patient_dob ASC` (oldest) or `DESC` (youngest).
 9. If you need age, approximate it using `strftime('%Y', 'now') - substr(patient_dob, 1, 4)`.
+10. **Observation display names may use underscores instead of spaces** (e.g., "HEART_RATE" not "HEART RATE"). When searching for observations:
+    - Use flexible patterns like `UPPER(o.display) LIKE '%HEART%RATE%'` (matches both "HEART RATE" and "HEART_RATE")
+    - OR use `REPLACE(UPPER(o.display), '_', ' ') LIKE '%HEART RATE%'` to normalize before matching
+    - Common variations: HEART_RATE/HEART RATE, BLOOD_PRESSURE/BLOOD PRESSURE, SYSTOLIC_BP/SYSTOLIC BP
+11. **Medical term synonyms**:
+    - "A1C" or "HbA1c" → search for `LIKE '%A1C%' OR LIKE '%HEMOGLOBIN A1C%' OR LIKE '%HBA1C%'`
+    - "Pulse" → search for `LIKE '%PULSE%' OR LIKE '%HEART%RATE%'`
+    - "BP" or "blood pressure" → search for `LIKE '%BLOOD%PRESSURE%'` or `LIKE '%BP%'`
+    - "Blood sugar" → search for `LIKE '%GLUCOSE%'`
+12. **CRITICAL: Check chat history for patient context.** If the user:
+    - Uses pronouns like "he", "she", "his", "her", "them", "their", OR
+    - Uses phrases like "what about", "and", "also" that imply continuation, AND
+    - A specific patient was mentioned in recent chat history
+    Then you MUST filter for that patient in your WHERE clause. 
+    Examples:
+    - History: "Show John Smith's results" → "What's his glucose?" → Include `WHERE ... 'JOHN' ... 'SMITH'`
+    - History: "Show Barbara's BP" → "What about heart rate?" → Include `WHERE ... 'BARBARA'`
+    - History: "Show labs for Robert Chen" → "And cholesterol?" → Include `WHERE ... 'ROBERT' ... 'CHEN'`
 
 FEW SHOT EXAMPLES:
 
@@ -88,6 +108,12 @@ SQL: SELECT h.patient_first_name, h.patient_last_name, o.value_num, o.unit FROM 
 
 User: "Which patients have NO abnormal observations?"
 SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name FROM hl7_messages h WHERE h.id NOT IN (SELECT message_id FROM observations WHERE flag IN ('H', 'L'))
+
+User: "Show me all critical alerts"
+SQL: SELECT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o.alert_message FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE o.alert_level = 'CRITICAL'
+
+User: "Who has a warning?"
+SQL: SELECT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o.alert_message FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE o.alert_level = 'WARNING'
 
 RESPONSE FORMAT:
 Return a JSON object with exactly this structure:
@@ -204,13 +230,16 @@ def execute_safe_query(sql: str) -> tuple[List[Dict[str, Any]], Optional[str]]:
 # LLM Integration
 # ---------------------------------------------------------------------------
 
-def generate_sql_from_question(question: str) -> tuple[str, str, Optional[str]]:
+def generate_sql_from_question(question: str, history: List[Dict[str, str]] = []) -> tuple[str, str, Optional[str]]:
     """
     Use LLM to generate SQL from natural language question.
     Returns (sql, explanation, error_message).
     """
     prompt = f"""
 {SQL_GENERATION_PROMPT}
+
+CHAT HISTORY:
+{json.dumps(history, indent=2) if history else "No history"}
 
 USER QUESTION: {question}
 
@@ -280,7 +309,7 @@ Format a helpful response. Output JSON only.
 # Main Query Function
 # ---------------------------------------------------------------------------
 
-def process_query(question: str) -> Dict[str, Any]:
+def process_query(question: str, history: List[Dict[str, str]] = []) -> Dict[str, Any]:
     """
     Main entry point: process a natural language query.
     
@@ -294,8 +323,21 @@ def process_query(question: str) -> Dict[str, Any]:
             "error": Optional[str]
         }
     """
+    # Step 0: Reject direct SQL statements (security check)
+    # Users should ask in natural language, not submit raw SQL
+    sql_keywords = r'^\s*(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE)'
+    if re.match(sql_keywords, question, re.IGNORECASE):
+        return {
+            "success": False,
+            "answer": "Please ask your question in natural language rather than SQL. For example: 'Show all patients' or 'Who has high glucose?'",
+            "highlights": [],
+            "sql_used": "",
+            "row_count": 0,
+            "error": "Direct SQL queries not allowed. Please use natural language."
+        }
+    
     # Step 1: Generate SQL from question
-    sql, explanation, error = generate_sql_from_question(question)
+    sql, explanation, error = generate_sql_from_question(question, history)
     if error:
         return {
             "success": False,

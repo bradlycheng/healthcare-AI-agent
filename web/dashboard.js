@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // State
     let allMessages = [];
     let filteredMessages = [];
+    let chatHistory = []; // Tracks user/AI conversation
     let currentPage = 1;
     const pageSize = 10;
 
@@ -76,10 +77,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // if (confirm('Are you sure...')) { 
         if (true) {
             try {
-                console.log('Sending DELETE request...');
-                const response = await fetch(`${API_BASE}/messages`, { method: 'DELETE' });
-                console.log('Delete response:', response.status);
-                if (!response.ok) {
+                console.log('Sending RESET request...');
+                const response = await fetch(`${API_BASE}/admin/reset`, { method: 'POST' });
+                console.log('Reset response:', response.status);
+                if (!response.ok && response.status !== 409) {
                     const txt = await response.text();
                     throw new Error(txt || 'Failed to reset messages');
                 }
@@ -546,10 +547,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const loadingId = addLoadingMessage();
 
         try {
+            // Prepare history (last 5 messages)
+            const context = chatHistory.slice(-5);
+
             const response = await fetch(`${API_BASE}/api/query`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question })
+                body: JSON.stringify({ question, history: context })
             });
 
             // Remove loading message
@@ -623,6 +627,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         queryMessages.appendChild(messageDiv);
         queryMessages.scrollTop = queryMessages.scrollHeight;
+
+        // Add to history (unless it's an error or loading)
+        if (sender !== 'system' && !options.isError) {
+            chatHistory.push({ role: sender, content: text });
+        }
 
         return messageDiv.id;
     }
