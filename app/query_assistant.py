@@ -4,6 +4,7 @@ Natural Language Query Assistant
 
 Translates user questions into SQL queries using AWS Bedrock,
 executes them safely, and formats responses in natural language.
+Supports RAG (Retrieval-Augmented Generation) with medical guidelines.
 """
 
 import json
@@ -15,6 +16,9 @@ from typing import Any, Dict, List, Optional
 from .llm_client import call_llm_for_json, LLMError
 
 DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
+
+# RAG settings
+RAG_ENABLED = os.getenv("RAG_ENABLED", "true").lower() == "true"
 
 
 # ---------------------------------------------------------------------------
@@ -126,8 +130,8 @@ Output JSON ONLY.
 
 
 RESPONSE_FORMAT_PROMPT = """
-You are a helpful healthcare data assistant. Given query results, provide a
-natural, conversational response to the user's question.
+You are a helpful healthcare data assistant. Given query results and medical reference context,
+provide a natural, conversational response to the user's question.
 
 RULES:
 1. Be concise but informative
@@ -135,6 +139,8 @@ RULES:
 3. Format numbers and dates readably
 4. Highlight abnormal values (flag = 'H' or 'L')
 5. Don't mention SQL or technical details
+6. Use the MEDICAL CONTEXT to provide clinical interpretation when relevant
+7. When using medical context, mention the source (e.g., "According to ADA guidelines...")
 
 RESPONSE FORMAT:
 Return a JSON object:
@@ -230,6 +236,56 @@ def execute_safe_query(sql: str) -> tuple[List[Dict[str, Any]], Optional[str]]:
 # LLM Integration
 # ---------------------------------------------------------------------------
 
+def retrieve_context(question: str) -> tuple[str, List[Dict[str, Any]]]:
+    """
+    Search vector store for relevant medical context.
+    Returns (context_text, sources_list).
+    """
+    if not RAG_ENABLED:
+        return "", []
+    
+    try:
+        from .vector_store import search, get_document_count
+        
+        # Check if we have any documents indexed
+        if get_document_count() == 0:
+            return "", []
+        
+        results = search(question, top_k=3)
+        
+        if not results or not results.get('documents') or not results['documents'][0]:
+            return "", []
+        
+        # Build context string and sources list
+        context_parts = []
+        sources = []
+        
+        documents = results['documents'][0]
+        metadatas = results['metadatas'][0] if results.get('metadatas') else [{}] * len(documents)
+        distances = results['distances'][0] if results.get('distances') else [0.5] * len(documents)
+        
+        for i, doc in enumerate(documents):
+            title = metadatas[i].get('title', 'Unknown Source') if i < len(metadatas) else 'Unknown Source'
+            distance = distances[i] if i < len(distances) else 0.5
+            # Convert distance to similarity (lower distance = higher similarity)
+            relevance = max(0, 1 - distance)
+            
+            context_parts.append(f"[Source: {title}]\n{doc}")
+            sources.append({
+                "title": title,
+                "snippet": doc[:200] + "..." if len(doc) > 200 else doc,
+                "relevance": round(relevance, 2)
+            })
+        
+        context_text = "\n\n".join(context_parts)
+        return context_text, sources
+        
+    except Exception as e:
+        print(f"RAG retrieval error: {e}")
+        return "", []
+
+
+
 def generate_sql_from_question(question: str, history: List[Dict[str, str]] = []) -> tuple[str, str, Optional[str]]:
     """
     Use LLM to generate SQL from natural language question.
@@ -266,7 +322,8 @@ Generate the SQL query now. Output JSON only.
 def format_results_as_response(
     question: str, 
     results: List[Dict[str, Any]], 
-    sql_used: str
+    sql_used: str,
+    context: str = ""
 ) -> tuple[str, List[str], Optional[str]]:
     """
     Use LLM to format query results as natural language.
@@ -280,9 +337,19 @@ def format_results_as_response(
     results_preview = results[:20]
     results_json = json.dumps(results_preview, default=str, indent=2)
     
+    # Build context section
+    context_section = ""
+    if context:
+        context_section = f"""
+MEDICAL REFERENCE CONTEXT:
+{context}
+
+Use this context to provide clinical interpretations and cite sources when relevant.
+"""
+    
     prompt = f"""
 {RESPONSE_FORMAT_PROMPT}
-
+{context_section}
 USER QUESTION: {question}
 
 QUERY RESULTS ({len(results)} rows, showing first {len(results_preview)}):
@@ -320,6 +387,7 @@ def process_query(question: str, history: List[Dict[str, str]] = []) -> Dict[str
             "highlights": List[str],
             "sql_used": str,
             "row_count": int,
+            "sources": List[Dict],  # RAG sources
             "error": Optional[str]
         }
     """
@@ -372,8 +440,13 @@ def process_query(question: str, history: List[Dict[str, str]] = []) -> Dict[str
             "error": exec_error
         }
     
-    # Step 4: Format response
-    answer, highlights, format_error = format_results_as_response(question, results, sql)
+    # Step 4: Retrieve RAG context
+    context_text, sources = retrieve_context(question)
+    
+    # Step 5: Format response with context
+    answer, highlights, format_error = format_results_as_response(
+        question, results, sql, context=context_text
+    )
     
     return {
         "success": True,
@@ -381,5 +454,6 @@ def process_query(question: str, history: List[Dict[str, str]] = []) -> Dict[str
         "highlights": highlights if isinstance(highlights, list) else [],
         "sql_used": sql,
         "row_count": len(results),
+        "sources": sources,
         "error": None
     }

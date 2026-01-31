@@ -7,3 +7,5 @@ requests
 python-dotenv
 pytest
 boto3
+chromadb>=0.4.0
+pypdf>=3.0.0

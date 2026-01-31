@@ -1,0 +1,62 @@
+# Medical Reference: Blood Pressure Guidelines
+# Source: Adapted from American Heart Association Guidelines
+
+## Blood Pressure Categories
+
+Blood pressure is measured in millimeters of mercury (mmHg) and expressed as systolic over diastolic pressure.
+
+Normal Blood Pressure:
+- Systolic: Less than 120 mmHg
+- Diastolic: Less than 80 mmHg
+- No treatment required, maintain healthy lifestyle
+
+Elevated Blood Pressure:
+- Systolic: 120-129 mmHg
+- Diastolic: Less than 80 mmHg
+- Lifestyle changes recommended, monitor regularly
+
+Hypertension Stage 1:
+- Systolic: 130-139 mmHg
+- Diastolic: 80-89 mmHg
+- Lifestyle changes and possible medication
+- Increased risk of heart disease and stroke
+
+Hypertension Stage 2:
+- Systolic: 140 mmHg or higher
+- Diastolic: 90 mmHg or higher
+- Medication likely required along with lifestyle changes
+- Significantly increased cardiovascular risk
+
+Hypertensive Crisis:
+- Systolic: Higher than 180 mmHg
+- Diastolic: Higher than 120 mmHg
+- MEDICAL EMERGENCY - Seek immediate care
+- Risk of organ damage, stroke, heart attack
+
+## Critical Blood Pressure Values
+
+Dangerously Low (Hypotension):
+- Systolic below 90 mmHg or Diastolic below 60 mmHg
+- May cause dizziness, fainting, organ damage
+- Requires medical evaluation
+
+Dangerously High (Hypertensive Emergency):
+- Systolic above 180 mmHg with symptoms
+- Symptoms include: severe headache, chest pain, vision changes, confusion
+- Call emergency services immediately
+
+## Clinical Recommendations
+
+For patients with BP above 180/120 mmHg:
+1. Wait 5 minutes and remeasure
+2. If still elevated, this is a hypertensive crisis
+3. Check for symptoms of organ damage
+4. Immediate medical evaluation required
+5. Do not attempt to lower BP rapidly at home
+
+For patients with consistently elevated BP:
+1. Reduce sodium intake to less than 2,300 mg daily
+2. Increase physical activity to 150 minutes per week
+3. Maintain healthy weight (BMI 18.5-24.9)
+4. Limit alcohol consumption
+5. Follow prescribed medication regimen

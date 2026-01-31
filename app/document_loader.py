@@ -1,0 +1,158 @@
+# Document Loader for RAG
+# Loads and chunks documents for vector storage
+
+import os
+import re
+from typing import Dict, List, Tuple
+
+from .rag_config import CHUNK_SIZE, CHUNK_OVERLAP
+
+
+def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[str]:
+    """
+    Split text into overlapping chunks.
+    
+    Args:
+        text: The text to chunk
+        chunk_size: Maximum size of each chunk
+        overlap: Number of characters to overlap between chunks
+        
+    Returns:
+        List of text chunks
+    """
+    if not text:
+        return []
+    
+    # Clean the text
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    chunks = []
+    start = 0
+    
+    while start < len(text):
+        end = start + chunk_size
+        
+        # Try to break at sentence boundary
+        if end < len(text):
+            # Look for sentence end within the last 100 chars of chunk
+            last_period = text.rfind('.', start + chunk_size - 100, end)
+            if last_period > start:
+                end = last_period + 1
+        
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+        
+        start = end - overlap
+        if start < 0:
+            start = 0
+    
+    return chunks
+
+
+def load_text_file(path: str) -> str:
+    """Load text from a file."""
+    with open(path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+
+def load_pdf_file(path: str) -> str:
+    """
+    Load text from a PDF file.
+    Requires pypdf to be installed.
+    """
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        raise ImportError("pypdf is required for PDF loading. Install with: pip install pypdf")
+    
+    reader = PdfReader(path)
+    text = ""
+    for page in reader.pages:
+        page_text = page.extract_text()
+        if page_text:
+            text += page_text + "\n"
+    return text
+
+
+def load_document(path: str) -> Tuple[str, str]:
+    """
+    Load a document from various formats.
+    
+    Args:
+        path: Path to the document
+        
+    Returns:
+        Tuple of (text content, document title)
+    """
+    title = os.path.basename(path)
+    ext = os.path.splitext(path)[1].lower()
+    
+    if ext == '.pdf':
+        text = load_pdf_file(path)
+    elif ext in ['.txt', '.md']:
+        text = load_text_file(path)
+    else:
+        raise ValueError(f"Unsupported file type: {ext}")
+    
+    return text, title
+
+
+def index_document(path: str) -> int:
+    """
+    Load, chunk, and index a single document.
+    
+    Args:
+        path: Path to the document
+        
+    Returns:
+        Number of chunks indexed
+    """
+    from .vector_store import add_documents
+    
+    text, title = load_document(path)
+    chunks = chunk_text(text)
+    
+    if not chunks:
+        return 0
+    
+    # Create IDs and metadata for each chunk
+    ids = [f"{title}_{i}" for i in range(len(chunks))]
+    metadatas = [
+        {"title": title, "chunk_index": i, "source": path}
+        for i in range(len(chunks))
+    ]
+    
+    add_documents(chunks, metadatas, ids)
+    
+    return len(chunks)
+
+
+def index_directory(dir_path: str, extensions: List[str] = ['.pdf', '.txt', '.md']) -> Dict[str, int]:
+    """
+    Index all documents in a directory.
+    
+    Args:
+        dir_path: Path to the directory
+        extensions: File extensions to include
+        
+    Returns:
+        Dict mapping filename to number of chunks indexed
+    """
+    results = {}
+    
+    for filename in os.listdir(dir_path):
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in extensions:
+            continue
+        
+        filepath = os.path.join(dir_path, filename)
+        try:
+            count = index_document(filepath)
+            results[filename] = count
+            print(f"Indexed {filename}: {count} chunks")
+        except Exception as e:
+            print(f"Error indexing {filename}: {e}")
+            results[filename] = 0
+    
+    return results

@@ -575,7 +575,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 addMessage(data.answer, 'ai', {
                     highlights: data.highlights,
                     sql: data.sql_used,
-                    rowCount: data.row_count
+                    rowCount: data.row_count,
+                    sources: data.sources || []  // RAG sources
                 });
             } else {
                 addMessage(data.answer || 'Sorry, I couldn\'t process that question.', 'ai', { isError: true });
@@ -609,7 +610,25 @@ document.addEventListener('DOMContentLoaded', () => {
             contentHtml += '</ul>';
         }
 
-
+        // Add RAG sources if present
+        if (options.sources && options.sources.length > 0) {
+            contentHtml += '<div class="message-sources">';
+            contentHtml += '<p class="sources-header"><i class="fa-solid fa-book-medical"></i> Sources:</p>';
+            options.sources.forEach(src => {
+                const relevancePercent = Math.round((src.relevance || 0) * 100);
+                const relevanceClass = relevancePercent >= 80 ? 'high' : (relevancePercent >= 50 ? 'medium' : 'low');
+                contentHtml += `
+                    <div class="source-card">
+                        <div class="source-header">
+                            <span class="source-title">${escapeHtml(src.title || 'Unknown Source')}</span>
+                            <span class="source-relevance ${relevanceClass}">${relevancePercent}% match</span>
+                        </div>
+                        <p class="source-snippet">${escapeHtml(src.snippet || '')}</p>
+                    </div>
+                `;
+            });
+            contentHtml += '</div>';
+        }
 
         // Add error styling
         if (options.isError) {

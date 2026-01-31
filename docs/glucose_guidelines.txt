@@ -1,0 +1,52 @@
+# Medical Reference: Blood Glucose Guidelines
+# Source: Adapted from American Diabetes Association Standards of Care
+
+## Normal Blood Glucose Levels
+
+Fasting blood glucose levels:
+- Normal: 70-99 mg/dL
+- Prediabetes: 100-125 mg/dL
+- Diabetes: 126 mg/dL or higher
+
+Random blood glucose levels:
+- Normal: Less than 140 mg/dL
+- Prediabetes: 140-199 mg/dL  
+- Diabetes: 200 mg/dL or higher
+
+## Critical Values Requiring Immediate Attention
+
+Hypoglycemia (Low Blood Sugar):
+- Mild: 54-70 mg/dL - Patient may experience shakiness, sweating, confusion
+- Severe: Below 54 mg/dL - Medical emergency, risk of seizures and loss of consciousness
+- Critical: Below 40 mg/dL - Immediate treatment required, potential brain damage
+
+Hyperglycemia (High Blood Sugar):
+- Elevated: 180-250 mg/dL - May require medication adjustment
+- High: 250-300 mg/dL - Check for ketones, contact healthcare provider
+- Severe: Above 300 mg/dL - Medical emergency, risk of diabetic ketoacidosis (DKA)
+- Critical: Above 400 mg/dL - Immediate emergency care required
+
+## HbA1c (Glycated Hemoglobin) Reference Ranges
+
+- Normal: Below 5.7%
+- Prediabetes: 5.7-6.4%
+- Diabetes: 6.5% or higher
+- Target for most diabetics: Below 7.0%
+- Poorly controlled: Above 8.0%
+- Dangerous: Above 10.0% - High risk of complications
+
+## Clinical Recommendations
+
+For patients with glucose above 300 mg/dL:
+1. Check for ketones in urine
+2. Ensure adequate hydration
+3. Do not exercise if ketones are present
+4. Contact healthcare provider immediately
+5. May require emergency insulin therapy
+
+For patients with glucose below 70 mg/dL:
+1. Consume 15-20 grams of fast-acting carbohydrates
+2. Recheck blood glucose after 15 minutes
+3. Repeat treatment if still below 70 mg/dL
+4. If unconscious, administer glucagon injection
+5. Seek emergency care if unresponsive to treatment

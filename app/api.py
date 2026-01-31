@@ -135,6 +135,7 @@ class QueryResponse(BaseModel):
     highlights: List[str] = []
     sql_used: str = ""
     row_count: int = 0
+    sources: List[Dict[str, Any]] = []  # RAG sources
     error: Optional[str] = None
 
 
@@ -261,6 +262,7 @@ def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryRespon
         highlights=result.get("highlights", []),
         sql_used=result.get("sql_used", ""),
         row_count=result.get("row_count", 0),
+        sources=result.get("sources", []),
         error=result.get("error")
     )
     
