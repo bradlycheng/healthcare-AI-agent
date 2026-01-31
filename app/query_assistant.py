@@ -330,13 +330,13 @@ def format_results_as_response(
     Use LLM to format query results as natural language.
     Returns (answer, highlights, error_message).
     """
-    # For empty results, don't need LLM
-    if not results:
+    # If no database results AND no RAG context, return simple message
+    if not results and not context:
         return "I couldn't find any data matching your query.", [], None
     
     # Limit results shown to LLM to avoid token overload
-    results_preview = results[:20]
-    results_json = json.dumps(results_preview, default=str, indent=2)
+    results_preview = results[:20] if results else []
+    results_json = json.dumps(results_preview, default=str, indent=2) if results_preview else "No matching patient records found."
     
     # Build context section
     context_section = ""
@@ -346,6 +346,7 @@ MEDICAL REFERENCE CONTEXT:
 {context}
 
 Use this context to provide clinical interpretations and cite sources when relevant.
+If no patient data was found, you can still answer clinical questions using the medical context.
 """
     
     prompt = f"""
@@ -353,10 +354,11 @@ Use this context to provide clinical interpretations and cite sources when relev
 {context_section}
 USER QUESTION: {question}
 
-QUERY RESULTS ({len(results)} rows, showing first {len(results_preview)}):
+QUERY RESULTS ({len(results)} rows):
 {results_json}
 
-Format a helpful response. Output JSON only.
+Format a helpful response. If patient data is available, summarize it. If using medical context, provide helpful clinical information.
+Output JSON only.
 """
     
     try:
