@@ -85,7 +85,7 @@ def load_document(path: str) -> Tuple[str, str]:
     Returns:
         Tuple of (text content, document title)
     """
-    title = os.path.basename(path)
+    filename = os.path.basename(path)
     ext = os.path.splitext(path)[1].lower()
     
     if ext == '.pdf':
@@ -95,7 +95,38 @@ def load_document(path: str) -> Tuple[str, str]:
     else:
         raise ValueError(f"Unsupported file type: {ext}")
     
+    # Try to extract a friendly title from the document content
+    title = extract_title(text, filename)
+    
     return text, title
+
+
+def extract_title(text: str, fallback: str) -> str:
+    """
+    Extract a user-friendly title from document content.
+    Looks for markdown headers like '# Medical Reference: Blood Glucose Guidelines'
+    """
+    # Look for markdown header patterns
+    patterns = [
+        r'^#\s*Medical Reference:\s*(.+)$',  # "# Medical Reference: Blood Glucose Guidelines"
+        r'^#\s*(.+)$',                        # "# Title"
+        r'^##\s*(.+)$',                       # "## Title"
+    ]
+    
+    for line in text.split('\n')[:10]:  # Check first 10 lines
+        line = line.strip()
+        for pattern in patterns:
+            match = re.match(pattern, line, re.IGNORECASE)
+            if match:
+                title = match.group(1).strip()
+                # Clean up the title
+                title = re.sub(r'\s+', ' ', title)
+                if len(title) > 5:  # Reasonable title length
+                    return title
+    
+    # Fallback: clean up the filename
+    title = fallback.replace('_', ' ').replace('.txt', '').replace('.pdf', '').replace('.md', '')
+    return title.title()
 
 
 def index_document(path: str) -> int:

@@ -233,6 +233,33 @@ def execute_safe_query(sql: str) -> tuple[List[Dict[str, Any]], Optional[str]]:
 
 
 # ---------------------------------------------------------------------------
+# Helper Functions
+# ---------------------------------------------------------------------------
+
+def create_clean_snippet(text: str, max_length: int = 200) -> str:
+    """
+    Create a clean snippet that doesn't cut words in the middle.
+    """
+    if len(text) <= max_length:
+        return text
+    
+    # Take a chunk of the text
+    snippet = text[:max_length]
+    
+    # Try to find a sentence end near the end of the snippet
+    last_period = snippet.rfind('.')
+    if last_period > max_length * 0.7:  # If period is in the last 30%
+        return snippet[:last_period+1]
+    
+    # Otherwise try to find the last space
+    last_space = snippet.rfind(' ')
+    if last_space > 0:
+        return snippet[:last_space] + "..."
+        
+    return snippet + "..."
+
+
+# ---------------------------------------------------------------------------
 # LLM Integration
 # ---------------------------------------------------------------------------
 
@@ -276,10 +303,13 @@ def retrieve_context(question: str) -> tuple[str, List[Dict[str, Any]]]:
             # Clamp to 0-1 range for safety
             relevance = max(0, min(1, 1 - distance))
             
+            # Create a clean snippet that doesn't cut mid-word
+            snippet = create_clean_snippet(doc, max_length=180)
+            
             context_parts.append(f"[Source: {title}]\n{doc}")
             sources.append({
                 "title": title,
-                "snippet": doc[:200] + "..." if len(doc) > 200 else doc,
+                "snippet": snippet,
                 "relevance": round(relevance, 2)
             })
         
