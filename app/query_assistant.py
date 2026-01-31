@@ -264,12 +264,17 @@ def retrieve_context(question: str) -> tuple[str, List[Dict[str, Any]]]:
         metadatas = results['metadatas'][0] if results.get('metadatas') else [{}] * len(documents)
         distances = results['distances'][0] if results.get('distances') else [0.5] * len(documents)
         
+        # Debug: log the actual distances from ChromaDB
+        print(f"RAG DEBUG - distances: {distances}")
+        
+        # Use rank-based relevance since ChromaDB L2 distances vary widely
+        # Results are already sorted by distance (best first)
+        rank_scores = [0.90, 0.75, 0.60, 0.50, 0.40]  # Top 5 scores
+        
         for i, doc in enumerate(documents):
             title = metadatas[i].get('title', 'Unknown Source') if i < len(metadatas) else 'Unknown Source'
-            distance = distances[i] if i < len(distances) else 0.5
-            # Convert distance to similarity (lower distance = higher similarity)
-            # ChromaDB uses L2 distance, typical range 0-2, so we use 1/(1+distance)
-            relevance = 1 / (1 + distance)
+            # Use rank-based scoring instead of distance-based
+            relevance = rank_scores[i] if i < len(rank_scores) else 0.30
             
             context_parts.append(f"[Source: {title}]\n{doc}")
             sources.append({
