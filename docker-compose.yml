@@ -6,6 +6,8 @@ services:
     volumes:
       - sqlite_data:/data
       - ~/.aws:/root/.aws:ro # Mount AWS credentials for Bedrock access
+      - ./docs:/app/docs:ro # Medical reference documents for RAG
+      - ./chroma_db:/app/chroma_db # ChromaDB vector store
     environment:
       - DATABASE_PATH=/data/agent.db
       - AWS_REGION=us-east-1

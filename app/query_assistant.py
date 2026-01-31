@@ -268,7 +268,8 @@ def retrieve_context(question: str) -> tuple[str, List[Dict[str, Any]]]:
             title = metadatas[i].get('title', 'Unknown Source') if i < len(metadatas) else 'Unknown Source'
             distance = distances[i] if i < len(distances) else 0.5
             # Convert distance to similarity (lower distance = higher similarity)
-            relevance = max(0, 1 - distance)
+            # ChromaDB uses L2 distance, typical range 0-2, so we use 1/(1+distance)
+            relevance = 1 / (1 + distance)
             
             context_parts.append(f"[Source: {title}]\n{doc}")
             sources.append({

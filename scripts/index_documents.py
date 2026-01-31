@@ -31,7 +31,7 @@ def main():
         print(f"Error: Documents directory not found: {docs_dir}")
         sys.exit(1)
     
-    print(f"\n📚 RAG Document Indexer")
+    print(f"\n=== RAG Document Indexer ===")
     print(f"=" * 50)
     
     # Show current state
@@ -39,16 +39,16 @@ def main():
     print(f"Current chunks in vector store: {current_count}")
     
     if args.clear:
-        print("\n🗑️  Clearing existing documents...")
+        print("\n[*] Clearing existing documents...")
         clear_collection()
         print("  Done!")
     
-    print(f"\n📂 Indexing documents from: {docs_dir}")
+    print(f"\n[*] Indexing documents from: {docs_dir}")
     
     results = index_directory(docs_dir)
     
     total_chunks = sum(results.values())
-    print(f"\n✅ Indexing complete!")
+    print(f"\n[OK] Indexing complete!")
     print(f"   Documents processed: {len(results)}")
     print(f"   Total chunks created: {total_chunks}")
     print(f"   Total chunks in store: {get_document_count()}")
