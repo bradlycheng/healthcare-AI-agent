@@ -35,10 +35,14 @@ def init_vector_store() -> chromadb.Collection:
         settings=Settings(anonymized_telemetry=False)
     )
     
-    # Get or create collection
+    # Get or create collection with cosine distance
+    # Cosine distance gives us 0-1 range: 0 = identical, 1 = opposite
     _collection = _client.get_or_create_collection(
         name=COLLECTION_NAME,
-        metadata={"description": "Medical guidelines for RAG"}
+        metadata={
+            "description": "Medical guidelines for RAG",
+            "hnsw:space": "cosine"  # Use cosine distance for meaningful similarity scores
+        }
     )
     
     return _collection
