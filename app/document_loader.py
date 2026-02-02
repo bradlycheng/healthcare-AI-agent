@@ -30,6 +30,7 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
     start = 0
     
     while start < len(text):
+        print(f"DEBUG: start={start}, len={len(text)}")
         end = start + chunk_size
         
         # Try to break at sentence boundary
@@ -43,9 +44,17 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
         if chunk:
             chunks.append(chunk)
         
+        # If we reached the end of the text, stop
+        if end >= len(text):
+            break
+            
         start = end - overlap
         if start < 0:
             start = 0
+            
+        # Safety check to prevent infinite loops
+        if start >= end:
+            start = end - 1
     
     return chunks
 
