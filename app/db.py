@@ -4,12 +4,38 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Tuple, Optional
 
 import os
 
 DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
+
+# Thread-local storage for connections
+_local = threading.local()
+
+
+def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
+    """
+    Get a database connection with proper settings for concurrent access.
+    Uses WAL mode for better concurrent read/write handling.
+    """
+    conn = sqlite3.connect(db_path, timeout=30.0)
+    
+    # Enable WAL mode for better concurrency (allows reads during writes)
+    conn.execute("PRAGMA journal_mode=WAL")
+    
+    # Set busy timeout to wait instead of immediately failing on lock
+    conn.execute("PRAGMA busy_timeout=5000")
+    
+    # Synchronous mode - NORMAL is good balance of safety and speed
+    conn.execute("PRAGMA synchronous=NORMAL")
+    
+    # Enable foreign keys
+    conn.execute("PRAGMA foreign_keys=ON")
+    
+    return conn
 
 
 def init_db(db_path: str = DB_PATH) -> None:
@@ -19,7 +45,7 @@ def init_db(db_path: str = DB_PATH) -> None:
       hl7_messages(received_at, raw_hl7, patient_*, fhir_bundle_json)
       observations(message_id, code, display, value_num/value_raw, unit, ref range, flag, obs dt, status)
     """
-    conn = sqlite3.connect(db_path)
+    conn = get_connection(db_path)
     try:
         conn.execute(
             """
@@ -126,7 +152,7 @@ def prune_messages(days_to_keep: int = 2, db_path: str = DB_PATH) -> int:
     Delete messages and observations older than `days_to_keep`.
     Returns the number of messages deleted.
     """
-    conn = sqlite3.connect(db_path)
+    conn = get_connection(db_path)
     try:
         # Calculate retention cutoff
         cutoff = (datetime.utcnow() - timedelta(days=days_to_keep)).isoformat()
@@ -157,7 +183,7 @@ def delete_all_messages(db_path: str = DB_PATH) -> None:
     """
     Clear all data from the database.
     """
-    conn = sqlite3.connect(db_path)
+    conn = get_connection(db_path)
     try:
         cur = conn.cursor()
         cur.execute("DELETE FROM observations")
@@ -226,7 +252,7 @@ def insert_message_and_observations(
     if fhir_bundle is None:
         fhir_bundle = {}
     
-    conn = sqlite3.connect(db_path)
+    conn = get_connection(db_path)
     try:
         if received_at is None:
             received_at = datetime.utcnow().isoformat(sep=" ", timespec="microseconds")
