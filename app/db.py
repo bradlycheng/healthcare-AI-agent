@@ -53,7 +53,49 @@ def init_db(db_path: str = DB_PATH) -> None:
               status VARCHAR,
               alert_level VARCHAR,
               alert_message VARCHAR,
+              loinc_code VARCHAR,
               FOREIGN KEY(message_id) REFERENCES hl7_messages(id)
+            );
+            """
+        )
+        
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS visits (
+                visit_id TEXT PRIMARY KEY,
+                patient_id TEXT,
+                visit_date TEXT,
+                visit_type TEXT,
+                provider_name TEXT,
+                chief_complaint TEXT
+            );
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS medications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id TEXT,
+                medication_name TEXT,
+                dosage TEXT,
+                frequency TEXT,
+                start_date TEXT,
+                end_date TEXT,
+                status TEXT
+            );
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS diagnoses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id TEXT,
+                diagnosis_code TEXT,
+                diagnosis_name TEXT,
+                diagnosis_date TEXT,
+                status TEXT
             );
             """
         )
@@ -66,6 +108,11 @@ def init_db(db_path: str = DB_PATH) -> None:
             
         try:
             conn.execute("ALTER TABLE observations ADD COLUMN alert_message VARCHAR")
+        except sqlite3.OperationalError:
+            pass # Column likely exists
+
+        try:
+            conn.execute("ALTER TABLE observations ADD COLUMN loinc_code VARCHAR")
         except sqlite3.OperationalError:
             pass # Column likely exists
             
@@ -233,6 +280,8 @@ def insert_message_and_observations(
 
             value_num, value_raw = _coerce_value(ob.get("value"))
 
+            loinc_code = str(ob.get("loinc_code") or "")
+
             cur.execute(
                 """
                 INSERT INTO observations (
@@ -248,8 +297,9 @@ def insert_message_and_observations(
                   observation_datetime,
                   status,
                   alert_level,
-                  alert_message
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  alert_message,
+                  loinc_code
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     message_id,
@@ -264,7 +314,8 @@ def insert_message_and_observations(
                     obs_dt,
                     status,
                     alert_level,
-                    alert_msg
+                    alert_msg,
+                    loinc_code
                 ),
             )
 

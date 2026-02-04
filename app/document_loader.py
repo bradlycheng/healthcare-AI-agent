@@ -27,34 +27,19 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
     text = re.sub(r'\s+', ' ', text).strip()
     
     chunks = []
-    start = 0
-    
-    while start < len(text):
-        print(f"DEBUG: start={start}, len={len(text)}")
-        end = start + chunk_size
-        
-        # Try to break at sentence boundary
-        if end < len(text):
-            # Look for sentence end within the last 100 chars of chunk
-            last_period = text.rfind('.', start + chunk_size - 100, end)
-            if last_period > start:
-                end = last_period + 1
-        
-        chunk = text[start:end].strip()
-        if chunk:
-            chunks.append(chunk)
-        
         # If we reached the end of the text, stop
         if end >= len(text):
             break
             
-        start = end - overlap
-        if start < 0:
-            start = 0
+        next_start = end - overlap
+        if next_start < 0:
+            next_start = 0
             
-        # Safety check to prevent infinite loops
-        if start >= end:
-            start = end - 1
+        # Ensure we always make progress
+        if next_start <= start:
+            next_start = start + 1
+            
+        start = next_start
     
     return chunks
 

@@ -53,6 +53,33 @@ Table: observations
   - observation_datetime (VARCHAR)
   - alert_level (VARCHAR) -- 'CRITICAL', 'WARNING', or empty
   - alert_message (VARCHAR) -- Clinical explanation of the alert
+  - loinc_code (VARCHAR) -- Standard LOINC code (e.g. "8867-4")
+
+Table: visits
+  - visit_id (VARCHAR PRIMARY KEY)
+  - patient_id (VARCHAR)
+  - visit_date (DATETIME)
+  - visit_type (VARCHAR) -- 'Outpatient', 'Emergency', etc.
+  - provider_name (VARCHAR)
+  - chief_complaint (VARCHAR)
+
+Table: medications
+  - id (INTEGER PRIMARY KEY)
+  - patient_id (VARCHAR)
+  - medication_name (VARCHAR)
+  - dosage (VARCHAR)
+  - frequency (VARCHAR)
+  - start_date (DATE)
+  - end_date (DATE)
+  - status (VARCHAR) -- 'Active', 'Discontinued'
+
+Table: diagnoses
+  - id (INTEGER PRIMARY KEY)
+  - patient_id (VARCHAR)
+  - diagnosis_code (VARCHAR) -- ICD-10 code
+  - diagnosis_name (VARCHAR)
+  - diagnosis_date (DATE)
+  - status (VARCHAR) -- 'Active', 'Resolved'
 
 RULES:
 1. ONLY generate SELECT statements.
@@ -73,15 +100,11 @@ RULES:
     - "Pulse" → search for `LIKE '%PULSE%' OR LIKE '%HEART%RATE%'`
     - "BP" or "blood pressure" → search for `LIKE '%BLOOD%PRESSURE%'` or `LIKE '%BP%'`
     - "Blood sugar" → search for `LIKE '%GLUCOSE%'`
-12. **CRITICAL: Check chat history for patient context.** If the user:
-    - Uses pronouns like "he", "she", "his", "her", "them", "their", OR
-    - Uses phrases like "what about", "and", "also" that imply continuation, AND
-    - A specific patient was mentioned in recent chat history
-    Then you MUST filter for that patient in your WHERE clause. 
-    Examples:
-    - History: "Show John Smith's results" → "What's his glucose?" → Include `WHERE ... 'JOHN' ... 'SMITH'`
-    - History: "Show Barbara's BP" → "What about heart rate?" → Include `WHERE ... 'BARBARA'`
-    - History: "Show labs for Robert Chen" → "And cholesterol?" → Include `WHERE ... 'ROBERT' ... 'CHEN'`
+12. **CRITICAL: Context and Pronouns.**
+    - If the user implies a specific patient (e.g., "his", "her", "their", "the patient", "what about BP?"), you **MUST** identify the patient from the CHAT HISTORY.
+    - Look at the **ASSISTANT's previous answers** to see which patient was just discussed.
+    - Example: User "Show John Smith" -> Assistant "John Smith (P123)..." -> User "What about glucose?" -> SEARCH FOR JOHN SMITH.
+    - If you cannot find a patient in history, do NOT filter by patient.
 
 FEW SHOT EXAMPLES:
 
@@ -119,6 +142,15 @@ SQL: SELECT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o
 User: "Who has a warning?"
 SQL: SELECT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o.alert_message FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE o.alert_level = 'WARNING'
 
+User: "Who is taking Metformin?"
+SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, m.medication_name, m.dosage FROM hl7_messages h JOIN medications m ON h.patient_id = m.patient_id WHERE UPPER(m.medication_name) LIKE '%METFORMIN%' AND m.status = 'Active'
+
+User: "Show me all diabetic patients"
+SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, d.diagnosis_name FROM hl7_messages h JOIN diagnoses d ON h.patient_id = d.patient_id WHERE UPPER(d.diagnosis_name) LIKE '%DIABETES%' AND d.status = 'Active'
+
+User: "Show visits for John Smith"
+SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, v.visit_date, v.provider_name, v.chief_complaint FROM hl7_messages h JOIN visits v ON h.patient_id = v.patient_id WHERE UPPER(h.patient_first_name) = 'JOHN' AND UPPER(h.patient_last_name) = 'SMITH' ORDER BY v.visit_date DESC LIMIT 10
+
 RESPONSE FORMAT:
 Return a JSON object with exactly this structure:
 {
@@ -130,27 +162,129 @@ Output JSON ONLY.
 
 
 RESPONSE_FORMAT_PROMPT = """
-You are a helpful healthcare data assistant. Given query results and medical reference context,
-provide a natural, conversational response to the user's question.
+You are a helpful healthcare data assistant. Given query results, summarize the data accurately.
 
-RULES:
-1. Be concise but informative
-2. If results are empty, say so helpfully
-3. Format numbers and dates readably
-4. Highlight abnormal values (flag = 'H' or 'L')
-5. Don't mention SQL or technical details
-6. Use the MEDICAL CONTEXT to provide clinical interpretation when relevant
-7. When using medical context, mention the source (e.g., "According to ADA guidelines...")
+CRITICAL RULES:
+1. **Count from the DATA**: The ROW_COUNT may include duplicate rows. Count UNIQUE patients by looking at the actual names in the results. Report the unique count.
+2. **Summarize ALL results**: If the query returns multiple patients, LIST THEM ALL (up to 10) or say "Found X patients including: Name1, Name2, Name3...".
+3. **Don't Add Unrequested Info**: Only mention MEDICAL CONTEXT if the user asked a clinical question (e.g., "is this value normal?"). For simple data queries ("who has X?"), just answer the data question.
+4. **Be Specific**: Include patient names, values, and dates from the results. Don't generalize.
+5. **No Hallucinating**: If the data isn't in the results, don't invent it. Say "I don't have that information."
+6. **Highlight Abnormals**: If `flag` is 'H' or 'L', emphasize it.
+7. **Format Dates**: Convert dates to readable format (e.g., "Jan 15, 2025").
+
+EXAMPLES:
+- Q: "Who has diabetes?" Results: 7 unique names → Answer: "7 patients have diabetes: John Smith, Mary Jones, [list all]."
+- Q: "Show visits for X" Results: 42 rows, 5 unique patient names → Answer: "I found 42 visits across 5 patients. Here's a summary by patient: [breakdown]."
+- Q: "Who has no abnormal results?" Results: 61 rows but only 20 unique names → Answer: "20 patients have no abnormal results: [list names]."
 
 RESPONSE FORMAT:
-Return a JSON object:
 {
-  "answer": "Your natural language response here",
-  "highlights": ["Key point 1", "Key point 2"]
+  "answer": "Your accurate, data-driven response here",
+  "highlights": ["Key finding 1", "Key finding 2"]
 }
 
 Output JSON ONLY.
 """.strip()
+
+
+# ---------------------------------------------------------------------------
+# Input Sanitization (Prompt Injection Protection)
+# ---------------------------------------------------------------------------
+
+# Patterns that may indicate prompt injection attempts
+INJECTION_PATTERNS = [
+    r'ignore\s+(previous|above|all)',        # "ignore previous instructions"
+    r'disregard\s+(previous|above|all)',     # "disregard all instructions"
+    r'forget\s+(previous|above|everything)', # "forget everything"
+    r'new\s+instructions?:',                 # "new instructions:"
+    r'system\s*:',                           # Trying to inject system prompts
+    r'assistant\s*:',                        # Trying to inject assistant responses
+    r'\[INST\]',                             # LLM special tokens
+    r'\[/INST\]',
+    r'<\|.*?\|>',                            # Special delimiter tokens
+    r'<<SYS>>',                              # Llama system tokens
+    r'</s>',                                 # End of sequence tokens
+    r'Human:',                               # Role injection
+    r'AI:',
+    r'###\s*(Instruction|System|Human)',     # Markdown injection patterns
+]
+
+# Unicode categories that are suspicious
+SUSPICIOUS_UNICODE_RANGES = [
+    (0x200B, 0x200F),  # Zero-width chars, directional marks
+    (0x2028, 0x202F),  # Line/paragraph separators, embedding controls
+    (0x2060, 0x206F),  # Word joiner, invisible operators
+    (0xFEFF, 0xFEFF),  # BOM (zero-width no-break space)
+    (0xFFF0, 0xFFFF),  # Specials block
+]
+
+
+def sanitize_input(text: str) -> tuple[str, list[str]]:
+    """
+    Sanitize user input to prevent prompt injection attacks.
+    Returns (sanitized_text, list_of_warnings).
+    """
+    if not text:
+        return "", []
+    
+    warnings = []
+    sanitized = text
+    
+    # 1. Remove invisible/zero-width characters
+    cleaned_chars = []
+    for char in sanitized:
+        code_point = ord(char)
+        is_suspicious = any(
+            start <= code_point <= end 
+            for start, end in SUSPICIOUS_UNICODE_RANGES
+        )
+        if is_suspicious:
+            warnings.append(f"Removed suspicious character: U+{code_point:04X}")
+        else:
+            cleaned_chars.append(char)
+    sanitized = ''.join(cleaned_chars)
+    
+    # 2. Remove emoji (keep basic punctuation and medical symbols)
+    # Allow: letters, numbers, basic punctuation, common medical symbols
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # emoticons
+        "\U0001F300-\U0001F5FF"  # symbols & pictographs
+        "\U0001F680-\U0001F6FF"  # transport & map
+        "\U0001F700-\U0001F77F"  # alchemical symbols
+        "\U0001F780-\U0001F7FF"  # geometric shapes extended
+        "\U0001F800-\U0001F8FF"  # supplemental arrows-C
+        "\U0001F900-\U0001F9FF"  # supplemental symbols
+        "\U0001FA00-\U0001FA6F"  # chess symbols
+        "\U0001FA70-\U0001FAFF"  # symbols and pictographs extended-A
+        "\U00002702-\U000027B0"  # dingbats
+        "\U0001F1E0-\U0001F1FF"  # flags
+        "]+", 
+        flags=re.UNICODE
+    )
+    if emoji_pattern.search(sanitized):
+        warnings.append("Removed emoji characters")
+        sanitized = emoji_pattern.sub('', sanitized)
+    
+    # 3. Check for prompt injection patterns
+    text_lower = sanitized.lower()
+    for pattern in INJECTION_PATTERNS:
+        if re.search(pattern, text_lower, re.IGNORECASE):
+            warnings.append(f"Blocked potential injection pattern: {pattern}")
+            # Replace the entire suspicious phrase with "[BLOCKED]"
+            sanitized = re.sub(pattern, '[BLOCKED]', sanitized, flags=re.IGNORECASE)
+    
+    # 4. Limit length to prevent DoS
+    MAX_LENGTH = 1000
+    if len(sanitized) > MAX_LENGTH:
+        warnings.append(f"Truncated input from {len(sanitized)} to {MAX_LENGTH} chars")
+        sanitized = sanitized[:MAX_LENGTH]
+    
+    # 5. Normalize whitespace (collapse multiple spaces/newlines)
+    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
+    
+    return sanitized, warnings
 
 
 # ---------------------------------------------------------------------------
@@ -440,6 +574,24 @@ def process_query(question: str, history: List[Dict[str, str]] = []) -> Dict[str
             "sql_used": "",
             "row_count": 0,
             "error": "Direct SQL queries not allowed. Please use natural language."
+        }
+    
+    # Step 0.5: Sanitize input (prompt injection protection)
+    sanitized_question, sanitization_warnings = sanitize_input(question)
+    if sanitization_warnings:
+        print(f"SECURITY: Input sanitized. Warnings: {sanitization_warnings}")
+    
+    # Use sanitized question from here on
+    question = sanitized_question
+    
+    if not question.strip():
+        return {
+            "success": False,
+            "answer": "Your query was blocked due to potentially unsafe content. Please ask a normal question about patient data.",
+            "highlights": [],
+            "sql_used": "",
+            "row_count": 0,
+            "error": "Query blocked by input sanitization"
         }
     
     # Step 1: Generate SQL from question

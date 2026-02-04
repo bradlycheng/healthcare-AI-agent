@@ -276,6 +276,11 @@ OBX|6|TX|NOTE^Clinical Note||Healthy 72yo male. Mild hypertension controlled. Ov
 
 def seed_database(verbose=True):
     """Seed database with realistic sample data"""
+    import sqlite3
+    import os
+    
+    DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
+    
     if verbose:
         print("Initializing database...")
     init_db()
@@ -293,8 +298,68 @@ def seed_database(verbose=True):
             print(f"  [{i}/{len(messages)}] Processing message...")
         run_oru_pipeline(msg)
     
+    # Add medications, diagnoses, and visits for key patients
     if verbose:
-        print(f"\\n✓ Database seeded with {len(messages)} messages from 20 realistic patients")
+        print("Adding medications, diagnoses, and visits...")
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Sample medications (matching clinical notes in HL7 messages)
+    medications = [
+        ("10001", "Metformin", "500 mg", "BID", "2025-10-01", None, "Active"),  # Sarah Johnson - Diabetes
+        ("10002", "Lisinopril", "10 mg", "Daily", "2025-09-01", None, "Active"),  # Michael Chen - HTN
+        ("10002", "Atorvastatin", "20 mg", "Daily", "2025-09-01", None, "Active"),  # Michael Chen - Cholesterol
+        ("10003", "Levothyroxine", "50 mcg", "Daily", "2025-11-01", None, "Active"),  # Emily Rodriguez - Thyroid
+        ("10012", "Lisinopril", "10 mg", "Daily", "2025-01-01", None, "Active"),  # Kevin Anderson - HTN
+        ("10015", "Vitamin D", "2000 IU", "Daily", "2025-12-01", None, "Active"),  # Rachel White - Vit D
+    ]
+    
+    for med in medications:
+        cursor.execute("""
+            INSERT INTO medications (patient_id, medication_name, dosage, frequency, start_date, end_date, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, med)
+    
+    # Sample diagnoses
+    diagnoses = [
+        ("10001", "E11.9", "Type 2 Diabetes Mellitus", "2025-10-01", "Active"),
+        ("10002", "I10", "Essential Hypertension", "2025-09-01", "Active"),
+        ("10002", "E78.0", "Hyperlipidemia", "2025-09-01", "Active"),
+        ("10003", "E03.9", "Hypothyroidism", "2025-11-01", "Active"),
+        ("10004", "I21.9", "Acute Myocardial Infarction", "2025-01-28", "Active"),
+        ("10006", "N18.3", "Chronic Kidney Disease Stage 3", "2024-12-01", "Active"),
+        ("10008", "R73.03", "Prediabetes", "2025-11-01", "Active"),
+        ("10014", "J44.1", "COPD with Exacerbation", "2025-01-15", "Active"),
+        ("10019", "E66.9", "Metabolic Syndrome", "2025-01-17", "Active"),
+    ]
+    
+    for diag in diagnoses:
+        cursor.execute("""
+            INSERT INTO diagnoses (patient_id, diagnosis_code, diagnosis_name, diagnosis_date, status)
+            VALUES (?, ?, ?, ?, ?)
+        """, diag)
+    
+    # Sample visits
+    visits = [
+        ("V001", "10001", "2025-10-01", "Outpatient", "Dr. Smith", "New diabetes diagnosis"),
+        ("V002", "10001", "2025-12-01", "Outpatient", "Dr. Smith", "Diabetes follow-up"),
+        ("V003", "10002", "2025-09-01", "Outpatient", "Dr. Jones", "Hypertension workup"),
+        ("V004", "10004", "2025-01-28", "Emergency", "Dr. Williams", "Chest pain"),
+        ("V005", "10006", "2024-12-15", "Outpatient", "Dr. Chen", "Kidney function check"),
+    ]
+    
+    for visit in visits:
+        cursor.execute("""
+            INSERT INTO visits (visit_id, patient_id, visit_date, visit_type, provider_name, chief_complaint)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, visit)
+    
+    conn.commit()
+    conn.close()
+    
+    if verbose:
+        print(f"\n[OK] Database seeded with {len(messages)} messages from 20 realistic patients")
         print("  - 3 diabetics (various control levels)")
         print("  - 2 cardiac patients")
         print("  - 2 hypertension")
@@ -305,6 +370,10 @@ def seed_database(verbose=True):
         print("  - 1 metabolic syndrome")
         print("  - 6 healthy/minor conditions")
         print("  Total observations: ~120")
+        print(f"  Medications: {len(medications)}")
+        print(f"  Diagnoses: {len(diagnoses)}")
+        print(f"  Visits: {len(visits)}")
 
 if __name__ == "__main__":
     seed_database(verbose=True)
+
