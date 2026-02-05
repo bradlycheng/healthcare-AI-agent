@@ -335,49 +335,29 @@ NOTES (Free Text):
 {notes_block}
 
 TASK:
-Return a SINGLE JSON object with ALL of the following keys
-
-LOINC CODE REFERENCE (use these exact codes for extracted observations):
-- Hemoglobin: code="718-7", unit="g/dL"
-- WBC: code="6690-2", unit="/uL"
-- Blood Pressure Systolic: code="8480-6", unit="mmHg"
-- Blood Pressure Diastolic: code="8462-4", unit="mmHg"
-- Heart Rate: code="8867-4", unit="bpm"
-- SpO2: code="59408-5", unit="%"
-
-INSTRUCTIONS:
 1. ANALYZE the "NOTES (Free Text)" section for quantitative results NOT present in the Structured list.
-2. IGNORE values that already exist in the "OBSERVATIONS (Structured)" list (duplicates).
-3. EXTRACT new findings (e.g. "BP 130/80" in notes when missing from OBX).
-   - If you see a quantitative test result in the notes (e.g. "BP 130/80", "Pulse 90") that is NOT in the structured list, you MUST extract it.
-   - **IMPORTANT**: Even if "Patient reports", TREAT AS VALID.
-   - **NAMING**: Use standard names (e.g. "Glucose", "Blood Pressure").
-   - Set "source": "AI_EXTRACTED".
-   - **CRITICAL OPTIMIZATION**: In "structured_observations", return **ONLY THE NEWLY EXTRACTED ITEMS**.
-   - Do NOT repeat the input observations.
-   - If nothing is extracted, return an empty list [].
-4. Set "clinical_summary" to "". (We use local summary for speed).
-5. Generate a valid "fhir_bundle".
+2. EXTRACT ONLY NEW findings. Do NOT return items already in the Structured list.
+3. USE these exact LOINC codes:
+   - Hemoglobin: "718-7" (g/dL)
+   - WBC: "6690-2" (/uL)
+   - BP Systolic: "8480-6" (mmHg), BP Diastolic: "8462-4" (mmHg)
+   - Heart Rate: "8867-4" (bpm), SpO2: "59408-5" (%)
 
 OUTPUT JSON FORMAT:
 {{
-  "patient": {{...}},
-  "clinical_summary": "",
-  "notes_analysis": "EXTRACTED: [Value] | SKIPPED: [Reason]",
-  "structured_observations": [
+  "thought_process": "Briefly list the values found in notes and why they are new.",
+  "new_observations": [
     {{
       "code": "...",
       "display": "...",
       "value": ...,
       "unit": "...",
-      "flag": "...",
-      "source": "HL7" | "AI_EXTRACTED"
+      "source": "AI_EXTRACTED"
     }}
-  ],
-  "fhir_bundle": {{...}}
+  ]
 }}
 
-Return ONLY valid JSON.
+STRICT CONSTRAINT: Return ONLY valid JSON. No comments, no preamble. ONLY include data explicitly stated in the notes.
 """.strip()
 
 
@@ -388,29 +368,24 @@ def _merge_llm_output(
     base_fhir_bundle: Dict[str, Any],
     llm_raw: Dict[str, Any],
 ) -> Tuple[Dict[str, Any], str, List[Dict[str, Any]], Dict[str, Any]]:
-    patient = base_patient
-    summary = base_summary
-    structured_observations = base_structured_obs
-    fhir_bundle = base_fhir_bundle
+    # Phase 2: Simplified Merge for "Delta Only" Extraction
+    structured_observations = list(base_structured_obs)
+    
+    new_obs = llm_raw.get("new_observations", [])
+    if isinstance(new_obs, list):
+        for o in new_obs:
+            if not isinstance(o, dict): continue
+            o["source"] = "AI_EXTRACTED"
+            # Basic dedup check to prevent AI repeating structured data
+            is_dupe = any(
+                str(b["code"]) == str(o.get("code")) and str(b["value"]) == str(o.get("value"))
+                for b in base_structured_obs
+            )
+            if not is_dupe:
+                structured_observations.append(o)
 
-    if llm_raw.get("clinical_summary"):
-        summary = llm_raw["clinical_summary"]
-
-    if isinstance(llm_raw.get("structured_observations"), list):
-        # SAFER MERGE: 
-        # 1. Keep all original HL7 observations (ground truth).
-        # 2. Only add "AI_EXTRACTED" observations from the LLM.
-        # 3. This prevents the LLM from accidentally deleting or hallucinating modifications to raw data.
-        
-        llm_obs = llm_raw["structured_observations"]
-        
-        # Filter for only AI extracted items
-        ai_extracted = [o for o in llm_obs if o.get("source") == "AI_EXTRACTED"]
-        
-        # Combine: Base HL7 + AI Extracted
-        structured_observations = base_structured_obs + ai_extracted
-
-    return patient, summary, structured_observations, fhir_bundle
+    # Patient, summary, and bundle are handled locally now for speed
+    return base_patient, base_summary, structured_observations, base_fhir_bundle
 
 
 def _ensure_obs_fields(obs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -527,6 +502,9 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
                 llm_raw,
             )
             structured_observations = _ensure_obs_fields(structured_observations)
+            # Regenerate summary and FHIR bundle locally to include new items
+            clinical_summary = _basic_clinical_summary(structured_observations)
+            fhir_bundle = _build_fhir_bundle(patient, structured_observations)
         except LLMError as e:
             print(f"DEBUG LLM ERROR: {e}")
             pass

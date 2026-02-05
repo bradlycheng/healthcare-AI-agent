@@ -167,7 +167,7 @@ def call_llm_for_json(prompt: str) -> Dict[str, Any]:
     payload = {
         "prompt": f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
         "max_gen_len": 2048,
-        "temperature": 0.3,
+        "temperature": 0.0,
         "top_p": 0.9
     }
 
