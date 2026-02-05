@@ -261,35 +261,55 @@ document.addEventListener('DOMContentLoaded', () => {
             const startTime = Date.now();
 
             try {
-                // Construct payload
-                // We use parsing endpoint first
-                const useLLM = aiToggle && aiToggle.checked;
-                const url = `/oru/parse?persist=false&use_llm=${useLLM}`;
+                // STAGE 1: Instant Parse (LLM Disabled)
+                const payloadFast = {
+                    hl7_text: hl7,
+                    use_llm: false,
+                    persist: false
+                };
 
-                const response = await fetch(url, {
+                const responseFast = await fetch('/oru/parse', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        hl7_text: hl7,
-                        use_llm: useLLM,
-                        persist: false
-                    })
+                    body: JSON.stringify(payloadFast)
                 });
 
-                if (!response.ok) {
-                    throw new Error(await response.text());
-                }
+                if (!responseFast.ok) throw new Error(await responseFast.text());
 
-                currentAnalysisData = await response.json();
-
-                // Render
+                currentAnalysisData = await responseFast.json();
                 renderResults(currentAnalysisData);
-                if (resultsArea) resultsArea.classList.remove('hidden');
 
-                // Show Save Button
+                if (resultsArea) resultsArea.classList.remove('hidden');
                 if (saveBtn) saveBtn.classList.remove('hidden');
 
-                showToast('Analysis complete.', 'success');
+                // STAGE 2: AI Enrichment (if requested)
+                const useLLM = aiToggle && aiToggle.checked;
+                if (useLLM) {
+                    // Update UI for Stage 2
+                    processBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles fa-spin"></i> AI Analyzing...';
+
+                    const payloadAI = {
+                        hl7_text: hl7,
+                        use_llm: true,
+                        persist: false
+                    };
+
+                    const responseAI = await fetch('/oru/parse', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payloadAI)
+                    });
+
+                    if (!responseAI.ok) throw new Error(await responseAI.text());
+
+                    const dataAI = await responseAI.json();
+                    currentAnalysisData = dataAI; // Update with enriched data
+                    renderResults(dataAI);
+
+                    showToast('AI Analysis complete.', 'success');
+                } else {
+                    showToast('Analysis complete.', 'success');
+                }
 
             } catch (err) {
                 console.error(err);

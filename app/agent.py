@@ -306,8 +306,9 @@ def _build_llm_prompt(
 ) -> str:
     import json as _json
 
-    patient_json = _json.dumps(patient, indent=2)
-    obs_json = _json.dumps(structured_observations, indent=2)
+    patient_json = _json.dumps(patient, ensure_ascii=False)
+    # Compact JSON to save tokens/latency
+    obs_json = _json.dumps(structured_observations, ensure_ascii=False)
     
     # Extract all notes for explicit prompting
     all_notes = []
@@ -345,23 +346,24 @@ LOINC CODE REFERENCE (use these exact codes for extracted observations):
 - SpO2: code="59408-5", unit="%"
 
 INSTRUCTIONS:
-1. Start with the "OBSERVATIONS (Structured)" list effectively.
-2. CHECK the "NOTES (Free Text)" section carefully.
-   - If you see a quantitative test result in the notes (like "BP 130/80", "Pulse 90", "Temp 101.5") that is NOT in the structured list, you MUST extract it.
-   - **IMPORTANT: Even if the note says "Patient reports", TREAT THIS AS A VALID FINDING for this extraction.**
-   - Example matches: "patient reports BP 140/90", "heart rate 110", "O2 sat 98%".
-   - **NAMING CONVENTION**: Use standard, concise display names (e.g., use "Glucose" instead of "Fasting Blood Glucose" if possible, or "Blood Pressure" instead of "BP").
-   - For extracted items, set "source": "AI_EXTRACTED".
-   - For original items, set "source": "HL7".
-   - **CRITICALLY IMPORTANT**: You MUST add these new extracted observations to the "structured_observations" list in your JSON output. Do not just put them in the FHIR bundle.
-3. Generate a "clinical_summary" of the findings.
-4. Generate a valid "fhir_bundle".
+1. ANALYZE the "NOTES (Free Text)" section for quantitative results NOT present in the Structured list.
+2. IGNORE values that already exist in the "OBSERVATIONS (Structured)" list (duplicates).
+3. EXTRACT new findings (e.g. "BP 130/80" in notes when missing from OBX).
+   - If you see a quantitative test result in the notes (e.g. "BP 130/80", "Pulse 90") that is NOT in the structured list, you MUST extract it.
+   - **IMPORTANT**: Even if "Patient reports", TREAT AS VALID.
+   - **NAMING**: Use standard names (e.g. "Glucose", "Blood Pressure").
+   - Set "source": "AI_EXTRACTED".
+   - **CRITICAL OPTIMIZATION**: In "structured_observations", return **ONLY THE NEWLY EXTRACTED ITEMS**.
+   - Do NOT repeat the input observations.
+   - If nothing is extracted, return an empty list [].
+4. Set "clinical_summary" to "". (We use local summary for speed).
+5. Generate a valid "fhir_bundle".
 
 OUTPUT JSON FORMAT:
 {{
   "patient": {{...}},
-  "clinical_summary": "...",
-  "notes_analysis": "EXTRACTED: [Value] from [Snippet] | SKIPPED: [Reason]",
+  "clinical_summary": "",
+  "notes_analysis": "EXTRACTED: [Value] | SKIPPED: [Reason]",
   "structured_observations": [
     {{
       "code": "...",
@@ -391,7 +393,7 @@ def _merge_llm_output(
     structured_observations = base_structured_obs
     fhir_bundle = base_fhir_bundle
 
-    if isinstance(llm_raw.get("clinical_summary"), str):
+    if llm_raw.get("clinical_summary"):
         summary = llm_raw["clinical_summary"]
 
     if isinstance(llm_raw.get("structured_observations"), list):
