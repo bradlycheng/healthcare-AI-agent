@@ -578,12 +578,13 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
             clinical_summary = alert_summary
 
     # 6) Persist (Optional)
+    message_id = None
     if persist:
         try:
             init_db()
             msh_obj = parse_msh(hl7_text)
             msh_dict = msh_obj.__dict__ if msh_obj else {}
-            insert_message_and_observations(
+            message_id = insert_message_and_observations(
                 received_at=str(datetime.utcnow()),
                 raw_hl7=hl7_text,
                 patient=patient,
@@ -596,6 +597,7 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
             raise e
 
     return {
+        "id": message_id,
         "patient": patient,
         "clinical_summary": clinical_summary,
         "structured_observations": structured_observations,
