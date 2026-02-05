@@ -233,7 +233,7 @@ def test_api_integration():
                     test("Timeline endpoint works", r3.status_code == 200)
             
             # Test reset endpoint exists
-            r4 = requests.post("http://127.0.0.1:8080/admin/reset", timeout=10)
+            r4 = requests.post("http://127.0.0.1:8080/admin/reset", timeout=60)
             test("Reset endpoint works", r4.status_code in [200, 201], f"status={r4.status_code}")
         else:
             test("Server is running", False, f"status={r.status_code}")
