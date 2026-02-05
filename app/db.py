@@ -187,10 +187,24 @@ def delete_all_messages(db_path: str = DB_PATH) -> None:
     Clear all data from the database.
     """
     conn = get_connection(db_path)
+    print(f"DEBUG: Attempting to delete all messages from {db_path}...", flush=True)
     try:
         cur = conn.cursor()
         cur.execute("DELETE FROM observations")
+        print(f"DEBUG: Deleted {cur.rowcount} observations", flush=True)
         cur.execute("DELETE FROM hl7_messages")
+        print(f"DEBUG: Deleted {cur.rowcount} messages", flush=True)
+        cur.execute("DELETE FROM visits")
+        print(f"DEBUG: Deleted {cur.rowcount} visits", flush=True)
+        cur.execute("DELETE FROM medications")
+        print(f"DEBUG: Deleted {cur.rowcount} medications", flush=True)
+        cur.execute("DELETE FROM diagnoses")
+        print(f"DEBUG: Deleted {cur.rowcount} diagnoses", flush=True)
+        # Reset sequences for auto-increment IDs
+        cur.execute("DELETE FROM sqlite_sequence WHERE name='hl7_messages'")
+        cur.execute("DELETE FROM sqlite_sequence WHERE name='observations'")
+        cur.execute("DELETE FROM sqlite_sequence WHERE name='medications'")
+        cur.execute("DELETE FROM sqlite_sequence WHERE name='diagnoses'")
         conn.commit()
     finally:
         conn.close()

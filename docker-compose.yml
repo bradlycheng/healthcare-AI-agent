@@ -8,6 +8,8 @@ services:
       - ~/.aws:/root/.aws:ro # Mount AWS credentials for Bedrock access
       - ./docs:/app/docs:ro # Medical reference documents for RAG
       - ./chroma_db:/app/chroma_db # ChromaDB vector store
+      - ./web:/app/web # Frontend code (hot reload)
+      - ./app:/app/app # Backend code (hot reload)
     environment:
       - DATABASE_PATH=/data/agent.db
       - AWS_REGION=us-east-1

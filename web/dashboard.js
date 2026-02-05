@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshBtn.disabled = true;
 
         try {
-            const response = await fetch(`${API_BASE}/messages?limit=200`);
+            const response = await fetch(`${API_BASE}/messages?limit=1000`);
             if (!response.ok) throw new Error('Failed to fetch messages');
 
             const data = await response.json();

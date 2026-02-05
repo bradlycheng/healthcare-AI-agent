@@ -513,7 +513,7 @@ def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseRespon
 
 @app.get("/messages", response_model=MessageListResponse)
 def list_messages(
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=2000),
     offset: int = Query(0, ge=0),
 ) -> MessageListResponse:
     """
@@ -719,14 +719,13 @@ async def reset_demo_data():
             loop = asyncio.get_running_loop()
             
             def _perform_reset():
-                from .db import delete_all_messages
                 from .seed import seed_database
-                delete_all_messages()
+                # delete_all_messages() is called inside seed_database
                 seed_database(verbose=False)
                 
             await loop.run_in_executor(None, _perform_reset)
             
-            return {"success": True, "message": "Database reset with 20 realistic patients and ~120 observations."}
+            return {"success": True, "message": "Database reset with 100 realistic patients and corresponding clinical data."}
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Reset failed: {str(e)}")
 
