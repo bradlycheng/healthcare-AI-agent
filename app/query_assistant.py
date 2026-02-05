@@ -105,15 +105,23 @@ RULES:
     - If the user implies a specific patient (e.g., "his", "her", "their", "the patient", "what about BP?"), you **MUST** identify the patient from the CHAT HISTORY.
     - Look at the **ASSISTANT's previous answers** to see which patient was just discussed.
     - Example: User "Show John Smith" -> Assistant "John Smith (P123)..." -> User "What about glucose?" -> SEARCH FOR JOHN SMITH.
+    - Example: User "Show John Smith" -> Assistant "John Smith (P123)..." -> User "What about glucose?" -> SEARCH FOR JOHN SMITH.
     - If you cannot find a patient in history, do NOT filter by patient.
+13. **AMBIGUITY:**
+    - If the user asks about a number without context (e.g., "Is 85 good?") and there is no history, DO NOT GUESS.
+    - Return an empty SQL query and explanation: "Please specify what measurement you are referring to (e.g., Glucose, Diastolic BP, Heart Rate)."
 
 FEW SHOT EXAMPLES:
 
 User: "Show all patients"
 SQL: SELECT DISTINCT patient_id, patient_first_name, patient_last_name FROM hl7_messages LIMIT 50
 
-User: "What are John Smith's lab results?"
-SQL: SELECT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o.unit, o.flag FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE UPPER(h.patient_first_name) = 'JOHN' AND UPPER(h.patient_last_name) = 'SMITH'
+User: "Show visits for John Smith"
+SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, v.visit_date, v.provider_name, v.chief_complaint FROM hl7_messages h JOIN visits v ON h.patient_id = v.patient_id WHERE UPPER(h.patient_first_name) = 'JOHN' AND UPPER(h.patient_last_name) = 'SMITH' ORDER BY v.visit_date DESC LIMIT 10
+
+User: "Is 85 good?"
+SQL: 
+-- Explanation: The user did not specify a measurement. Do not guess.
 
 User: "Which patients have elevated glucose?"
 SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, o.value_num, o.unit FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE UPPER(o.display) LIKE '%GLUCOSE%' AND o.flag = 'H'
@@ -146,11 +154,22 @@ SQL: SELECT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o
 User: "Who is taking Metformin?"
 SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, m.medication_name, m.dosage FROM hl7_messages h JOIN medications m ON h.patient_id = m.patient_id WHERE UPPER(m.medication_name) LIKE '%METFORMIN%' AND m.status = 'Active'
 
-User: "Show me all diabetic patients"
-SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, d.diagnosis_name FROM hl7_messages h JOIN diagnoses d ON h.patient_id = d.patient_id WHERE UPPER(d.diagnosis_name) LIKE '%DIABETES%' AND d.status = 'Active'
 
-User: "Show visits for John Smith"
-SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, v.visit_date, v.provider_name, v.chief_complaint FROM hl7_messages h JOIN visits v ON h.patient_id = v.patient_id WHERE UPPER(h.patient_first_name) = 'JOHN' AND UPPER(h.patient_last_name) = 'SMITH' ORDER BY v.visit_date DESC LIMIT 10
+CRITICAL RULES:
+1. **Count from the DATA**: The ROW_COUNT may include duplicate rows. Count UNIQUE patients by looking at the actual names in the results. Report the unique count.
+2. **Summarize ALL results**: If the query returns multiple patients, LIST THEM ALL (up to 10) or say "Found X patients including: Name1, Name2, Name3...".
+3. **Don't Add Unrequested Info**: Only mention MEDICAL CONTEXT if the user asked a clinical question (e.g., "is this value normal?"). For simple data queries ("who has X?"), just answer the data question.
+4. **Be Specific**: Include patient names, values, and dates from the results. Don't generalize.
+5. **No Hallucinating**: If the data isn't in the results, don't invent it. Say "I don't have that information."
+6. **Highlight Abnormals**: If `flag` is 'H' or 'L', emphasize it.
+7. **Format Dates**: Convert dates to readable format (e.g., "Jan 15, 2025").
+8. **Clinical Accuracy**: When applying guidelines, COMPARE NUMBERS CAREFULLY. (e.g., 141 is GREATER THAN 140, so it is NOT normal). Quote the guideline range you are using.
+9. **Check Logic**: If you say "145 is normal ( < 140 )", you are WRONG. 145 > 140. Be precise.
+
+EXAMPLES:
+- Q: "Who has diabetes?" Results: 7 unique names → Answer: "7 patients have diabetes: John Smith, Mary Jones, [list all]."
+- Q: "Show visits for X" Results: 42 rows, 5 unique patient names → Answer: "I found 42 visits across 5 patients. Here's a summary by patient: [breakdown]."
+- Q: "Who has no abnormal results?" Results: 61 rows but only 20 unique names → Answer: "20 patients have no abnormal results: [list names]."
 
 RESPONSE FORMAT:
 Return a JSON object with exactly this structure:
@@ -158,8 +177,10 @@ Return a JSON object with exactly this structure:
   "sql": "SELECT ...",
   "explanation": "Brief explanation"
 }
-Output JSON ONLY.
+1. If the query is AMBIGUOUS (no unit/context), set "sql" to "SELECT 'AMBIGUOUS'" and "explanation" to "Please specify what measurement you are referring to (e.g., Glucose, Diastolic BP, Heart Rate)."
+2. Output JSON ONLY.
 """.strip()
+
 
 
 RESPONSE_FORMAT_PROMPT = """
@@ -400,6 +421,9 @@ Generate the SQL query now. Output JSON only.
         
         if not sql:
             return "", "", "LLM did not generate a SQL query"
+
+        if "SELECT 'AMBIGUOUS'" in sql.upper():
+             return "", "", f"AMBIGUOUS: {explanation}"
         
         return sql, explanation, None
         
@@ -505,6 +529,18 @@ def process_query(question: str, history: List[Dict[str, str]] = []) -> Dict[str
     # Step 1: Generate SQL from question
     sql, explanation, error = generate_sql_from_question(question, history)
     if error:
+        if error.startswith("AMBIGUOUS:"):
+             # User friendly return
+             reason = error.replace("AMBIGUOUS: ", "")
+             return {
+                "success": False,
+                "answer": reason,
+                "highlights": [],
+                "sql_used": "",
+                "row_count": 0,
+                "error": None # Treated as a valid conversational response
+            }
+
         return {
             "success": False,
             "answer": f"I couldn't understand that question. Error: {error}",
