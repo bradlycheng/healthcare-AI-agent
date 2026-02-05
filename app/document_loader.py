@@ -27,7 +27,18 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
     text = re.sub(r'\s+', ' ', text).strip()
     
     chunks = []
+    
+    start = 0
+    while True:
+        end = start + chunk_size
+        
         # If we reached the end of the text, stop
+        if start >= len(text):
+            break
+            
+        chunk = text[start:end]
+        chunks.append(chunk)
+
         if end >= len(text):
             break
             

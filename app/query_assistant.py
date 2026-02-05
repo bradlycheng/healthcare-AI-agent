@@ -173,6 +173,8 @@ CRITICAL RULES:
 5. **No Hallucinating**: If the data isn't in the results, don't invent it. Say "I don't have that information."
 6. **Highlight Abnormals**: If `flag` is 'H' or 'L', emphasize it.
 7. **Format Dates**: Convert dates to readable format (e.g., "Jan 15, 2025").
+8. **Clinical Accuracy**: When applying guidelines, COMPARE NUMBERS CAREFULLY. (e.g., 141 is GREATER THAN 140, so it is NOT normal). Quote the guideline range you are using.
+9. **Check Logic**: If you say "145 is normal ( < 140 )", you are WRONG. 145 > 140. Be precise.
 
 EXAMPLES:
 - Q: "Who has diabetes?" Results: 7 unique names → Answer: "7 patients have diabetes: John Smith, Mary Jones, [list all]."
@@ -193,18 +195,6 @@ Output JSON ONLY.
 # Input Sanitization (Prompt Injection Protection)
 # ---------------------------------------------------------------------------
 
-    r'AI:',
-    r'###\s*(Instruction|System|Human)',     # Markdown injection patterns
-]
-
-# Unicode categories that are suspicious
-SUSPICIOUS_UNICODE_RANGES = [
-    (0x200B, 0x200F),  # Zero-width chars, directional marks
-    (0x2028, 0x202F),  # Line/paragraph separators, embedding controls
-    (0x2060, 0x206F),  # Word joiner, invisible operators
-    (0xFEFF, 0xFEFF),  # BOM (zero-width no-break space)
-    (0xFFF0, 0xFFFF),  # Specials block
-]
 
 
 def sanitize_input(text: str) -> tuple[str, list[str]]:
