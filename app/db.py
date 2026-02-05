@@ -83,7 +83,7 @@ def init_db(db_path: str = DB_PATH) -> None:
               alert_level VARCHAR,
               alert_message VARCHAR,
               loinc_code VARCHAR,
-              FOREIGN KEY(message_id) REFERENCES hl7_messages(id)
+              FOREIGN KEY(message_id) REFERENCES hl7_messages(id) ON DELETE CASCADE
             );
             """
         )
@@ -283,6 +283,20 @@ def insert_message_and_observations(
         bundle_json = json.dumps(fhir_bundle)
 
         cur = conn.cursor()
+
+        # --- STORAGE LIMIT ENFORCEMENT ---
+        # Stop saving and raise error if 1300 records reached
+        # (Max seed ~1200 + 100 user buffer)
+        try:
+            count = cur.execute("SELECT COUNT(*) FROM hl7_messages").fetchone()[0]
+            if count >= 1300:
+                 raise ValueError("Demo database storage limit reached (1300 messages). Please Reset Demo.")
+        except ValueError:
+            raise
+        except Exception as e:
+            print(f"Error checking storage limit: {e}")
+        # --------------------------------
+
         cur.execute(
             """
             INSERT INTO hl7_messages (

@@ -74,12 +74,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function confirmDelete() {
         console.log('Reset Demo Clicked');
-        // if (confirm('Are you sure...')) { 
-        if (true) {
+        if (confirm('Are you sure you want to reset the database? This action cannot be undone.')) {
+
+            const password = prompt("Please enter the Admin Password to confirm reset:");
+            if (!password) return; // User cancelled
+
             try {
                 console.log('Sending RESET request...');
-                const response = await fetch(`${API_BASE}/admin/reset`, { method: 'POST' });
+                const response = await fetch(`${API_BASE}/admin/reset`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: password })
+                });
+
                 console.log('Reset response:', response.status);
+
+                if (response.status === 401) {
+                    showToast('Incorrect Password. Reset cancelled.', 'error');
+                    return;
+                }
+
                 if (!response.ok && response.status !== 409) {
                     const txt = await response.text();
                     throw new Error(txt || 'Failed to reset messages');

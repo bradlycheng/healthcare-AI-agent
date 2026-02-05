@@ -717,12 +717,28 @@ import asyncio
 from asyncio import Lock
 reset_lock = Lock()
 
+import os
+import time
+from pydantic import BaseModel
+
+class ResetRequest(BaseModel):
+    password: str
+
 @app.post("/admin/reset")
-async def reset_demo_data():
+async def reset_demo_data(req: ResetRequest):
     """
     Reset database to initial demo state.
     Deletes all messages and reseeds with sample data.
+    Requires password.
     """
+    # Load password from env, default to d3m0th1s
+    admin_password = os.getenv("ADMIN_PASSWORD", "d3m0th1s")
+
+    if req.password != admin_password:
+        # Anti-brute force delay
+        time.sleep(1.0)
+        raise HTTPException(status_code=401, detail="Incorrect Password")
+
     if reset_lock.locked():
         raise HTTPException(status_code=409, detail="Reset already in progress. Please wait.")
 
