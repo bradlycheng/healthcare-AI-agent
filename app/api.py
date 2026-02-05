@@ -188,10 +188,12 @@ class PatientSummaryResponse(BaseModel):
 
 # ---------- DB Helpers ----------
 
-def _conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+from .db import get_connection as _conn
+
+# def _conn() -> sqlite3.Connection:
+#     conn = sqlite3.connect(DB_PATH)
+#     conn.row_factory = sqlite3.Row
+#     return conn
 
 
 def _parse_fhir_bundle(raw_json: Optional[str]) -> Dict[str, Any]:

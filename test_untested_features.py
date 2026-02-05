@@ -219,21 +219,21 @@ def test_api_integration():
     import requests
     
     try:
-        r = requests.get("http://localhost:8080/health", timeout=2)
+        r = requests.get("http://127.0.0.1:8080/health", timeout=2)
         if r.status_code == 200:
             test("Server is running", True)
             
             # Test patient timeline endpoint
-            r2 = requests.get("http://localhost:8080/patients", timeout=5)
+            r2 = requests.get("http://127.0.0.1:8080/patients", timeout=5)
             if r2.status_code == 200:
                 patients = r2.json().get("patients", [])
                 if patients:
                     pid = patients[0]["patient_id"]
-                    r3 = requests.get(f"http://localhost:8080/patients/{pid}/timeline", timeout=5)
+                    r3 = requests.get(f"http://127.0.0.1:8080/patients/{pid}/timeline", timeout=5)
                     test("Timeline endpoint works", r3.status_code == 200)
             
             # Test reset endpoint exists
-            r4 = requests.post("http://localhost:8080/admin/reset", timeout=10)
+            r4 = requests.post("http://127.0.0.1:8080/admin/reset", timeout=10)
             test("Reset endpoint works", r4.status_code in [200, 201], f"status={r4.status_code}")
         else:
             test("Server is running", False, f"status={r.status_code}")

@@ -35,6 +35,9 @@ def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
     # Enable foreign keys
     conn.execute("PRAGMA foreign_keys=ON")
     
+    # Use Row factory for name-based access
+    conn.row_factory = sqlite3.Row
+    
     return conn
 
 
