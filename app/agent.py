@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json as _json
+import sys
+import traceback
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -12,7 +15,7 @@ from .llm_client import LLMError, call_llm_for_json
 from .alerts import check_alert
 from .security import sanitize_text
 
-# Toggle this if/when you want to actually use Ollama for enrichment.
+# Toggle this if/when you want to actually use AI for enrichment.
 USE_LLM = True
 
 # Text-based OBX-2 value types that need AI analysis (per HL7 v2 spec)
@@ -25,21 +28,13 @@ def _needs_ai_analysis(observations: List[Dict[str, Any]]) -> bool:
     """
     for obs in observations:
         notes = obs.get("notes", [])
-        if notes and any(n.strip() for n in notes):
-            print(f"DEBUG: AI needed due to notes: {notes}")
-            return True
-        
         vtype = obs.get("value_type", "").upper()
-        if vtype in TEXT_VALUE_TYPES:
-            print(f"DEBUG: AI needed due to text type: {vtype}")
+        if notes and any(n.strip() for n in notes):
             return True
-    
+        if vtype in TEXT_VALUE_TYPES:
+            return True
     return False
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _flag_to_phrase(flag: str) -> Optional[str]:
     mapping = {"H": "high", "L": "low", "N": "within normal range"}
@@ -123,63 +118,64 @@ def _build_fhir_bundle(patient: Dict[str, Any], structured_observations: List[Di
 
 
 def _build_llm_prompt(patient: Dict[str, Any], structured_observations: List[Dict[str, Any]]) -> str:
-    import json as _json
-    patient_json = _json.dumps(patient, ensure_ascii=False)
-    obs_json = _json.dumps(structured_observations, ensure_ascii=False)
     all_notes = []
     for o in structured_observations:
         for n in o.get("notes", []):
             all_notes.append(f"- Note attached to {o.get('display', 'observation')}: {n}")
     notes_block = "CLINICAL NOTES FOUND IN INPUT:\n" + "\n".join(all_notes) if all_notes else "NO NOTES FOUND."
-
-    return f"""
-You are a smart clinical assistant. Your PRIMARY goal is to extract clinical values from free-text notes.
-
-INPUT DATA:
----
-PATIENT: {patient_json}
----
-OBSERVATIONS (Structured): {obs_json}
----
-NOTES (Free Text):
-{notes_block}
-
-TASK:
-1. ANALYZE the "NOTES (Free Text)" section for clinical observations.
-2. EXTRACT new quantitative (NUMERIC) findings or UPDATED values.
-3. **STRICT NEGATION**: Do NOT extract any value mentioned in a negative context.
-   - Example: "BP is not 120/80" -> SKIP.
-   - Example: "No fever (102F)" -> SKIP.
-4. **REFERENCE VS RESULT**: ONLY extract the patient's result.
-   - Example: "Normal range 4-11, current is 6.5" -> Extract 6.5 ONLY.
-5. **CATEGORICAL ACCURACY**: Only map values to codes if the text naming the observation matches (e.g., "Pulse" to HR).
-6. LOINC REFERENCE:
-   - Hemoglobin: "718-7" (g/dL) | WBC: "6690-2" (/uL)
-   - BP Systolic: "8480-6" (mmHg) | BP Diastolic: "8462-4" (mmHg)
-   - Heart Rate: "8867-4" (bpm) | SpO2: "59408-5" (%)
-   - Glucose: "2345-7" (mg/dL) | Temperature: "8310-5" (F)
-   - Weight: "29463-7" (kg)
-
-OUTPUT JSON FORMAT:
-{{
-  "thought_process": "Explain for each candidate if it was POSITIVE (extracted) or NEGATIVE (skipped).",
+    
+    json_format_example = """
+JSON FORMAT:
+{
+  "thought_process": "...",
   "new_observations": [
-    {{
-      "code": "...", "display": "...", "value": ..., "unit": "...", "source": "AI_EXTRACTED"
-    }}
+    { "code": "LOINC_CODE", "display": "LABEL", "value": 0.0, "unit": "UNIT" }
+  ]
+}
+"""
+    return f"""
+<INSTRUCTIONS>
+Extract clinical observations from the provided notes.
+- ONLY current, non-negated results.
+- SKIP any value associated with "not", "no", "denies", "none", "negative", "yesterday", "past".
+- For "SYS/DIA" BP: create separate "8480-6" (Sys) and "8462-4" (Dia) entries.
+- If no current valid values exist, return "new_observations": [].
+</INSTRUCTIONS>
+
+<LOINC_MAP>
+- Heart Rate: 8867-4
+- BP Systolic: 8480-6
+- BP Diastolic: 8462-4
+- Temperature: 8310-5
+</LOINC_MAP>
+
+<INPUT_NOTES>
+{notes_block}
+</INPUT_NOTES>
+
+<OUTPUT_FORMAT>
+Return JSON only:
+{{
+  "thought_process": "brief reasoning",
+  "new_observations": [
+    {{ "code": "LOINC", "display": "LABEL", "value": FLOAT, "unit": "UNIT" }}
   ]
 }}
-
-STRICT CONSTRAINT: Return ONLY valid JSON. No preamble. ONLY include data explicitly stated in the notes.
+</OUTPUT_FORMAT>
 """.strip()
 
 
 def _merge_llm_output(base_patient, base_summary, base_structured_obs, base_fhir_bundle, llm_raw) -> Tuple:
+    if not isinstance(llm_raw, dict):
+        return base_patient, base_summary, base_structured_obs, base_fhir_bundle
+    
     structured_observations = list(base_structured_obs)
     new_obs = llm_raw.get("new_observations", [])
     if isinstance(new_obs, list):
         for o in new_obs:
             if not isinstance(o, dict): continue
+            # Ensure required fields
+            if not o.get("code") or o.get("value") is None: continue
             o["source"] = "AI_EXTRACTED"
             # Allow update if value is different
             is_dupe = any(str(b["code"]) == str(o.get("code")) and str(b["value"]) == str(o.get("value")) for b in base_structured_obs)
@@ -208,12 +204,14 @@ def _ensure_obs_fields(obs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         })
     return fixed
 
+
 LOINC_LOOKUP = [
     ("diastolic", "8462-4", "mmHg"), ("systolic", "8480-6", "mmHg"),
     ("glucose", "2345-7", "mg/dL"), ("hemoglobin", "718-7", "g/dL"),
     ("wbc", "6690-2", "/uL"), ("heart rate", "8867-4", "bpm"), ("pulse", "8867-4", "bpm"),
     ("spo2", "59408-5", "%"), ("o2 sat", "59408-5", "%")
 ]
+
 
 def _normalize_loinc_codes(obs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for o in obs:
@@ -239,6 +237,7 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
     clinical_summary = _basic_clinical_summary(structured_observations)
     fhir_bundle = _build_fhir_bundle(patient, structured_observations)
 
+    llm_raw = {}
     if USE_LLM and use_llm and _needs_ai_analysis(structured_observations):
         try:
             prompt = _build_llm_prompt(patient, structured_observations)
@@ -249,10 +248,13 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
             structured_observations = _ensure_obs_fields(structured_observations)
             clinical_summary = _basic_clinical_summary(structured_observations)
             fhir_bundle = _build_fhir_bundle(patient, structured_observations)
-        except Exception: pass
 
-        structured_observations = _normalize_loinc_codes(structured_observations)
-        structured_observations = [o for o in structured_observations if o.get("value") is not None and o.get("value") != ""]
+            structured_observations = _normalize_loinc_codes(structured_observations)
+            structured_observations = [o for o in structured_observations if o.get("value") is not None and o.get("value") != ""]
+        except Exception as e:
+            print(f"CRITICAL: AI Pipeline Failure: {e}", file=sys.stderr, flush=True)
+            traceback.print_exc(file=sys.stderr)
+            pass
 
     for ob in structured_observations:
         alert = check_alert(ob.get("code"), ob.get("value"))
@@ -267,4 +269,11 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
             str(datetime.utcnow()), hl7_text, patient, structured_observations, fhir_bundle, msh.__dict__ if msh else {}
         )
 
-    return {"id": message_id, "patient": patient, "clinical_summary": clinical_summary, "structured_observations": structured_observations, "fhir_bundle": fhir_bundle}
+    return {
+        "id": message_id, 
+        "patient": patient, 
+        "clinical_summary": clinical_summary, 
+        "structured_observations": structured_observations, 
+        "fhir_bundle": fhir_bundle,
+        "ai_analysis": llm_raw or {}
+    }

@@ -9,5 +9,9 @@ if [ "$DATABASE_PATH" = "/data/agent.db" ] && [ ! -f /data/agent.db ]; then
     echo "Database initialized successfully"
 fi
 
-# Start the application
-exec uvicorn app.api:app --host 0.0.0.0 --port 8080
+# Start the application or run passed command
+if [ $# -eq 0 ]; then
+    exec uvicorn app.api:app --host 0.0.0.0 --port 8080
+else
+    exec "$@"
+fi

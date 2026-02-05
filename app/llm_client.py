@@ -140,7 +140,11 @@ def _try_repair_json(raw: str) -> str:
     """
     Very small, conservative JSON "repair" helper.
     """
+    import re
     text = raw.strip()
+    
+    # Remove single-line comments like // this is a comment
+    text = re.sub(r'//.*$', '', text, flags=re.MULTILINE)
 
     # Case: LLM forgot the final closing brace on a top-level object.
     if text.startswith("{") and not text.endswith("}"):

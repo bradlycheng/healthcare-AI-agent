@@ -85,6 +85,7 @@ class ORUParseResponse(BaseModel):
     structured_observations: List[ObservationOut]
     fhir_bundle: Dict[str, Any]
     hl7_ack: str = ""
+    ai_analysis: Optional[Dict[str, Any]] = None
 
 
 class SaveMessageRequest(BaseModel):
@@ -425,7 +426,7 @@ def save_message_endpoint(req: SaveMessageRequest):
 
 
 @app.post("/oru/parse", response_model=ORUParseResponse)
-def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseResponse:
+async def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseResponse:
     """
     Run the ORU pipeline and return the result.
     If persist=False, it's a dry-run (preview).
@@ -453,6 +454,7 @@ def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseRespon
                 detail=f"Invalid Message Type: Expected ORU (Observation Result), received '{msh.message_type}'."
             )
 
+    import asyncio
     try:
         # Rate limit check if requesting LLM
         if req.use_llm:
@@ -466,8 +468,8 @@ def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseRespon
     
             _RATE_LIMIT_STORE[client_ip] = now_ts
     
-        # Pass persist flag to pipeline
-        result: Dict[str, Any] = run_oru_pipeline(req.hl7_text, use_llm=req.use_llm, persist=req.persist)
+        # Run in separate thread to avoid blocking the event loop during Bedrock call
+        result: Dict[str, Any] = await asyncio.to_thread(run_oru_pipeline, req.hl7_text, req.use_llm, req.persist)
     except HTTPException:
         raise
     except Exception as e:
@@ -480,6 +482,7 @@ def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseRespon
     clinical_summary = result.get("clinical_summary", "") or ""
     structured_list = result.get("structured_observations", []) or []
     fhir_bundle = result.get("fhir_bundle", {}) or {}
+    ai_analysis = result.get("ai_analysis", {}) or {}
 
     patient = PatientOut(
         id=patient_dict.get("id", "patient-1"),
@@ -517,6 +520,7 @@ def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseRespon
         structured_observations=observations,
         fhir_bundle=fhir_bundle,
         hl7_ack=ack_message,
+        ai_analysis=ai_analysis
     )
 
 
