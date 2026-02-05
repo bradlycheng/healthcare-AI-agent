@@ -461,6 +461,8 @@ def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseRespon
     
         # Pass persist flag to pipeline
         result: Dict[str, Any] = run_oru_pipeline(req.hl7_text, use_llm=req.use_llm, persist=req.persist)
+    except HTTPException:
+        raise
     except Exception as e:
         # Catch any parser errors (like hl7apy failures) and return 400 if it's a data issue
         if "Msh missing" in str(e) or "Invalid" in str(e):

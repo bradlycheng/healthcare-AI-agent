@@ -179,20 +179,37 @@ def _parse_observations(msg: Message) -> List[Dict[str, Any]]:
 
     for child in msg.children:
         if child.name == "NTE":
-            # Attach note to the last observation if exists
-            if observations:
-                last_obs = observations[-1]
-                note_text = ""
-                try:
-                    # NTE-3 is the comment
-                    note_text = _safe_value(child.nte_3)
-                except Exception:
-                    pass
-                
-                if note_text:
-                    if "notes" not in last_obs:
-                        last_obs["notes"] = []
-                    last_obs["notes"].append(note_text)
+            # If no observations yet, create a placeholder "Clinical Note"
+            if not observations:
+                observations.append(
+                    {
+                        "code": "NOTE",
+                        "display": "Clinical Note",
+                        "value": "See comments",
+                        "unit": "",
+                        "value_type": "TX",
+                        "reference_low": None,
+                        "reference_high": None,
+                        "flag": "",
+                        "observation_datetime": "",
+                        "status": "F",
+                        "notes": [],
+                        "source": "HL7",
+                    }
+                )
+            
+            last_obs = observations[-1]
+            note_text = ""
+            try:
+                # NTE-3 is the comment
+                note_text = _safe_value(child.nte_3)
+            except Exception:
+                pass
+            
+            if note_text:
+                if "notes" not in last_obs:
+                    last_obs["notes"] = []
+                last_obs["notes"].append(note_text)
             continue
 
         if child.name != "OBX":

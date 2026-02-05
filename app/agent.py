@@ -144,16 +144,24 @@ NOTES (Free Text):
 {notes_block}
 
 TASK:
-1. ANALYZE the "NOTES (Free Text)" section for quantitative results.
-2. EXTRACT new findings or UPDATED values (if different from the Structured list).
-3. USE these exact LOINC codes:
+1. ANALYZE the "NOTES (Free Text)" section for clinical observations.
+2. EXTRACT new quantitative (NUMERIC) findings or UPDATED values.
+3. **STRICT NEGATION**: Do NOT extract any value mentioned in a negative context.
+   - Example: "BP is not 120/80" -> SKIP.
+   - Example: "No fever (102F)" -> SKIP.
+4. **REFERENCE VS RESULT**: ONLY extract the patient's result.
+   - Example: "Normal range 4-11, current is 6.5" -> Extract 6.5 ONLY.
+5. **CATEGORICAL ACCURACY**: Only map values to codes if the text naming the observation matches (e.g., "Pulse" to HR).
+6. LOINC REFERENCE:
    - Hemoglobin: "718-7" (g/dL) | WBC: "6690-2" (/uL)
    - BP Systolic: "8480-6" (mmHg) | BP Diastolic: "8462-4" (mmHg)
    - Heart Rate: "8867-4" (bpm) | SpO2: "59408-5" (%)
+   - Glucose: "2345-7" (mg/dL) | Temperature: "8310-5" (F)
+   - Weight: "29463-7" (kg)
 
 OUTPUT JSON FORMAT:
 {{
-  "thought_process": "Briefly list the values found in notes and why they are new or different.",
+  "thought_process": "Explain for each candidate if it was POSITIVE (extracted) or NEGATIVE (skipped).",
   "new_observations": [
     {{
       "code": "...", "display": "...", "value": ..., "unit": "...", "source": "AI_EXTRACTED"
