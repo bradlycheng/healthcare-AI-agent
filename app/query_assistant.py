@@ -14,6 +14,7 @@ import sqlite3
 from typing import Any, Dict, List, Optional
 
 from .llm_client import call_llm_for_json, LLMError
+from .security import sanitize_text
 
 DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
 
@@ -192,20 +193,6 @@ Output JSON ONLY.
 # Input Sanitization (Prompt Injection Protection)
 # ---------------------------------------------------------------------------
 
-# Patterns that may indicate prompt injection attempts
-INJECTION_PATTERNS = [
-    r'ignore\s+(previous|above|all)',        # "ignore previous instructions"
-    r'disregard\s+(previous|above|all)',     # "disregard all instructions"
-    r'forget\s+(previous|above|everything)', # "forget everything"
-    r'new\s+instructions?:',                 # "new instructions:"
-    r'system\s*:',                           # Trying to inject system prompts
-    r'assistant\s*:',                        # Trying to inject assistant responses
-    r'\[INST\]',                             # LLM special tokens
-    r'\[/INST\]',
-    r'<\|.*?\|>',                            # Special delimiter tokens
-    r'<<SYS>>',                              # Llama system tokens
-    r'</s>',                                 # End of sequence tokens
-    r'Human:',                               # Role injection
     r'AI:',
     r'###\s*(Instruction|System|Human)',     # Markdown injection patterns
 ]
@@ -225,66 +212,9 @@ def sanitize_input(text: str) -> tuple[str, list[str]]:
     Sanitize user input to prevent prompt injection attacks.
     Returns (sanitized_text, list_of_warnings).
     """
-    if not text:
-        return "", []
-    
-    warnings = []
-    sanitized = text
-    
-    # 1. Remove invisible/zero-width characters
-    cleaned_chars = []
-    for char in sanitized:
-        code_point = ord(char)
-        is_suspicious = any(
-            start <= code_point <= end 
-            for start, end in SUSPICIOUS_UNICODE_RANGES
-        )
-        if is_suspicious:
-            warnings.append(f"Removed suspicious character: U+{code_point:04X}")
-        else:
-            cleaned_chars.append(char)
-    sanitized = ''.join(cleaned_chars)
-    
-    # 2. Remove emoji (keep basic punctuation and medical symbols)
-    # Allow: letters, numbers, basic punctuation, common medical symbols
-    emoji_pattern = re.compile(
-        "["
-        "\U0001F600-\U0001F64F"  # emoticons
-        "\U0001F300-\U0001F5FF"  # symbols & pictographs
-        "\U0001F680-\U0001F6FF"  # transport & map
-        "\U0001F700-\U0001F77F"  # alchemical symbols
-        "\U0001F780-\U0001F7FF"  # geometric shapes extended
-        "\U0001F800-\U0001F8FF"  # supplemental arrows-C
-        "\U0001F900-\U0001F9FF"  # supplemental symbols
-        "\U0001FA00-\U0001FA6F"  # chess symbols
-        "\U0001FA70-\U0001FAFF"  # symbols and pictographs extended-A
-        "\U00002702-\U000027B0"  # dingbats
-        "\U0001F1E0-\U0001F1FF"  # flags
-        "]+", 
-        flags=re.UNICODE
-    )
-    if emoji_pattern.search(sanitized):
-        warnings.append("Removed emoji characters")
-        sanitized = emoji_pattern.sub('', sanitized)
-    
-    # 3. Check for prompt injection patterns
-    text_lower = sanitized.lower()
-    for pattern in INJECTION_PATTERNS:
-        if re.search(pattern, text_lower, re.IGNORECASE):
-            warnings.append(f"Blocked potential injection pattern: {pattern}")
-            # Replace the entire suspicious phrase with "[BLOCKED]"
-            sanitized = re.sub(pattern, '[BLOCKED]', sanitized, flags=re.IGNORECASE)
-    
-    # 4. Limit length to prevent DoS
-    MAX_LENGTH = 1000
-    if len(sanitized) > MAX_LENGTH:
-        warnings.append(f"Truncated input from {len(sanitized)} to {MAX_LENGTH} chars")
-        sanitized = sanitized[:MAX_LENGTH]
-    
-    # 5. Normalize whitespace (collapse multiple spaces/newlines)
-    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
-    
-    return sanitized, warnings
+    sanitized = sanitize_text(text)
+    # We keep the return signature for compatibility
+    return sanitized, []
 
 
 # ---------------------------------------------------------------------------
@@ -550,18 +480,6 @@ Output JSON only.
 
 def process_query(question: str, history: List[Dict[str, str]] = []) -> Dict[str, Any]:
     """
-    Main entry point: process a natural language query.
-    
-    Returns:
-        {
-            "success": bool,
-            "answer": str,
-            "highlights": List[str],
-            "sql_used": str,
-            "row_count": int,
-            "sources": List[Dict],  # RAG sources
-            "error": Optional[str]
-        }
     """
     # Step 0: Reject direct SQL statements (security check)
     # Users should ask in natural language, not submit raw SQL

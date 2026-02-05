@@ -7,6 +7,7 @@ import sqlite3
 from typing import Any, Dict, List, Optional
 
 from .agent import run_oru_pipeline
+from .security import sanitize_text
 
 import sys
 # Force unbuffered stdout
@@ -255,8 +256,11 @@ def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryRespon
     
     _RATE_LIMIT_STORE[client_ip] = now_ts
     
+    # Sanitize query to prevent injection
+    sanitized_q = sanitize_text(req.question)
+    
     # Process the query
-    result = process_query(req.question, req.history)
+    result = process_query(sanitized_q, req.history)
     
     return QueryResponse(
         success=result.get("success", False),
@@ -426,7 +430,10 @@ def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseRespon
     Run the ORU pipeline and return the result.
     If persist=False, it's a dry-run (preview).
     """
-    # 0. Basic Validation
+    # 0. Sanitize input (Strip emojis, non-standard unicode, injection tags)
+    req.hl7_text = sanitize_text(req.hl7_text, strict_ascii=True)
+
+    # 1. Basic Validation
     if not req.hl7_text or "MSH" not in req.hl7_text:
         raise HTTPException(status_code=400, detail="Invalid HL7 message. Must start with MSH segment.")
 

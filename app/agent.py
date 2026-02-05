@@ -10,6 +10,7 @@ from .hl7_msh import parse_msh
 from .hl7_parser import parse_oru
 from .llm_client import LLMError, call_llm_for_json
 from .alerts import check_alert
+from .security import sanitize_text
 
 # Toggle this if/when you want to actually use Ollama for enrichment.
 USE_LLM = True
@@ -226,6 +227,8 @@ def _normalize_loinc_codes(obs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) -> Dict[str, Any]:
+    # Defense in depth: sanitize here as well
+    hl7_text = sanitize_text(hl7_text, strict_ascii=True)
     try:
         patient, structured_observations = parse_oru(hl7_text)
     except Exception as e:
