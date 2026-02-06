@@ -188,7 +188,7 @@ def seed_data():
 
     conn.commit()
     conn.close()
-    print("✅ Seed Complete: 100 Patients, Visits, Observations, Meds, and Diagnoses created.")
+    print("Seed Complete: 100 Patients, Visits, Observations, Meds, and Diagnoses created.")
 
 if __name__ == "__main__":
     seed_data()

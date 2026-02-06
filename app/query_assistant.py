@@ -223,9 +223,10 @@ def sanitize_input(text: str) -> tuple[str, list[str]]:
     Sanitize user input to prevent prompt injection attacks.
     Returns (sanitized_text, list_of_warnings).
     """
+    from .security import detect_injection_patterns
+    warnings = detect_injection_patterns(text)
     sanitized = sanitize_text(text)
-    # We keep the return signature for compatibility
-    return sanitized, []
+    return sanitized, warnings
 
 
 # ---------------------------------------------------------------------------
@@ -511,7 +512,15 @@ def process_query(question: str, history: List[Dict[str, str]] = []) -> Dict[str
     # Step 0.5: Sanitize input (prompt injection protection)
     sanitized_question, sanitization_warnings = sanitize_input(question)
     if sanitization_warnings:
-        print(f"SECURITY: Input sanitized. Warnings: {sanitization_warnings}")
+        print(f"SECURITY: Input BLOCKED. Detected patterns: {sanitization_warnings}")
+        return {
+            "success": False,
+            "answer": "Your query was blocked due to potentially unsafe content. Please ask a normal question about patient data.",
+            "highlights": [],
+            "sql_used": "",
+            "row_count": 0,
+            "error": "Query blocked by input sanitization"
+        }
     
     # Use sanitized question from here on
     question = sanitized_question
