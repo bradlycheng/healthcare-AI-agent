@@ -252,13 +252,47 @@
                 </div>
             </div>
         </div>
+
+        <!-- Reset Confirmation Modal -->
+        <div class="modal-overlay" id="reset-modal">
+            <div class="modal-content" style="max-width: 400px;">
+                <div class="modal-header">
+                    <h2><i class="fa-solid fa-triangle-exclamation" style="color: #ef4444;"></i> Reset Database</h2>
+                    <button class="modal-close" id="close-reset-modal">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-bottom: 1rem; color: #ef4444; font-weight: 500;">
+                        Are you sure you want to reset the database? This action cannot be undone.
+                    </p>
+                    <div style="margin-bottom: 1rem;">
+                        <label for="reset-password" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">
+                            Enter Admin Password:
+                        </label>
+                        <input type="password" id="reset-password"
+                            style="width: 100%; padding: 0.75rem; border: 1px solid #374151; border-radius: 6px; background: #1f2937; color: white; font-size: 1rem;"
+                            placeholder="Enter password...">
+                    </div>
+                    <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                        <button id="reset-cancel-btn" class="btn-secondary" style="padding: 0.75rem 1.5rem;">
+                            Cancel
+                        </button>
+                        <button id="reset-confirm-btn" class="btn-danger"
+                            style="padding: 0.75rem 1.5rem; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                            Reset Database
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <footer class="footer">
         <p>&copy; 2024 Healthcare AI Agent. Built with Python & DeepMind.</p>
     </footer>
 
-    <script src="dashboard.js?v=6"></script>
+    <script src="dashboard.js?v=7"></script>
 </body>
 
 </html>

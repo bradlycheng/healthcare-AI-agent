@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModal = document.getElementById('close-modal');
 
     // Initialize
-    console.log('Dashboard JS Loaded v6 (Reset Button Fix)');
+    console.log('Dashboard JS Loaded v7 (Custom Modal Reset)');
 
 
 
@@ -74,54 +74,104 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Reset Modal Elements
+    const resetModal = document.getElementById('reset-modal');
+    const resetPasswordInput = document.getElementById('reset-password');
+    const resetConfirmBtn = document.getElementById('reset-confirm-btn');
+    const resetCancelBtn = document.getElementById('reset-cancel-btn');
+    const closeResetModal = document.getElementById('close-reset-modal');
+
+    // Show reset modal
+    function showResetModal() {
+        console.log('Opening reset modal');
+        resetPasswordInput.value = '';
+        resetModal.classList.add('visible');
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => resetPasswordInput.focus(), 100);
+    }
+
+    // Hide reset modal
+    function hideResetModal() {
+        console.log('Closing reset modal');
+        resetModal.classList.remove('visible');
+        document.body.style.overflow = '';
+        isResetting = false;
+    }
+
+    // Set up reset modal event listeners
+    if (resetCancelBtn) {
+        resetCancelBtn.addEventListener('click', hideResetModal);
+    }
+    if (closeResetModal) {
+        closeResetModal.addEventListener('click', hideResetModal);
+    }
+    if (resetModal) {
+        resetModal.addEventListener('click', (e) => {
+            if (e.target === resetModal) hideResetModal();
+        });
+    }
+    if (resetConfirmBtn) {
+        resetConfirmBtn.addEventListener('click', performReset);
+    }
+    if (resetPasswordInput) {
+        resetPasswordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performReset();
+        });
+    }
+
     let isResetting = false; // Prevent double-click issues
 
-    async function confirmDelete() {
-        // Prevent double-triggering
+    // Called when Reset Demo button is clicked
+    function confirmDelete() {
         if (isResetting) {
             console.log('Reset already in progress, ignoring click');
             return;
         }
         isResetting = true;
-
         console.log('Reset Demo Clicked');
-        if (confirm('Are you sure you want to reset the database? This action cannot be undone.')) {
+        showResetModal();
+    }
 
-            const password = prompt("Please enter the Admin Password to confirm reset:");
-            if (!password) {
-                isResetting = false;
-                return; // User cancelled
+    // Called when user confirms reset in modal
+    async function performReset() {
+        const password = resetPasswordInput.value.trim();
+        if (!password) {
+            showToast('Please enter the admin password', 'error');
+            return;
+        }
+
+        resetConfirmBtn.disabled = true;
+        resetConfirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
+
+        try {
+            console.log('Sending RESET request...');
+            const response = await fetch(`${API_BASE}/admin/reset`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: password })
+            });
+
+            console.log('Reset response:', response.status);
+
+            if (response.status === 401) {
+                showToast('Incorrect Password. Reset cancelled.', 'error');
+                return;
             }
 
-            try {
-                console.log('Sending RESET request...');
-                const response = await fetch(`${API_BASE}/admin/reset`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: password })
-                });
-
-                console.log('Reset response:', response.status);
-
-                if (response.status === 401) {
-                    showToast('Incorrect Password. Reset cancelled.', 'error');
-                    return;
-                }
-
-                if (!response.ok && response.status !== 409) {
-                    const txt = await response.text();
-                    throw new Error(txt || 'Failed to reset messages');
-                }
-                showToast('Database reset to sample data', 'success');
-                loadMessages(); // Refresh list to show empty state
-            } catch (err) {
-                console.error('Error resetting messages:', err);
-                showToast('Failed: ' + err.message, 'error');
-            } finally {
-                isResetting = false;
+            if (!response.ok && response.status !== 409) {
+                const txt = await response.text();
+                throw new Error(txt || 'Failed to reset messages');
             }
-        } else {
-            // User clicked No on confirm dialog
+
+            hideResetModal();
+            showToast('Database reset to sample data', 'success');
+            loadMessages(); // Refresh list to show empty state
+        } catch (err) {
+            console.error('Error resetting messages:', err);
+            showToast('Failed: ' + err.message, 'error');
+        } finally {
+            resetConfirmBtn.disabled = false;
+            resetConfirmBtn.innerHTML = 'Reset Database';
             isResetting = false;
         }
     }
