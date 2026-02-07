@@ -50,3 +50,6 @@ Thumbs.db
 
 # Secret config
 .env.local
+
+# Vector database (generated at runtime)
+chroma_db/
