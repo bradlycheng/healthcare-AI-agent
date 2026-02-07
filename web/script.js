@@ -568,12 +568,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 showToast(`Saved to database! Check the Dashboard to view the record.`, 'success');
                 saveBtn.classList.add('hidden');
+
+                // Show "Analyze Another Message" button
+                const analyzeAnotherBtn = document.getElementById('analyze-another-btn');
+                if (analyzeAnotherBtn) {
+                    analyzeAnotherBtn.classList.remove('hidden');
+                }
             } catch (err) {
                 console.error(err);
                 showToast('Failed to save: ' + err.message, 'error');
                 saveBtn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm & Save';
                 saveBtn.disabled = false;
             }
+        });
+    }
+
+    // Analyze Another Message Button Logic
+    const analyzeAnotherBtn = document.getElementById('analyze-another-btn');
+    if (analyzeAnotherBtn) {
+        analyzeAnotherBtn.addEventListener('click', () => {
+            // Reload the sample HL7 message (better for demo experience)
+            const sampleMessage = `MSH|^~\\&|HIS|MedCenter|LIS|LAB|202401201200||ORU^R01|MSG_CARDIAC|P|2.5
+PID|1||12345||SMITH^JOHN||19750315|M
+OBR|1|ORD456|RES456|CARD-PANEL^Cardiac Panel|||202401201200
+OBX|1|NM|49563-0^TROPONIN I||0.12|ng/mL|0.00-0.04|HH|||F
+OBX|2|NM|2157-6^CK-MB||8.5|ng/mL|0.0-5.0|H|||F
+OBX|3|TX|NOTE^Clinical Note||50 y/o male presenting with crushing chest pain radiating to left arm x 2 hours. Diaphoretic, BP 160/95, HR 110, SpO2 94% on room air. History of HTN and hyperlipidemia. ECG shows ST elevation in leads V1-V4. Suspect STEMI. Cardiology consult requested. Started on aspirin, heparin, nitroglycerin drip.||||||F`;
+
+            if (hl7Input) {
+                hl7Input.value = sampleMessage;
+                hl7Input.focus();
+            }
+
+            // Hide results area
+            if (resultsArea) resultsArea.classList.add('hidden');
+
+            // Hide the "Analyze Another" button
+            analyzeAnotherBtn.classList.add('hidden');
+
+            // Reset current analysis data
+            currentAnalysisData = null;
+
+            // Scroll to input area
+            const demoSection = document.getElementById('demo-live');
+            if (demoSection) {
+                demoSection.scrollIntoView({ behavior: 'smooth' });
+            }
+
+            showToast('Sample message loaded - click Analyze to demo again!', 'info');
         });
     }
 

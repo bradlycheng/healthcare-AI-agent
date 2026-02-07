@@ -16,12 +16,27 @@ INJECTION_PATTERNS = [
     r"\[/INST\]", 
     r"<<SYS>>", 
     r"<</SYS>>",
-    r"(?i)ignore\s+(previous|above|all)\s+instructions",
-    r"(?i)disregard\s+(previous|above|all)\s+instructions",
+    r"(?i)ignore\s+(previous|above|all|the|my).*instructions",
+    r"(?i)disregard\s+(previous|above|all|the|my).*(instructions|rules)",
     r"(?i)forget\s+(previous|above|everything)",
     r"(?i)you are now a",
     r"(?i)system prompt",
+    r"(?i)do anything now",  # DAN jailbreak
+    r"(?i)jailbreak",
+    r"(?i)bypass\s+(security|filter|rules)",
 ]
+
+
+def detect_injection_patterns(text: str) -> list[str]:
+    """
+    Returns a list of detected injection pattern names.
+    Used to block queries before they reach the LLM.
+    """
+    detected = []
+    for pattern in INJECTION_PATTERNS:
+        if re.search(pattern, text):
+            detected.append(pattern)
+    return detected
 
 # Invisible or confusing unicode ranges
 SUSPICIOUS_UNICODE_RANGES = [

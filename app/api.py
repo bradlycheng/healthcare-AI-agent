@@ -257,7 +257,22 @@ def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryRespon
     
     _RATE_LIMIT_STORE[client_ip] = now_ts
     
-    # Sanitize query to prevent injection
+    # Security: Block prompt injection attempts at API layer
+    from .security import detect_injection_patterns
+    injection_warnings = detect_injection_patterns(req.question)
+    if injection_warnings:
+        print(f"SECURITY API BLOCK: {injection_warnings}")
+        return QueryResponse(
+            success=False,
+            answer="Your query was blocked due to potentially unsafe content. Please ask a normal question about patient data.",
+            highlights=[],
+            sql_used="",
+            row_count=0,
+            sources=[],
+            error="Query blocked by input sanitization"
+        )
+    
+    # Sanitize query (strips control chars, etc.)
     sanitized_q = sanitize_text(req.question)
     
     # Process the query

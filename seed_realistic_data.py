@@ -88,12 +88,12 @@ def seed_data():
         if random.random() < 0.25: # 25% chance of High Cholesterol
             patient_conditions.append("Hyperlipidemia")
             
-        # Generate Visits & Data (Over 2 years)
+        # Generate Visits & Data (Within last 2 days to avoid startup pruning)
         num_visits = random.randint(3, 12)
-        base_date = datetime.now() - timedelta(days=730)
+        base_date = datetime.now() - timedelta(hours=36)  # Start 36 hours ago
         
         for v in range(num_visits):
-            visit_date = base_date + timedelta(days=random.randint(0, 700))
+            visit_date = base_date + timedelta(hours=random.randint(0, 30))  # Spread over last day+
             visit_id = f"V{uuid.uuid4().hex[:8]}"
             date_str = visit_date.strftime("%Y-%m-%d %H:%M:%S")
             provider = random.choice(PROVIDERS)
@@ -188,7 +188,7 @@ def seed_data():
 
     conn.commit()
     conn.close()
-    print("✅ Seed Complete: 100 Patients, Visits, Observations, Meds, and Diagnoses created.")
+    print("Seed Complete: 100 Patients, Visits, Observations, Meds, and Diagnoses created.")
 
 if __name__ == "__main__":
     seed_data()

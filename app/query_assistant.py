@@ -154,6 +154,18 @@ SQL: SELECT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o
 User: "Who is taking Metformin?"
 SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, m.medication_name, m.dosage FROM hl7_messages h JOIN medications m ON h.patient_id = m.patient_id WHERE UPPER(m.medication_name) LIKE '%METFORMIN%' AND m.status = 'Active'
 
+User: "Who has diabetes?"
+SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, d.diagnosis_name FROM hl7_messages h JOIN diagnoses d ON h.patient_id = d.patient_id WHERE (UPPER(d.diagnosis_name) LIKE '%DIABETES%' OR UPPER(d.diagnosis_code) LIKE '%E11%' OR UPPER(d.diagnosis_code) LIKE '%E10%') AND d.status = 'Active' LIMIT 50
+
+User: "Show patients with hypertension"
+SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, d.diagnosis_name FROM hl7_messages h JOIN diagnoses d ON h.patient_id = d.patient_id WHERE (UPPER(d.diagnosis_name) LIKE '%HYPERTENSION%' OR UPPER(d.diagnosis_code) LIKE '%I10%') AND d.status = 'Active' LIMIT 50
+
+User: "What medications is John Smith on?"
+SQL: SELECT m.medication_name, m.dosage, m.frequency, m.status FROM hl7_messages h JOIN medications m ON h.patient_id = m.patient_id WHERE UPPER(h.patient_first_name) = 'JOHN' AND UPPER(h.patient_last_name) = 'SMITH' ORDER BY m.status DESC, m.medication_name
+
+User: "Show all active diagnoses"
+SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, d.diagnosis_name, d.diagnosis_date FROM hl7_messages h JOIN diagnoses d ON h.patient_id = d.patient_id WHERE d.status = 'Active' ORDER BY d.diagnosis_date DESC LIMIT 50
+
 
 CRITICAL RULES:
 1. **Count from the DATA**: The ROW_COUNT may include duplicate rows. Count UNIQUE patients by looking at the actual names in the results. Report the unique count.
@@ -223,9 +235,10 @@ def sanitize_input(text: str) -> tuple[str, list[str]]:
     Sanitize user input to prevent prompt injection attacks.
     Returns (sanitized_text, list_of_warnings).
     """
+    from .security import detect_injection_patterns
+    warnings = detect_injection_patterns(text)
     sanitized = sanitize_text(text)
-    # We keep the return signature for compatibility
-    return sanitized, []
+    return sanitized, warnings
 
 
 # ---------------------------------------------------------------------------
@@ -511,7 +524,15 @@ def process_query(question: str, history: List[Dict[str, str]] = []) -> Dict[str
     # Step 0.5: Sanitize input (prompt injection protection)
     sanitized_question, sanitization_warnings = sanitize_input(question)
     if sanitization_warnings:
-        print(f"SECURITY: Input sanitized. Warnings: {sanitization_warnings}")
+        print(f"SECURITY: Input BLOCKED. Detected patterns: {sanitization_warnings}")
+        return {
+            "success": False,
+            "answer": "Your query was blocked due to potentially unsafe content. Please ask a normal question about patient data.",
+            "highlights": [],
+            "sql_used": "",
+            "row_count": 0,
+            "error": "Query blocked by input sanitization"
+        }
     
     # Use sanitized question from here on
     question = sanitized_question
