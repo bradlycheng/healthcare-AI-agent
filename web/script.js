@@ -568,12 +568,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 showToast(`Saved to database! Check the Dashboard to view the record.`, 'success');
                 saveBtn.classList.add('hidden');
+
+                // Show "Analyze Another Message" button
+                const analyzeAnotherBtn = document.getElementById('analyze-another-btn');
+                if (analyzeAnotherBtn) {
+                    analyzeAnotherBtn.classList.remove('hidden');
+                }
             } catch (err) {
                 console.error(err);
                 showToast('Failed to save: ' + err.message, 'error');
                 saveBtn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm & Save';
                 saveBtn.disabled = false;
             }
+        });
+    }
+
+    // Analyze Another Message Button Logic
+    const analyzeAnotherBtn = document.getElementById('analyze-another-btn');
+    if (analyzeAnotherBtn) {
+        analyzeAnotherBtn.addEventListener('click', () => {
+            // Clear the input
+            if (hl7Input) {
+                hl7Input.value = '';
+                hl7Input.focus();
+            }
+
+            // Hide results area
+            if (resultsArea) resultsArea.classList.add('hidden');
+
+            // Hide the "Analyze Another" button
+            analyzeAnotherBtn.classList.add('hidden');
+
+            // Reset current analysis data
+            currentAnalysisData = null;
+
+            // Scroll to input area
+            const demoSection = document.getElementById('demo-live');
+            if (demoSection) {
+                demoSection.scrollIntoView({ behavior: 'smooth' });
+            }
+
+            showToast('Ready for a new analysis!', 'info');
         });
     }
 
