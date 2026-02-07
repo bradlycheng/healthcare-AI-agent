@@ -22,6 +22,7 @@ INJECTION_PATTERNS = [
     r"(?i)you are now a",
     r"(?i)system prompt",
     r"(?i)do anything now",  # DAN jailbreak
+    r"(?i)\bDAN\b",  # DAN keyword directly
     r"(?i)jailbreak",
     r"(?i)bypass\s+(security|filter|rules)",
 ]

@@ -110,8 +110,14 @@ RULES:
 13. **AMBIGUITY:**
     - If the user asks about a number without context (e.g., "Is 85 good?") and there is no history, DO NOT GUESS.
     - Return an empty SQL query and explanation: "Please specify what measurement you are referring to (e.g., Glucose, Diastolic BP, Heart Rate)."
+14. **PROVIDERS vs PATIENTS**:
+    - If the user asks for "Dr. X", "Nurse Y", or a provider name, search `provider_name` in the `visits` table.
+    - Do NOT search patient names for providers.
 
 FEW SHOT EXAMPLES:
+
+User: "List visits for Dr. Alice Chen"
+SQL: SELECT v.visit_date, v.provider_name, v.chief_complaint, h.patient_first_name, h.patient_last_name FROM visits v JOIN hl7_messages h ON v.patient_id = h.patient_id WHERE UPPER(v.provider_name) LIKE '%ALICE%CHEN%' ORDER BY v.visit_date DESC LIMIT 50
 
 User: "Show all patients"
 SQL: SELECT DISTINCT patient_id, patient_first_name, patient_last_name FROM hl7_messages LIMIT 50

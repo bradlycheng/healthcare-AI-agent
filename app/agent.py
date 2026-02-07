@@ -266,7 +266,12 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
         init_db()
         msh = parse_msh(hl7_text)
         message_id = insert_message_and_observations(
-            str(datetime.utcnow()), hl7_text, patient, structured_observations, fhir_bundle, msh.__dict__ if msh else {}
+            received_at=str(datetime.utcnow()),
+            raw_hl7=hl7_text,
+            patient=patient,
+            observations=structured_observations,
+            fhir_bundle=fhir_bundle,
+            msh=msh.__dict__ if msh else {}
         )
 
     return {

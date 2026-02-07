@@ -1,4 +1,32 @@
 // Dashboard JavaScript
+
+// Global functions for agent UI (must be outside DOMContentLoaded for inline onclick)
+function toggleTrace(traceId) {
+    const container = document.getElementById(traceId);
+    if (!container) return;
+    const content = container.querySelector('.trace-content');
+    const toggle = container.querySelector('.trace-toggle');
+    const icon = toggle.querySelector('.toggle-icon i');
+
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        toggle.setAttribute('aria-expanded', 'true');
+        icon.className = 'fa-solid fa-minus';
+    } else {
+        content.style.display = 'none';
+        toggle.setAttribute('aria-expanded', 'false');
+        icon.className = 'fa-solid fa-plus';
+    }
+}
+
+function handleClarification(option) {
+    const queryInput = document.getElementById('query-input');
+    if (queryInput) {
+        queryInput.value = option;
+        queryInput.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter' }));
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // State
     let allMessages = [];
@@ -145,18 +173,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             console.log('Sending RESET request...');
-            const response = await fetch(`${API_BASE}/admin/reset`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: password })
+            console.log('Sending RESET request...');
+            const response = await fetch(`${API_BASE}/messages`, {
+                method: 'DELETE'
             });
 
             console.log('Reset response:', response.status);
 
-            if (response.status === 401) {
-                showToast('Incorrect Password. Reset cancelled.', 'error');
-                return;
-            }
+
 
             if (!response.ok && response.status !== 409) {
                 const txt = await response.text();
@@ -655,12 +679,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (data.success) {
-                addMessage(data.answer, 'ai', {
-                    highlights: data.highlights,
-                    sql: data.sql_used,
-                    rowCount: data.row_count,
-                    sources: data.sources || []  // RAG sources
-                });
+                // Handle clarification requests inline
+                if (data.needs_clarification && data.clarification_question) {
+                    addMessage(data.clarification_question, 'ai', {
+                        isClarification: true,
+                        clarificationOptions: data.clarification_options || [],
+                        reasoningTrace: data.reasoning_trace || [],
+                        toolsUsed: data.tools_used || []
+                    });
+                } else {
+                    addMessage(data.answer, 'ai', {
+                        highlights: data.highlights,
+                        sql: data.sql_used,
+                        rowCount: data.row_count,
+                        sources: data.sources || [],
+                        reasoningTrace: data.reasoning_trace || [],
+                        toolsUsed: data.tools_used || []
+                    });
+                }
             } else {
                 addMessage(data.answer || 'Sorry, I couldn\'t process that question.', 'ai', { isError: true });
             }
@@ -683,6 +719,57 @@ document.addEventListener('DOMContentLoaded', () => {
         const avatarIcon = sender === 'ai' ? 'fa-robot' : 'fa-user';
 
         let contentHtml = `<p>${escapeHtml(text)}</p>`;
+
+        // Add tool usage badge if present
+        if (options.toolsUsed && options.toolsUsed.length > 0) {
+            contentHtml = `
+                <div class="agent-tools-badge">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    Used: ${options.toolsUsed.map(t => `<span class="tool-name">${escapeHtml(t)}</span>`).join(', ')}
+                </div>` + contentHtml;
+        }
+
+        // Add clarification options if present
+        if (options.isClarification && options.clarificationOptions && options.clarificationOptions.length > 0) {
+            contentHtml += '<div class="clarification-options">';
+            options.clarificationOptions.forEach(opt => {
+                contentHtml += `<button class="clarification-btn" onclick="handleClarification('${escapeHtml(opt.replace(/'/g, "\\'"))}')">${escapeHtml(opt)}</button>`;
+            });
+            contentHtml += '</div>';
+        }
+
+        // Add reasoning trace (collapsible)
+        if (options.reasoningTrace && options.reasoningTrace.length > 0) {
+            const traceId = `trace-${Date.now()}`;
+            contentHtml += `<div class="reasoning-trace" id="${traceId}">`;
+            contentHtml += `<button class="trace-toggle" aria-expanded="false" onclick="toggleTrace('${traceId}')">
+                <span class="toggle-icon"><i class="fa-solid fa-plus"></i></span>
+                <span><i class="fa-solid fa-brain"></i> Agent Reasoning (${options.reasoningTrace.length} step${options.reasoningTrace.length > 1 ? 's' : ''})</span>
+            </button>`;
+            contentHtml += '<div class="trace-content" style="display: none;">';
+            options.reasoningTrace.forEach((step, i) => {
+                contentHtml += `<div class="trace-step">`;
+                contentHtml += `<div class="trace-thought"><strong>Thought:</strong> ${escapeHtml(step.thought || '')}</div>`;
+                if (step.tools && step.tools.length > 0) {
+                    contentHtml += '<div class="trace-tools">';
+                    step.tools.forEach(tool => {
+                        contentHtml += `<span class="trace-tool"><i class="fa-solid fa-wrench"></i> ${escapeHtml(tool.tool)}</span>`;
+                    });
+                    contentHtml += '</div>';
+                }
+                if (step.results && step.results.length > 0) {
+                    contentHtml += '<div class="trace-results">';
+                    step.results.forEach(r => {
+                        const icon = r.success ? 'fa-check' : 'fa-xmark';
+                        const cls = r.success ? 'success' : 'error';
+                        contentHtml += `<span class="trace-result ${cls}"><i class="fa-solid ${icon}"></i> ${escapeHtml(r.tool)} (${r.time_ms}ms)</span>`;
+                    });
+                    contentHtml += '</div>';
+                }
+                contentHtml += '</div>';
+            });
+            contentHtml += '</div></div>';
+        }
 
         // Add highlights if present
         if (options.highlights && options.highlights.length > 0) {

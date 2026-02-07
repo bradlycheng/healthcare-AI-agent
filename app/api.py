@@ -140,6 +140,12 @@ class QueryResponse(BaseModel):
     row_count: int = 0
     sources: List[Dict[str, Any]] = []  # RAG sources
     error: Optional[str] = None
+    # New agent fields (backward compatible)
+    reasoning_trace: List[Dict[str, Any]] = []
+    tools_used: List[str] = []
+    needs_clarification: bool = False
+    clarification_question: Optional[str] = None
+    clarification_options: List[str] = []
 
 
 # Patient Timeline Models
@@ -243,12 +249,11 @@ def health_check() -> Dict[str, str]:
 @app.post("/api/query", response_model=QueryResponse)
 def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryResponse:
     """
-    Natural language query endpoint.
-    Translates questions to SQL, executes safely, returns formatted response.
+    Natural language query endpoint using AI Agent.
+    Agent decides which tools to use (database, guidelines, calculators, etc.)
+    Falls back to legacy system on error.
     """
-    from .query_assistant import process_query
-    
-    # Rate limit check (reuse existing mechanism)
+    # Rate limit check
     client_ip = request.client.host if request.client else "unknown"
     now_ts = __import__("time").time()
     last_ts = _RATE_LIMIT_STORE.get(client_ip, 0.0)
@@ -258,7 +263,7 @@ def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryRespon
     
     _RATE_LIMIT_STORE[client_ip] = now_ts
     
-    # Security: Block prompt injection attempts at API layer
+    # Security: Block prompt injection at API layer
     from .security import detect_injection_patterns
     injection_warnings = detect_injection_patterns(req.question)
     if injection_warnings:
@@ -266,28 +271,49 @@ def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryRespon
         return QueryResponse(
             success=False,
             answer="Your query was blocked due to potentially unsafe content. Please ask a normal question about patient data.",
-            highlights=[],
-            sql_used="",
-            row_count=0,
-            sources=[],
             error="Query blocked by input sanitization"
         )
     
-    # Sanitize query (strips control chars, etc.)
-    sanitized_q = sanitize_text(req.question)
-    
-    # Process the query
-    result = process_query(sanitized_q, req.history)
-    
-    return QueryResponse(
-        success=result.get("success", False),
-        answer=result.get("answer", "Sorry, I couldn't process that."),
-        highlights=result.get("highlights", []),
-        sql_used=result.get("sql_used", ""),
-        row_count=result.get("row_count", 0),
-        sources=result.get("sources", []),
-        error=result.get("error")
-    )
+    # Use new Agent system
+    try:
+        from .healthcare_agent import run_agent_query
+        result = run_agent_query(req.question, req.history)
+        
+        # If agent failed with an error, try legacy fallback
+        if not result.get("success", False) and result.get("error"):
+            print(f"Agent returned error, trying legacy: {result.get('error')}")
+            raise Exception(result.get("error"))
+        
+        return QueryResponse(
+            success=result.get("success", False),
+            answer=result.get("answer", "Sorry, I couldn't process that."),
+            highlights=result.get("highlights", []),
+            sql_used=result.get("sql_used", ""),
+            row_count=result.get("row_count", 0),
+            sources=result.get("sources", []),
+            error=result.get("error"),
+            reasoning_trace=result.get("reasoning_trace", []),
+            tools_used=result.get("tools_used", []),
+            needs_clarification=result.get("needs_clarification", False),
+            clarification_question=result.get("clarification_question"),
+            clarification_options=result.get("clarification_options", [])
+        )
+    except Exception as e:
+        # Fallback to legacy system
+        print(f"Agent error, falling back to legacy: {e}")
+        from .query_assistant import process_query
+        sanitized_q = sanitize_text(req.question)
+        result = process_query(sanitized_q, req.history)
+        
+        return QueryResponse(
+            success=result.get("success", False),
+            answer=result.get("answer", "Sorry, I couldn't process that."),
+            highlights=result.get("highlights", []),
+            sql_used=result.get("sql_used", ""),
+            row_count=result.get("row_count", 0),
+            sources=result.get("sources", []),
+            error=result.get("error")
+        )
     
 
 # ---------- RAG Routes ----------

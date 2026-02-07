@@ -2829,3 +2829,164 @@ mark.highlight {
         background: rgba(255, 255, 0, 0.25);
     }
 }
+
+/* ========================================
+   Agent UI Styles
+   ======================================== */
+
+/* Tool Usage Badge */
+.agent-tools-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    background: rgba(112, 0, 255, 0.1);
+    padding: 0.3rem 0.8rem;
+    border-radius: 12px;
+    margin-bottom: 0.5rem;
+    border: 1px solid rgba(112, 0, 255, 0.2);
+}
+
+.agent-tools-badge i {
+    color: var(--secondary);
+}
+
+.agent-tools-badge .tool-name {
+    background: rgba(112, 0, 255, 0.2);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-weight: 500;
+    color: #a78bfa;
+}
+
+/* Clarification Options */
+.clarification-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.clarification-btn {
+    background: rgba(0, 242, 255, 0.1);
+    border: 1px solid rgba(0, 242, 255, 0.3);
+    color: var(--primary);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.clarification-btn:hover {
+    background: rgba(0, 242, 255, 0.2);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 242, 255, 0.2);
+}
+
+/* Reasoning Trace */
+.reasoning-trace {
+    margin-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 0.5rem;
+}
+
+.trace-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 0.5rem 0;
+    transition: color 0.2s ease;
+}
+
+.trace-toggle:hover {
+    color: var(--primary);
+}
+
+.trace-toggle .toggle-icon {
+    width: 16px;
+    text-align: center;
+}
+
+.trace-content {
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.trace-step {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.trace-step:last-child {
+    border-bottom: none;
+}
+
+.trace-thought {
+    color: var(--text-muted);
+    font-style: italic;
+    margin-bottom: 0.5rem;
+}
+
+.trace-thought strong {
+    color: var(--primary);
+    font-style: normal;
+}
+
+.trace-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.trace-tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: rgba(112, 0, 255, 0.15);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: #a78bfa;
+}
+
+.trace-tool i {
+    font-size: 0.65rem;
+}
+
+.trace-results {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.trace-result {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.trace-result.success {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+}
+
+.trace-result.error {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+}

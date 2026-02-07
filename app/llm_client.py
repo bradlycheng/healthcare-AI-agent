@@ -139,21 +139,46 @@ def _strip_markdown_fences(content: str) -> str:
 def _try_repair_json(raw: str) -> str:
     """
     Very small, conservative JSON "repair" helper.
+    Handles common LLM issues like missing braces or trailing comments.
     """
     import re
     text = raw.strip()
     
     # Remove single-line comments like // this is a comment
     text = re.sub(r'//.*$', '', text, flags=re.MULTILINE)
+    
+    # Case 1: Response starts with a key (missing opening brace)
+    # e.g., '\n  "answer": ...'
+    if text.startswith('"') or text.lstrip().startswith('"'):
+        text = text.lstrip()
+        # Add opening brace
+        candidate = "{" + text
+        # Also add closing brace if missing
+        if not candidate.rstrip().endswith("}"):
+            candidate = candidate.rstrip().rstrip(",") + "\n}"
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            pass  # Try other repairs
 
-    # Case: LLM forgot the final closing brace on a top-level object.
+    # Case 2: LLM forgot the final closing brace on a top-level object
     if text.startswith("{") and not text.endswith("}"):
         candidate = text + "\n}"
         try:
             json.loads(candidate)
             return candidate
         except json.JSONDecodeError:
-            return text
+            pass
+    
+    # Case 3: LLM forgot opening brace but has closing
+    if not text.startswith("{") and text.endswith("}"):
+        candidate = "{\n" + text
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            pass
 
     return text
 
