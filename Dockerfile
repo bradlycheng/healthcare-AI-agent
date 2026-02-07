@@ -13,8 +13,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the application code and static files
 COPY app/ ./app
 COPY web/ ./web
+COPY docs/ ./docs
 COPY agent.db .
 COPY entrypoint.sh .
+COPY ingest_guidelines.py .
 RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 
 # Expose the port the app runs on
