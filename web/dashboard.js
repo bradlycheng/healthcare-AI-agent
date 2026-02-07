@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModal = document.getElementById('close-modal');
 
     // Initialize
-    console.log('Dashboard JS Loaded v5 (Stable)');
+    console.log('Dashboard JS Loaded v6 (Reset Button Fix)');
 
 
 
@@ -50,6 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const btn = e.target.closest('#delete-btn');
             if (btn) {
                 e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
                 confirmDelete();
             }
         });
@@ -72,12 +74,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    let isResetting = false; // Prevent double-click issues
+
     async function confirmDelete() {
+        // Prevent double-triggering
+        if (isResetting) {
+            console.log('Reset already in progress, ignoring click');
+            return;
+        }
+        isResetting = true;
+
         console.log('Reset Demo Clicked');
         if (confirm('Are you sure you want to reset the database? This action cannot be undone.')) {
 
             const password = prompt("Please enter the Admin Password to confirm reset:");
-            if (!password) return; // User cancelled
+            if (!password) {
+                isResetting = false;
+                return; // User cancelled
+            }
 
             try {
                 console.log('Sending RESET request...');
@@ -103,7 +117,12 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (err) {
                 console.error('Error resetting messages:', err);
                 showToast('Failed: ' + err.message, 'error');
+            } finally {
+                isResetting = false;
             }
+        } else {
+            // User clicked No on confirm dialog
+            isResetting = false;
         }
     }
 
