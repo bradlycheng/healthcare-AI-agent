@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from typing import Any, Dict, List, Optional
 
@@ -288,6 +289,64 @@ def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryRespon
         error=result.get("error")
     )
     
+
+# ---------- RAG Routes ----------
+
+@app.get("/api/document/{filename}")
+def get_document_content(filename: str, request: Request):
+    """
+    Get full text content of a RAG document.
+    """
+    # 1. Rate Limiting (Simple)
+    client_ip = request.client.host if request.client else "unknown"
+    now_ts = __import__("time").time()
+    # Use a separate key prefix for internal docs to avoid blocking chat
+    limit_key = f"doc_{client_ip}"
+    last_ts = _RATE_LIMIT_STORE.get(limit_key, 0.0)
+    
+    if now_ts - last_ts < 0.5: # 0.5s limit to prevent scraping
+        raise HTTPException(status_code=429, detail="Too many requests.")
+    
+    _RATE_LIMIT_STORE[limit_key] = now_ts
+
+    # 2. Filename Validation (Strict Regex)
+    import re
+    if not re.match(r'^[a-zA-Z0-9_\-\.]+$', filename):
+        raise HTTPException(status_code=400, detail="Invalid filename format")
+    
+    # 3. Extension Whitelist
+    ALLOWED_EXTENSIONS = {'.txt', '.md', '.pdf', '.json', '.csv'}
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="File type not allowed")
+    
+    # 4. Path Traversal Prevention (Strict)
+    try:
+        docs_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "docs"))
+        file_path = os.path.abspath(os.path.join(docs_dir, filename))
+        
+        # Ensure the resolved path starts with the docs directory
+        if not file_path.startswith(docs_dir):
+            raise HTTPException(status_code=403, detail="Access denied")
+            
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        # 5. Size Limit (e.g. 5MB) to prevent DOS
+        if os.path.getsize(file_path) > 5 * 1024 * 1024:
+             raise HTTPException(status_code=400, detail="Document too large")
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return {"filename": filename, "content": content}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error reading doc {filename}: {e}")
+        raise HTTPException(status_code=500, detail="Error reading document")
+    
+
+
 
 # ---------- Patient Timeline Routes ----------
 

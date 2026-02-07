@@ -693,24 +693,69 @@ document.addEventListener('DOMContentLoaded', () => {
             contentHtml += '</ul>';
         }
 
-        // Add RAG sources if present
+        // Add RAG sources if present (collapsible)
         if (options.sources && options.sources.length > 0) {
-            contentHtml += '<div class="message-sources">';
-            contentHtml += '<p class="sources-header"><i class="fa-solid fa-book-medical"></i> Sources:</p>';
+            // Find the highest relevance score
+            const maxRelevance = Math.max(...options.sources.map(s => s.relevance || 0));
+            const maxPercent = Math.round(maxRelevance * 100);
+
+            const sourceId = `sources-${Date.now()}`;
+            contentHtml += `<div class="sources-collapsible" id="${sourceId}">`;
+            contentHtml += `<button class="sources-toggle" aria-expanded="false" onclick="toggleSources('${sourceId}')">
+                <span class="toggle-icon"><i class="fa-solid fa-plus"></i></span>
+                <span class="sources-summary">
+                    <i class="fa-solid fa-book-medical"></i> 
+                    Sources (${options.sources.length}) 
+                    <span class="best-match">Best match: ${maxPercent}%</span>
+                </span>
+            </button>`;
+            contentHtml += '<div class="sources-content" style="display: none;">';
             options.sources.forEach(src => {
                 const relevancePercent = Math.round((src.relevance || 0) * 100);
                 const relevanceClass = relevancePercent >= 80 ? 'high' : (relevancePercent >= 50 ? 'medium' : 'low');
+                const sourceTitle = escapeHtml(src.title || 'Unknown Source');
+                // Use filename if available, otherwise fallback to title
+                const docIdentifier = src.filename || src.title || '';
+
+                // Prepare snippet for JS string (escape backslashes, quotes, newlines)
+                const rawSnippet = src.full_snippet || '';
+                const safeSnippet = rawSnippet
+                    .replace(/\\/g, '\\\\')
+                    .replace(/'/g, "\\'")
+                    .replace(/\n/g, '\\n')
+                    .replace(/\r/g, '');
+
+                // Escape HTML for attribute (mostly for double quotes if any, and general safety)
+                // Note: We used escapeHtml above for title/id, but safeSnippet needs to be passed to JS.
+                const attrSnippet = escapeHtml(safeSnippet);
+                const attrId = escapeHtml(docIdentifier.replace(/'/g, "\\'"));
+                const attrTitle = sourceTitle.replace(/'/g, "\\'"); // sourceTitle is ALREADY html escaped. prevent double escape of quotes?
+                // actually title is html escaped. so ' -> &#039;. so attrTitle has &#039;.
+                // if we use it in JS string '...', browser decodes &#039; -> '
+                // so we need \' in JS. so we need to ensure title has \' instead of ' BEFORE html escape?
+                // Too complex. Let's just use raw title and escape it properly for JS+HTML.
+
+                // Simpler approach:
+                // 1. Raw -> JS Escape -> HTML Escape
+                const jsId = (src.filename || src.title || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const jsTitle = (src.title || 'Unknown Source').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const finalId = escapeHtml(jsId);
+                const finalTitle = escapeHtml(jsTitle);
+
                 contentHtml += `
                     <div class="source-card">
                         <div class="source-header">
-                            <span class="source-title">${escapeHtml(src.title || 'Unknown Source')}</span>
+                            <span class="source-title">${sourceTitle}</span>
                             <span class="source-relevance ${relevanceClass}">${relevancePercent}% match</span>
                         </div>
                         <p class="source-snippet">${escapeHtml(src.snippet || '')}</p>
+                        <button class="view-doc-btn" onclick="showDocumentModal('${finalId}', '${finalTitle}', '${attrSnippet}')">
+                            <i class="fa-solid fa-file-lines"></i> View Full Document
+                        </button>
                     </div>
                 `;
             });
-            contentHtml += '</div>';
+            contentHtml += '</div></div>';
         }
 
         // Add error styling
@@ -767,3 +812,178 @@ document.addEventListener('DOMContentLoaded', () => {
         if (msg) msg.remove();
     }
 });
+
+// ==============================================
+// Global Functions for Sources (outside DOMContentLoaded)
+// ==============================================
+
+// Toggle sources collapsible section
+function toggleSources(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const toggle = container.querySelector('.sources-toggle');
+    const content = container.querySelector('.sources-content');
+    const icon = toggle.querySelector('.toggle-icon i');
+
+    const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+
+    if (isExpanded) {
+        // Collapse
+        content.style.display = 'none';
+        toggle.setAttribute('aria-expanded', 'false');
+        icon.className = 'fa-solid fa-plus';
+    } else {
+        // Expand
+        content.style.display = 'block';
+        toggle.setAttribute('aria-expanded', 'true');
+        icon.className = 'fa-solid fa-minus';
+    }
+}
+
+// Show document viewer modal
+window.showDocumentModal = async function (filename, displayTitle, highlightText) {
+    console.log(`[RAG] Opening document. Filename: "${filename}", Title: "${displayTitle}"`);
+    if (highlightText) console.log(`[RAG] Highlighting snippet length: ${highlightText.length}`);
+
+    if (!filename) {
+        console.error('[RAG] No filename provided to showDocumentModal');
+        alert("Cannot view document: Filename is missing.");
+        return;
+    }
+
+    // Determine API Base URL
+    const API_BASE = (window.location.protocol === 'file:')
+        ? 'http://localhost:8080'
+        : ''; // Relative path for served app
+
+    // Create or get modal
+    let modal = document.getElementById('doc-viewer-modal');
+    // ... (modal creation logic same as before, simplified for this replace check) ...
+    // Note: If I don't include the whole function, I need to be careful.
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'doc-viewer-modal';
+        modal.className = 'doc-modal';
+        modal.innerHTML = `
+            <div class="doc-modal-content">
+                <div class="doc-modal-header">
+                    <h3 id="doc-modal-title">Document</h3>
+                    <button class="doc-modal-close" onclick="closeDocumentModal()">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div class="doc-modal-body" id="doc-modal-body">
+                    <div class="doc-loading">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Loading...
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // Close on outside click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeDocumentModal();
+        });
+    }
+
+    // Reset content and show loading
+    const body = document.getElementById('doc-modal-body');
+    document.getElementById('doc-modal-title').textContent = displayTitle || filename;
+    body.innerHTML = `
+        <div class="doc-loading">
+            <i class="fa-solid fa-circle-notch fa-spin"></i>
+            <p>Loading document content...</p>
+        </div>
+    `;
+
+    modal.classList.add('visible');
+    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+
+    try {
+        const url = `${API_BASE}/api/document/${encodeURIComponent(filename)}`;
+        console.log(`[RAG] Fetching from: ${url}`);
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Server returned ${response.status}: ${errText}`);
+        }
+
+        const data = await response.json();
+
+        // Use textContent for safety, but we want to allow formatting? 
+        // Docs are raw text.
+        body.innerHTML = '';
+        const pre = document.createElement('pre');
+        pre.className = 'doc-content';
+
+        if (highlightText) {
+            const content = data.content;
+
+            // Robust Highlighting: Match regardless of whitespace differences (newlines, spaces)
+            // 1. Escape regex special characters in the snippet
+            const escapedHighlight = highlightText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // 2. Replace all whitespace sequences with \s+ pattern to match any whitespace (including newlines)
+            const flexibleHighlight = escapedHighlight.replace(/\s+/g, '\\s+');
+
+            // Create regex (multiline matching not strictly needed if \s matches \n, but good to have)
+            const regex = new RegExp(flexibleHighlight);
+            const match = regex.exec(content);
+
+            if (match) {
+                const idx = match.index;
+                const matchedStr = match[0];
+
+                const before = escapeHtmlGlobal(content.substring(0, idx));
+                const highlight = escapeHtmlGlobal(matchedStr);
+                const after = escapeHtmlGlobal(content.substring(idx + matchedStr.length));
+
+                pre.innerHTML = `${before}<mark class="highlight">${highlight}</mark>${after}`;
+
+                // Scroll to highlight
+                setTimeout(() => {
+                    const mark = pre.querySelector('mark');
+                    if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+            } else {
+                pre.textContent = content; // Fallback
+                console.warn('[RAG] Highlight text not found in document (regex match failed).');
+                console.log('Snippet pattern:', flexibleHighlight);
+            }
+        } else {
+            pre.textContent = data.content;
+        }
+
+        body.appendChild(pre);
+
+    } catch (err) {
+        console.error('[RAG] Error loading document:', err);
+        body.innerHTML = `
+            <div class="doc-error">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <p>Could not load document.</p>
+                <small>${escapeHtmlGlobal(err.message)}</small>
+            </div>
+        `;
+    }
+}
+
+// Close document modal
+function closeDocumentModal() {
+    const modal = document.getElementById('doc-viewer-modal');
+    if (modal) {
+        modal.classList.remove('visible');
+        document.body.style.overflow = '';
+    }
+}
+
+// Helper for escaping HTML in global scope
+function escapeHtmlGlobal(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}

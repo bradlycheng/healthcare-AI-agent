@@ -394,11 +394,17 @@ def retrieve_context(question: str) -> tuple[str, List[Dict[str, Any]]]:
             # Create a clean snippet that doesn't cut mid-word
             snippet = create_clean_snippet(doc, max_length=180)
             
+            # Extract filename from source path for fetching full document
+            source_path = metadatas[i].get('source', '')
+            filename = os.path.basename(source_path) if source_path else ''
+            
             context_parts.append(f"[Source: {title}]\n{doc}")
             sources.append({
                 "title": title,
                 "snippet": snippet,
-                "relevance": round(relevance, 2)
+                "relevance": round(relevance, 2),
+                "filename": filename,
+                "full_snippet": doc
             })
         
         context_text = "\n\n".join(context_parts)
