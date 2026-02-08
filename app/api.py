@@ -479,14 +479,26 @@ def get_patient_summary_endpoint(patient_id: str, request: Request) -> PatientSu
     return PatientSummaryResponse(patient_id=patient_id, summary=summary)
 
 
+
+class ResetRequest(BaseModel):
+    password: str
+
 @app.delete("/messages", status_code=204)
-def clear_all_messages_endpoint():
+def clear_all_messages_endpoint(req: ResetRequest):
     """
     Reset database to original sample data.
+    Requires password validation.
     """
     from .db import delete_all_messages
     from .seed import seed_database
     
+    # HARDCODED PASSWORD FOR DEMO (In production, use env vars)
+    VALID_PASSWORDS = ["admin123", "demo-reset", "admin"]
+    
+    if req.password not in VALID_PASSWORDS:
+        print(f"SECURITY: Failed reset attempt with password '{req.password}'")
+        raise HTTPException(status_code=401, detail="Invalid admin password")
+
     try:
         # 1. Wipe everything
         delete_all_messages()

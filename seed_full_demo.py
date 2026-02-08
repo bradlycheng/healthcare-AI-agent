@@ -4,7 +4,7 @@ import datetime
 import uuid
 import os
 
-DB_PATH = "C:/Users/bradl/Desktop/healthcare_ai_agent/data/healthcare.db"
+DB_PATH = "agent.db"
 
 def seed_demo_data():
     # Force delete DB
@@ -16,8 +16,8 @@ def seed_demo_data():
             print("ERROR: Could not delete DB. File might be locked.")
             return
 
-    # Ensure directory
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    # Ensure directory (no longer needed for current dir but kept for safety)
+    # os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
     print(f"Initializing and seeding {DB_PATH}...")
     conn = sqlite3.connect(DB_PATH)
@@ -35,7 +35,7 @@ def seed_demo_data():
             patient_dob TEXT,
             patient_sex TEXT,
             message_datetime TEXT,
-            raw_message TEXT
+            raw_hl7 TEXT
         )
     ''')
     
@@ -73,7 +73,7 @@ def seed_demo_data():
     dt_sarah = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
     
     cursor.execute("""
-        INSERT INTO hl7_messages (id, message_type, received_at, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, message_datetime, raw_message)
+        INSERT INTO hl7_messages (id, message_type, received_at, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, message_datetime, raw_hl7)
         VALUES (?, 'ORU^R01', ?, 'P-SARAH', 'SARAH', 'JENKINS', '1980-05-15', 'F', ?, 'SEED_SARAH')
     """, (sarah_id, dt_sarah, dt_sarah))
     
@@ -93,7 +93,7 @@ def seed_demo_data():
     dt_john = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     cursor.execute("""
-        INSERT INTO hl7_messages (id, message_type, received_at, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, message_datetime, raw_message)
+        INSERT INTO hl7_messages (id, message_type, received_at, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, message_datetime, raw_hl7)
         VALUES (?, 'ORU^R01', ?, 'P-JOHN', 'JOHN', 'SMITH', '1964-05-15', 'M', ?, 'SEED_JOHN')
     """, (john_id, dt_john, dt_john))
     

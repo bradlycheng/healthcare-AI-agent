@@ -21,7 +21,10 @@ LOINC_MAP = {
     "Hemoglobin A1c": {"code": "4548-4", "unit": "%", "min": 4.0, "max": 5.6},
     "TSH": {"code": "3016-3", "unit": "uIU/mL", "min": 0.4, "max": 4.0},
     "ALT": {"code": "1742-6", "unit": "U/L", "min": 7, "max": 55},
-    "AST": {"code": "1920-8", "unit": "U/L", "min": 8, "max": 48}
+    "AST": {"code": "1920-8", "unit": "U/L", "min": 8, "max": 48},
+    "Serum Creatinine": {"code": "2160-0", "unit": "mg/dL", "min": 0.6, "max": 1.2},
+    "BUN": {"code": "3094-0", "unit": "mg/dL", "min": 7, "max": 20},
+    "eGFR": {"code": "33914-3", "unit": "mL/min/1.73m2", "min": 90, "max": 120}
 }
 
 FIRST_NAMES = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", 
@@ -49,6 +52,12 @@ CONDITIONS = {
         "dx_name": "Hyperlipidemia, unspecified",
         "meds": [("Atorvastatin", "20 mg", "Daily"), ("Simvastatin", "40 mg", "Nightly")],
         "labs": ["Total Cholesterol", "LDL", "HDL", "Triglycerides"]
+    },
+    "CKD": {
+        "dx_code": "N18.3",
+        "dx_name": "Chronic kidney disease, stage 3 (moderate)",
+        "meds": [("Furosemide", "20 mg", "Daily")],
+        "labs": ["Serum Creatinine", "BUN", "eGFR"]
     }
 }
 
@@ -91,7 +100,7 @@ def seed_database(verbose=True, use_llm=False):
         {"id": "P-JOHN", "first": "John", "last": "Smith", "sex": "M", "age": 62, "conditions": ["Diabetes", "CKD"]}
     ]
     
-    for i in range(100):
+    for i in range(30):
         if i < len(DEMO_PATIENTS):
             dp = DEMO_PATIENTS[i]
             pid, first, last, sex, age, patient_conditions = dp["id"], dp["first"], dp["last"], dp["sex"], dp["age"], dp["conditions"]
@@ -161,15 +170,21 @@ def seed_database(verbose=True, use_llm=False):
                 loinc_info = LOINC_MAP[lab_name]
                 
                 # Logic for abnormal values
+                # Use uniform for everything to handle floats (e.g. A1c 4.0-5.6)
                 val = random.uniform(loinc_info["min"], loinc_info["max"])
+                
                 if "Diabetes" in patient_conditions and lab_name == "Glucose":
                     val = random.uniform(110, 250)
                 if "Hypertension" in patient_conditions and "BP" in lab_name:
                     val *= random.uniform(1.1, 1.4)
                 if "Hyperlipidemia" in patient_conditions and lab_name == "LDL":
                     val = random.uniform(110, 190)
-                    
-                val = round(val, 1) if "BP" not in lab_name and "Rate" not in lab_name else int(val)
+                
+                # Round appropriately
+                if "BP" in lab_name or "Rate" in lab_name:
+                    val = int(round(val))
+                else:
+                    val = round(val, 1)
                 
                 flag = "N"
                 if val < loinc_info["min"]: flag = "L"

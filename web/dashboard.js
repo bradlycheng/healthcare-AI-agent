@@ -175,7 +175,11 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('Sending RESET request...');
             console.log('Sending RESET request...');
             const response = await fetch(`${API_BASE}/messages`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ password: password })
             });
 
             console.log('Reset response:', response.status);

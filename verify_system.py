@@ -8,7 +8,7 @@ import io
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
-BASE_URL = "http://localhost:8080"
+BASE_URL = "http://localhost:8000"
 
 def print_pass(msg):
     print(f"[PASS]: {msg}")
@@ -96,6 +96,17 @@ OBX|1|NM|GLU^Glucose||105|mg/dL|70-100|H|||F"""
             print_fail(f"Query request failed: {resp.status_code} {resp.text}")
     except Exception as e:
         print_fail(f"Query exception: {e}")
+
+    # 5. Reset Demo (DELETE /messages)
+    print("\nTesting Reset Demo...")
+    try:
+        resp = requests.delete(f"{BASE_URL}/messages")
+        if resp.status_code == 204:
+            print_pass("Reset Demo (DELETE /messages)")
+        else:
+            print_fail(f"Reset failed: {resp.status_code} {resp.text}")
+    except Exception as e:
+        print_fail(f"Reset exception: {e}")
 
     print("\n🎉 All Verification Steps Passed!")
 
