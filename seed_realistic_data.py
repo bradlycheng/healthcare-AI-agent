@@ -4,7 +4,7 @@ import random
 import uuid
 import json
 from datetime import datetime, timedelta
-from app.db import DB_PATH, init_db
+from app.db import DB_PATH, init_db, get_connection
 
 # Constants
 LOINC_MAP = {
@@ -72,7 +72,7 @@ def seed_data():
     print("Initializing Database...")
     init_db()
     
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection(DB_PATH)
     cursor = conn.cursor()
     
     # Generate 100 Patients

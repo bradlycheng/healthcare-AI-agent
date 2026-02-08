@@ -3,7 +3,7 @@ import random
 import uuid
 import os
 from datetime import datetime, timedelta
-from .db import DB_PATH, init_db, delete_all_messages
+from .db import DB_PATH, init_db, delete_all_messages, get_connection
 
 # Constants
 LOINC_MAP = {
@@ -74,10 +74,9 @@ def seed_database(verbose=True, use_llm=False):
     delete_all_messages()
     print("Data cleared successfully.")
 
-    # 3. Connect (use local connection to match seed script logic)
-    # Using raw sqlite3 connect because the generator code does precise transactions
+    # 3. Connect (use get_connection for timeout/WAL settings)
     db_path = os.getenv("DATABASE_PATH", DB_PATH)
-    conn = sqlite3.connect(db_path)
+    conn = get_connection(db_path)
     cursor = conn.cursor()
     
     # Generate 100 Patients (Deterministic)
