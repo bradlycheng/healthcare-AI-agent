@@ -493,7 +493,7 @@ def clear_all_messages_endpoint(req: ResetRequest):
     from .seed import seed_database
     
     # HARDCODED PASSWORD FOR DEMO (In production, use env vars)
-    VALID_PASSWORDS = ["admin123", "demo-reset", "admin"]
+    VALID_PASSWORDS = ["admin123", "demo-reset", "admin", "d3m0th1s"]
     
     if req.password not in VALID_PASSWORDS:
         print(f"SECURITY: Failed reset attempt with password '{req.password}'")
