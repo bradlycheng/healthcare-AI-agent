@@ -130,6 +130,7 @@ class ObservationListResponse(BaseModel):
 class QueryRequest(BaseModel):
     question: str
     history: List[Dict[str, str]] = []
+    reasoning_depth: str = "standard"
 
 
 class QueryResponse(BaseModel):
@@ -277,7 +278,7 @@ def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryRespon
     # Use new Agent system
     try:
         from .healthcare_agent import run_agent_query
-        result = run_agent_query(req.question, req.history)
+        result = run_agent_query(req.question, req.history, depth=req.reasoning_depth)
         
         # If agent failed with an error, try legacy fallback
         if not result.get("success", False) and result.get("error"):

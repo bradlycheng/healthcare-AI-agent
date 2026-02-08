@@ -89,7 +89,7 @@ def get_patient_timeline(patient_id: str, db_path: str = DB_PATH) -> Dict[str, A
         
         # Get all visits (messages) for this patient
         message_rows = conn.execute("""
-            SELECT id, received_at, raw_hl7
+            SELECT id, received_at, raw_message
             FROM hl7_messages
             WHERE patient_id = ?
             ORDER BY received_at ASC

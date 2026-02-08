@@ -86,26 +86,37 @@ def seed_database(verbose=True, use_llm=False):
         
     random.seed(42)  # Ensure consistency
     
+    # --- FIXED DEMO PATIENTS ---
+    DEMO_PATIENTS = [
+        {"id": "P-SARAH", "first": "Sarah", "last": "Jenkins", "sex": "F", "age": 45, "conditions": ["Hypertension"]},
+        {"id": "P-JOHN", "first": "John", "last": "Smith", "sex": "M", "age": 62, "conditions": ["Diabetes", "CKD"]}
+    ]
+    
     for i in range(100):
-        first = random.choice(FIRST_NAMES)
-        last = random.choice(LAST_NAMES)
-        if i % 5 == 0: 
-            # Ensure some duplicates or specific patterns for search testing
-            last = "SearchTest" 
+        if i < len(DEMO_PATIENTS):
+            dp = DEMO_PATIENTS[i]
+            pid, first, last, sex, age, patient_conditions = dp["id"], dp["first"], dp["last"], dp["sex"], dp["age"], dp["conditions"]
+        else:
+            first = random.choice(FIRST_NAMES)
+            last = random.choice(LAST_NAMES)
+            if i % 5 == 0: 
+                # Ensure some duplicates or specific patterns for search testing
+                last = "SearchTest" 
+                
+            sex = random.choice(["M", "F"])
+            age = random.randint(25, 85)
+            pid = f"P{10000+i}"
             
-        sex = random.choice(["M", "F"])
-        age = random.randint(25, 85)
+            # Assign Conditions
+            patient_conditions = []
+            if random.random() < 0.3: # 30% chance of HTN
+                patient_conditions.append("Hypertension")
+            if random.random() < 0.15: # 15% chance of Diabetes
+                patient_conditions.append("Diabetes")
+            if random.random() < 0.25: # 25% chance of High Cholesterol
+                patient_conditions.append("Hyperlipidemia")
+            
         dob = generate_dob(age)
-        pid = f"P{10000+i}"
-        
-        # Assign Conditions
-        patient_conditions = []
-        if random.random() < 0.3: # 30% chance of HTN
-            patient_conditions.append("Hypertension")
-        if random.random() < 0.15: # 15% chance of Diabetes
-            patient_conditions.append("Diabetes")
-        if random.random() < 0.25: # 25% chance of High Cholesterol
-            patient_conditions.append("Hyperlipidemia")
             
         # Generate Visits & Data (Over 2 years)
         num_visits = random.randint(3, 12)

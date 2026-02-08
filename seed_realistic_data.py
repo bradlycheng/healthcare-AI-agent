@@ -22,7 +22,10 @@ LOINC_MAP = {
     "Hemoglobin A1c": {"code": "4548-4", "unit": "%", "min": 4.0, "max": 5.6},
     "TSH": {"code": "3016-3", "unit": "uIU/mL", "min": 0.4, "max": 4.0},
     "ALT": {"code": "1742-6", "unit": "U/L", "min": 7, "max": 55},
-    "AST": {"code": "1920-8", "unit": "U/L", "min": 8, "max": 48}
+    "AST": {"code": "1920-8", "unit": "U/L", "min": 8, "max": 48},
+    "Serum Creatinine": {"code": "2160-0", "unit": "mg/dL", "min": 0.6, "max": 1.2},
+    "BUN": {"code": "3094-0", "unit": "mg/dL", "min": 7, "max": 20},
+    "eGFR": {"code": "33914-3", "unit": "mL/min/1.73m2", "min": 90, "max": 120}
 }
 
 FIRST_NAMES = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", 
@@ -50,6 +53,12 @@ CONDITIONS = {
         "dx_name": "Hyperlipidemia, unspecified",
         "meds": [("Atorvastatin", "20 mg", "Daily"), ("Simvastatin", "40 mg", "Nightly")],
         "labs": ["Total Cholesterol", "LDL", "HDL", "Triglycerides"]
+    },
+    "CKD": {
+        "dx_code": "N18.3",
+        "dx_name": "Chronic kidney disease, stage 3 (moderate)",
+        "meds": [("Furosemide", "20 mg", "Daily")],
+        "labs": ["Serum Creatinine", "BUN", "eGFR"]
     }
 }
 
@@ -68,25 +77,32 @@ def seed_data():
     
     # Generate 100 Patients
     print("Generating 100 Patients...")
+    
+    # --- FIXED DEMO PATIENTS ---
+    DEMO_PATIENTS = [
+        {"id": "P-SARAH", "first": "Sarah", "last": "Jenkins", "sex": "F", "age": 45, "conditions": ["Hypertension"]},
+        {"id": "P-JOHN", "first": "John", "last": "Smith", "sex": "M", "age": 62, "conditions": ["Diabetes", "CKD"]}
+    ]
+    
     for i in range(100):
-        first = random.choice(FIRST_NAMES)
-        last = random.choice(LAST_NAMES)
-        if i % 5 == 0: # Ensure some duplicates for search testing
-            last = "DuplicateCheck"
+        if i < len(DEMO_PATIENTS):
+            dp = DEMO_PATIENTS[i]
+            pid, first, last, sex, age, patient_conditions = dp["id"], dp["first"], dp["last"], dp["sex"], dp["age"], dp["conditions"]
+        else:
+            first = random.choice(FIRST_NAMES)
+            last = random.choice(LAST_NAMES)
+            sex = random.choice(["M", "F"])
+            age = random.randint(25, 85)
+            pid = f"P{10000+i}"
             
-        sex = random.choice(["M", "F"])
-        age = random.randint(25, 85)
+            # Assign Conditions (Random)
+            patient_conditions = []
+            if random.random() < 0.3: patient_conditions.append("Hypertension")
+            if random.random() < 0.15: patient_conditions.append("Diabetes")
+            if random.random() < 0.25: patient_conditions.append("Hyperlipidemia")
+            if random.random() < 0.1: patient_conditions.append("CKD")
+            
         dob = generate_dob(age)
-        pid = f"P{10000+i}"
-        
-        # Assign Conditions
-        patient_conditions = []
-        if random.random() < 0.3: # 30% chance of HTN
-            patient_conditions.append("Hypertension")
-        if random.random() < 0.15: # 15% chance of Diabetes
-            patient_conditions.append("Diabetes")
-        if random.random() < 0.25: # 25% chance of High Cholesterol
-            patient_conditions.append("Hyperlipidemia")
             
         # Generate Visits & Data (Within last 2 days to avoid startup pruning)
         num_visits = random.randint(3, 12)
@@ -139,6 +155,10 @@ def seed_data():
                     val *= random.uniform(1.1, 1.4)
                 if "Hyperlipidemia" in patient_conditions and lab_name == "LDL":
                     val = random.uniform(110, 190)
+                if "CKD" in patient_conditions:
+                    if lab_name == "Serum Creatinine": val = random.uniform(1.5, 3.0)
+                    if lab_name == "eGFR": val = random.uniform(30, 59)
+                    if lab_name == "BUN": val = random.uniform(25, 50)
                     
                 val = round(val, 1) if "BP" not in lab_name and "Rate" not in lab_name else int(val)
                 

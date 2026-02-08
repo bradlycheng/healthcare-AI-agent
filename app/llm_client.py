@@ -145,7 +145,25 @@ def _try_repair_json(raw: str) -> str:
     text = raw.strip()
     
     # Remove single-line comments like // this is a comment
-    text = re.sub(r'//.*$', '', text, flags=re.MULTILINE)
+    text = re.sub(r'(?m)^\s*//.*$', '', text)
+    text = re.sub(r'(?m)\s+//.*$', '', text)
+    
+    # Remove hash comments # like this (commonly used by Python-heavy LLMs)
+    # Be careful not to kill # inside strings.
+    # A safer way is to match strings OR comments, and only replace comments.
+    # Pattern: "..." | '...' | #...
+    pattern = r'(".*?"|\'.*?\')|(#.*$)'
+    def replace_comment(match):
+        if match.group(2): return "" # It's a comment, replace with empty
+        return match.group(1) # It's a string, keep it
+    
+    text = re.sub(pattern, replace_comment, text, flags=re.MULTILINE)
+
+    # Remove multi-line comments like /* this is a comment */
+    text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+    
+    # Also remove trailing commas (common error)
+    text = re.sub(r',(\s*[}\]])', r'\1', text)
     
     # Case 1: Response starts with a key (missing opening brace)
     # e.g., '\n  "answer": ...'

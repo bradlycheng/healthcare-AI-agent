@@ -34,7 +34,15 @@ class ToolName(str, Enum):
     SEARCH_GUIDELINES = "search_guidelines"
     GET_PATIENT_CONTEXT = "get_patient_context"
     CLINICAL_CALCULATOR = "clinical_calculator"
+
     ASK_CLARIFICATION = "ask_clarification"
+
+
+class ReasoningDepth(str, Enum):
+    """Depth of reasoning strategies."""
+    FAST = "fast"        # Direct SQL/RAG (Legacy)
+    STANDARD = "standard"  # ReAct Loop (Current)
+    DEEP = "deep"        # Reflection + Planning + ReAct
 
 
 @dataclass
@@ -151,7 +159,7 @@ Example response:
 {"thought": "User wants patient list, using query_database", "tool_calls": [{"tool": "query_database", "input": {"query": "show all patients"}}]}
 
 Example for risk/worried queries:
-{"thought": "User asks about worried/risk. I should check for signs of clinical instability or critical values.", "tool_calls": [{"tool": "query_database", "input": {"query": "show patients with heart rate > 120, systolic bp < 90, oxygen saturation < 90, or temperature > 100.4"}}]}
+{"thought": "User asks about worried/risk. I should check for signs of clinical instability OR uncontrolled chronic disease.", "tool_calls": [{"tool": "query_database", "input": {"query": "show patients with heart rate > 120, systolic bp > 160, diastolic bp > 100, glucose > 300, A1c > 9, or oxygen saturation < 90"}}]}
 
 If you can answer directly from conversation history without tools:
 {"thought": "I already have this information", "tool_calls": [], "direct_answer": "Your answer here"}
@@ -219,16 +227,29 @@ class HealthcareAgent:
             ToolName.ASK_CLARIFICATION.value: self._tool_ask_clarification,
         }
     
-    def run(self, question: str, history: List[Dict[str, str]] = None) -> AgentResponse:
+    def run(self, question: str, history: List[Dict[str, str]] = None, depth: str = "standard") -> AgentResponse:
         """
-        Main agent entry point.
+        Main agent entry point with Reasoning Router.
         
         Args:
             question: User's natural language question
             history: Previous conversation history
+            depth: "fast", "standard", or "deep"
+        """
+        if history is None:
+            history = []
             
-        Returns:
-            AgentResponse with answer and metadata
+        # Router
+        if depth == ReasoningDepth.FAST.value:
+            return self._run_fast(question, history)
+        elif depth == ReasoningDepth.DEEP.value:
+            return self._run_deep(question, history)
+        else:
+            return self._run_standard(question, history)
+
+    def _run_standard(self, question: str, history: List[Dict[str, str]] = None) -> AgentResponse:
+        """
+        Standard ReAct Loop (Legacy 'run' method).
         """
         if history is None:
             history = []
@@ -260,6 +281,7 @@ class HealthcareAgent:
         try:
             # Step 1: Planning - decide which tools to use
             plan = self._plan(question, history)
+            print(f"DEBUG: Plan result: {plan}")
             
             if plan.get("error"):
                 return AgentResponse(
@@ -388,18 +410,31 @@ class HealthcareAgent:
         history_str = ""
         if history:
             history_str = "\n\nCONVERSATION HISTORY:\n"
-            for msg in history[-5:]:  # Last 5 messages
+            # Reverse to label them relative to now? No, chronological is better for reading.
+            # But we can label the last one explicitly.
+            relevant_history = history[-5:]
+            for i, msg in enumerate(relevant_history):
                 role = msg.get("role", "user")
                 content = msg.get("content", "")
-                history_str += f"{role.upper()}: {content}\n"
+                
+                label = ""
+                if i == len(relevant_history) - 1:
+                    label = " [IMMEDIATELY PRECEDING MESSAGE]"
+                
+                history_str += f"{role.upper()}{label}: {content}\n"
         
         prompt = f"""
 {AGENT_SYSTEM_PROMPT}
+
 {history_str}
 
-USER QUESTION: {question}
+CURRENT USER QUESTION: {question}
 
-Decide which tools to use. Output JSON only.
+IMPORTANT: 
+- You interpret "it", "that", "he", "she" as referring to the SUBJECT of the [IMMEDIATELY PRECEDING MESSAGE].
+- Do NOT refer to older messages if a new topic was introduced in the [IMMEDIATELY PRECEDING MESSAGE].
+
+Decide which tools to use. Output valid JSON only. Do not use code blocks.
 """
         
         try:
@@ -603,7 +638,13 @@ Decide which tools to use. Output JSON only.
         if not patient_id:
             return {"error": "Could not find patient", "patient": None}
         
-        timeline = get_patient_timeline(patient_id)
+        try:
+            timeline = get_patient_timeline(patient_id)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {"error": f"Error retrieving timeline: {str(e)}", "patient": None}
+
         if not timeline:
             return {"error": "Patient not found", "patient": None}
         
@@ -702,26 +743,122 @@ Decide which tools to use. Output JSON only.
             return {"error": f"Unknown calculation: {calculation}. Supported: bmi, egfr"}
     
     def _tool_ask_clarification(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle clarification requests (this is handled specially in run())."""
+        """Ask user for clarification."""
         return {
             "needs_clarification": True,
             "question": input_data.get("question", "Could you please clarify?"),
             "options": input_data.get("options", [])
         }
 
+    # =========================================================================
+    # Reasoning Modes
+    # =========================================================================
+
+    def _run_fast(self, question: str, history: List[Dict[str, str]]) -> AgentResponse:
+        """
+        Fast Mode: Direct SQL/RAG without ReAct loop.
+        Wraps `query_assistant.process_query` logic.
+        """
+        from .query_assistant import process_query
+        
+        # We need to adapt the dict response from process_query to AgentResponse
+        start_time = time.time()
+        result = process_query(question, history)
+        duration = int((time.time() - start_time) * 1000)
+        
+        # Create a "fake" trace step for transparency
+        step = AgentStep(
+            thought="Fast Mode: Direct execution via Query Assistant",
+            tool_calls=[],
+            tool_results=[ToolResult(
+                tool="query_assistant",
+                success=result["success"],
+                result={"row_count": result.get("row_count")},
+                execution_time_ms=duration
+            )]
+        )
+        
+        return AgentResponse(
+            answer=result["answer"],
+            success=result["success"],
+            highlights=result.get("highlights", []),
+            reasoning_trace=[step],
+            sql_used=result.get("sql_used", ""),
+            row_count=result.get("row_count", 0),
+            sources=result.get("sources", []),
+            error=result.get("error")
+        )
+
+    def _run_deep(self, question: str, history: List[Dict[str, str]]) -> AgentResponse:
+        """
+        Deep Mode: Reflection + Standard ReAct.
+        """
+        # 1. Reflection / Planning Step
+        # JSON template in separate string to avoid f-string escaping issues
+        json_template = """
+{
+  "analysis": "This request requires...",
+  "strategy": "First query X, then check guidelines Y...",
+  "modifications": "Ensure to check for synonyms of..."
+}
+"""
+        reflection_prompt = f"""
+You are a Senior Clinical AI Supervisor.
+A user has asked: "{question}"
+
+Analyze the complexity of this request.
+1. Identify if this requires multi-step reasoning (e.g., compare two patients, trend analysis).
+2. Identify potential pitfalls (e.g., missing units, ambiguous terms).
+3. Formulate a high-level plan for the agent.
+
+Output JSON:
+""" + json_template + """
+Output valid JSON only. Do not use code blocks.
+"""
+        try:
+            reflection = call_llm_for_json(reflection_prompt)
+            strategy = reflection.get("strategy", "Proceed with standard analysis.")
+            
+            # Inject strategy into history or prompt to guide _run_standard?
+            # For now, we prepend the strategy to the question to guide the ReAct agent
+            enhanced_question = f"[STRATEGY: {strategy}] {question}"
+            
+            # Run Standard loop with enhanced context
+            response = self._run_standard(enhanced_question, history)
+            
+            # Prepend reflection step to trace
+            reflection_step = AgentStep(
+                thought=f"Deep Mode Reflection: {reflection.get('analysis')}",
+                tool_calls=[],
+                tool_results=[ToolResult(
+                    tool="reflection", 
+                    success=True, 
+                    result=reflection, 
+                    execution_time_ms=0
+                )]
+            )
+            response.reasoning_trace.insert(0, reflection_step)
+            
+            return response
+            
+        except Exception as e:
+            # Fallback to standard if reflection fails
+            return self._run_standard(question, history)
+
+
 
 # =============================================================================
 # Convenience Function
 # =============================================================================
 
-def run_agent_query(question: str, history: List[Dict[str, str]] = None) -> Dict[str, Any]:
+def run_agent_query(question: str, history: List[Dict[str, str]] = None, depth: str = "standard") -> Dict[str, Any]:
     """
     Run an agent query and return the result as a dict.
     
     This is the main entry point for the API.
     """
     agent = HealthcareAgent()
-    response = agent.run(question, history)
+    response = agent.run(question, history, depth)
     
     return {
         "success": response.success,

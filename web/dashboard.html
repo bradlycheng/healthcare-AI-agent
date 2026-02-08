@@ -113,7 +113,6 @@
                         <i class="fa-solid fa-robot"></i>
                         <span>AI Assistant</span>
                     </div>
-                    <span class="query-badge">Powered by Llama 3</span>
                 </div>
                 <div class="query-messages" id="query-messages">
                     <div class="message message-ai">
@@ -123,23 +122,31 @@
                         <div class="message-content">
                             <p>Hi! I can help you explore your patient data. Try asking:</p>
                             <ul class="message-examples">
-                                <li>"Show all patients"</li>
-                                <li>"What are Sarah Johnson's vitals?"</li>
-                                <li>"Which patients have abnormal glucose?"</li>
+                                <li>"Analyze blood pressure trends for Sarah Jenkins"</li>
+                                <li>"What is John Smith's latest glucose?"</li>
+                                <li>"Who has the highest heart rate?"</li>
                             </ul>
                         </div>
                     </div>
                 </div>
                 <div class="query-input-row">
                     <input type="text" id="query-input" placeholder="Ask about your patient data...">
+                    <div class="reasoning-selector-container">
+                        <select id="reasoning-depth" class="query-depth-select">
+                            <option value="fast">Fast</option>
+                            <option value="standard" selected>Standard</option>
+                            <option value="deep">Deep</option>
+                        </select>
+                    </div>
                     <button id="query-submit" class="btn-query-submit">
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
                 </div>
                 <div class="query-suggestions">
-                    <button class="suggestion-chip" data-query="Show all patients">All patients</button>
-                    <button class="suggestion-chip" data-query="Show abnormal results">Abnormal results</button>
-                    <button class="suggestion-chip" data-query="Recent messages this week">Recent messages</button>
+                    <button class="suggestion-chip" data-query="Analyze blood pressure trends for Sarah Jenkins"
+                        data-depth="deep">Sarah Jenkins BP</button>
+                    <button class="suggestion-chip" data-query="Who has the highest glucose?">Highest Glucose</button>
+                    <button class="suggestion-chip" data-query="Show abnormal results">Abnormal Results</button>
                 </div>
             </div>
         </section>
