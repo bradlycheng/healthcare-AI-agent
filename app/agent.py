@@ -120,34 +120,53 @@ def _build_fhir_bundle(patient: Dict[str, Any], structured_observations: List[Di
 def _build_llm_prompt(patient: Dict[str, Any], structured_observations: List[Dict[str, Any]]) -> str:
     all_notes = []
     for o in structured_observations:
+        # 1. Include Attached Notes (NTE)
         for n in o.get("notes", []):
             all_notes.append(f"- Note attached to {o.get('display', 'observation')}: {n}")
+        
+        # 2. Include Text Values (TX, FT, ST)
+        vtype = str(o.get("value_type", "")).upper()
+        if vtype in TEXT_VALUE_TYPES and o.get("value"):
+            all_notes.append(f"- {o.get('display', 'Text Observation')}: {o.get('value')}")
+
     notes_block = "CLINICAL NOTES FOUND IN INPUT:\n" + "\n".join(all_notes) if all_notes else "NO NOTES FOUND."
+
     
     json_format_example = """
 JSON FORMAT:
 {
   "thought_process": "...",
   "new_observations": [
-    { "code": "LOINC_CODE", "display": "LABEL", "value": 0.0, "unit": "UNIT" }
+    { "code": "LOINC_OR_CODE", "display": "LABEL", "value": "VALUE_OR_TEXT", "unit": "UNIT_OR_EMPTY" }
   ]
 }
 """
     return f"""
 <INSTRUCTIONS>
-Extract clinical observations from the provided notes.
-- ONLY current, non-negated results.
+Extract clinical observations, vital signs, symptoms, and diagnoses from the provided notes.
+- ONLY extract current, non-negated findings.
 - SKIP any value associated with "not", "no", "denies", "none", "negative", "yesterday", "past".
-- For "SYS/DIA" BP: create separate "8480-6" (Sys) and "8462-4" (Dia) entries.
-- If no current valid values exist, return "new_observations": [].
-</INSTRUCTIONS>
+- If a value is not found for a specific metric, DO NOT include it in the output.
+- EXTREMELY IMPORTANT: Return VALID JSON only. Do not use placeholders like "(no value)". Use null or strings.
 
-<LOINC_MAP>
-- Heart Rate: 8867-4
-- BP Systolic: 8480-6
-- BP Diastolic: 8462-4
-- Temperature: 8310-5
-</LOINC_MAP>
+<EXTRACTION_RULES>
+1. VITALS: Match to LOINC codes if possible.
+   - Heart Rate: 8867-4
+   - BP Systolic: 8480-6
+   - BP Diastolic: 8462-4
+   - Temperature: 8310-5
+   - SpO2: 59408-5
+   - Resp Rate: 9279-1
+
+2. SYMPTOMS & DIAGNOSES: Extract key findings.
+   - Use code "SYMPTOM" for subjective complaints (e.g. Chest Pain, Dizziness).
+   - Use code "DIAGNOSIS" for medical impressions (e.g. STEMI, Hypertension).
+   - Put the text description in the 'value' field (e.g. value="Chest Pain").
+   - Leave 'unit' empty for text findings.
+
+3. MEDICATIONS: Extract new prescriptions.
+   - Use code "MED" for medications (e.g. Aspirin).
+</EXTRACTION_RULES>
 
 <INPUT_NOTES>
 {notes_block}
@@ -158,11 +177,12 @@ Return JSON only:
 {{
   "thought_process": "brief reasoning",
   "new_observations": [
-    {{ "code": "LOINC", "display": "LABEL", "value": FLOAT, "unit": "UNIT" }}
+    {{ "code": "CODE", "display": "LABEL", "value": "VALUE", "unit": "UNIT" }}
   ]
 }}
 </OUTPUT_FORMAT>
 """.strip()
+
 
 
 def _merge_llm_output(base_patient, base_summary, base_structured_obs, base_fhir_bundle, llm_raw) -> Tuple:
@@ -171,9 +191,11 @@ def _merge_llm_output(base_patient, base_summary, base_structured_obs, base_fhir
     
     structured_observations = list(base_structured_obs)
     new_obs = llm_raw.get("new_observations", [])
+
     if isinstance(new_obs, list):
         for o in new_obs:
             if not isinstance(o, dict): continue
+            
             # Ensure required fields
             if not o.get("code") or o.get("value") is None: continue
             o["source"] = "AI_EXTRACTED"
@@ -182,6 +204,8 @@ def _merge_llm_output(base_patient, base_summary, base_structured_obs, base_fhir
             if not is_dupe:
                 structured_observations.append(o)
     return base_patient, base_summary, structured_observations, base_fhir_bundle
+
+
 
 
 def _ensure_obs_fields(obs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -242,6 +266,7 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
         try:
             prompt = _build_llm_prompt(patient, structured_observations)
             llm_raw = call_llm_for_json(prompt)
+
             patient, clinical_summary, structured_observations, fhir_bundle = _merge_llm_output(
                 patient, clinical_summary, structured_observations, fhir_bundle, llm_raw
             )
@@ -255,6 +280,7 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
             print(f"CRITICAL: AI Pipeline Failure: {e}", file=sys.stderr, flush=True)
             traceback.print_exc(file=sys.stderr)
             pass
+    
 
     for ob in structured_observations:
         alert = check_alert(ob.get("code"), ob.get("value"))

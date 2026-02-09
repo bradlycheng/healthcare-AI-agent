@@ -43,5 +43,17 @@ def test_reset_security():
     except Exception as e:
         print(f"FAIL: Exception {e}")
 
+    # 4. Test User Requested Password ('d3m0th1s')
+    print("\n4. Testing USER REQUESTED password ('d3m0th1s')...")
+    try:
+        resp = requests.delete(f"{BASE_URL}/messages", json={"password": "d3m0th1s"})
+        if resp.status_code == 204:
+            print("PASS: Accepted 'd3m0th1s' (204).")
+        else:
+            print(f"FAIL: Expected 204, got {resp.status_code}")
+            print(resp.text)
+    except Exception as e:
+        print(f"FAIL: Exception {e}")
+
 if __name__ == "__main__":
     test_reset_security()

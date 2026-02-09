@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Process Data | Health Data Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="background-glow"></div>
+
+    <!-- Creator Banner -->
+    <div class="creator-banner">
+        💼 Built by <a href="/about.html">Bradly Cheng</a> |
+        Software Engineer
+    </div>
+
+    <nav class="navbar">
+        <a href="/" class="logo">
+            <i class="fa-solid fa-staff-snake"></i>
+            <span>Health Data Agent</span>
+        </a>
+        <div class="nav-links">
+            <a href="/index.html#features">Features</a>
+            <a href="/process-data.html" class="active">Process Data</a>
+            <a href="/index.html#tech-stack">Technology</a>
+            <a href="/dashboard.html">Dashboard</a>
+            <a href="/about.html">About</a>
+        </div>
+        <a href="/process-data.html" class="btn-primary">Get Started</a>
+    </nav>
+
+    <div style="margin-top: 100px;"></div>
+
+    <!-- Ingest Section (Moved from Index) -->
+    <section id="demo-live" class="demo-section">
+        <div class="section-header">
+            <h2>Process Data</h2>
+            <p>Paste raw HL7 (ORU) messages below to extract observations and convert to FHIR.</p>
+        </div>
+
+
+        <div class="demo-container">
+            <div class="demo-input">
+                <div class="input-header">
+                    <label for="hl7-input">Raw HL7 (ORU) Message</label>
+                    <div class="input-controls">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="ai-toggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                        <span class="toggle-label">Enable AI Analysis</span>
+                    </div>
+                </div>
+                <textarea id="hl7-input"
+                    placeholder="Paste a raw HL7 (ORU) message here...">MSH|^~\&|HIS|MedCenter|LIS|LAB|202401201200||ORU^R01|MSG_CARDIAC|P|2.5
+PID|1||12345||SMITH^JOHN||19750315|M
+OBR|1|ORD456|RES456|CARD-PANEL^Cardiac Panel|||202401201200
+OBX|1|NM|49563-0^TROPONIN I||0.12|ng/mL|0.00-0.04|HH|||F
+OBX|2|NM|2157-6^CK-MB||8.5|ng/mL|0.0-5.0|H|||F
+OBX|3|TX|NOTE^Clinical Note||50 y/o male presenting with crushing chest pain radiating to left arm x 2 hours. Diaphoretic, BP 160/95, HR 110, SpO2 94% on room air. History of HTN and hyperlipidemia. ECG shows ST elevation in leads V1-V4. Suspect STEMI. Cardiology consult requested. Started on aspirin, heparin, nitroglycerin drip.||||||F</textarea>
+                <div class="action-buttons">
+                    <button id="process-btn" class="btn-primary">
+                        <i class="fa-solid fa-bolt"></i> Analyze (Preview)
+                    </button>
+                    <!-- Save button moved to table footer -->
+                </div>
+            </div>
+
+            <div class="demo-results hidden" id="results-area">
+                <div class="result-card patient-card">
+                    <div class="card-header">
+                        <i class="fa-solid fa-user-doctor"></i> Patient
+                    </div>
+                    <div class="card-body" id="res-patient">
+                        --
+                    </div>
+                </div>
+
+                <div class="result-card summary-card">
+                    <div class="card-header">
+                        <i class="fa-solid fa-file-medical-alt"></i> Clinical Summary
+                    </div>
+                    <div class="card-body" id="res-summary">
+                        --
+                    </div>
+                </div>
+
+                <div class="result-tabs">
+                    <div class="tab-header">
+                        <button class="tab-btn active" data-tab="tab-obs">Observations</button>
+                        <button class="tab-btn" data-tab="tab-fhir">FHIR JSON</button>
+                        <button class="tab-btn" data-tab="tab-ack">HL7 ACK</button>
+                    </div>
+                    <div class="tab-content active" id="tab-obs">
+                        <div class="table-responsive">
+                            <table class="obs-table">
+                                <thead>
+                                    <tr>
+                                        <!-- Select All Checkbox -->
+                                        <th style="width: 40px;"><input type="checkbox" id="select-all" checked></th>
+                                        <th style="width: 80px;">Source</th>
+                                        <th>Test Name / Code</th>
+                                        <th style="width: 100px;">Value</th>
+                                        <th style="width: 80px;">Unit</th>
+                                        <th style="width: 60px;">Flag</th>
+                                        <th>Ref Range</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="res-obs-body">
+                                </tbody>
+                            </table>
+                            <div class="table-actions">
+                                <button id="add-row-btn" class="btn-secondary small">
+                                    <i class="fa-solid fa-plus"></i> Add Observation
+                                </button>
+                                <button id="save-btn" class="btn-success small hidden">
+                                    <i class="fa-solid fa-check"></i> Confirm & Save
+                                </button>
+                                <button id="analyze-another-btn" class="btn-primary small hidden">
+                                    <i class="fa-solid fa-rotate"></i> Analyze Another Message
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-content" id="tab-fhir">
+                        <pre><code id="res-fhir"></code></pre>
+                    </div>
+                    <div class="tab-content" id="tab-ack">
+                        <pre><code id="res-ack" style="color:var(--success);"></code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <p>&copy; 2024 Health Data Agent | Created by Bradly Cheng</p>
+        <div class="social-links">
+            <a href="https://github.com/bradlycheng" target="_blank" rel="noopener"><i
+                    class="fa-brands fa-github"></i></a>
+            <a href="https://linkedin.com/in/bradlycheng" target="_blank" rel="noopener"><i
+                    class="fa-brands fa-linkedin"></i></a>
+        </div>
+    </footer>
+
+    <script src="script.js?v=1.1.1"></script>
+</body>
+
+</html>

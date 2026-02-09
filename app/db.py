@@ -145,6 +145,11 @@ def init_db(db_path: str = DB_PATH) -> None:
         except sqlite3.OperationalError:
             pass # Column likely exists
             
+        try:
+            conn.execute("ALTER TABLE observations ADD COLUMN source VARCHAR")
+        except sqlite3.OperationalError:
+            pass # Column likely exists
+            
         conn.commit()
     finally:
         conn.close()
@@ -355,8 +360,9 @@ def insert_message_and_observations(
                   status,
                   alert_level,
                   alert_message,
-                  loinc_code
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  loinc_code,
+                  source
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     message_id,
@@ -372,7 +378,8 @@ def insert_message_and_observations(
                     status,
                     alert_level,
                     alert_msg,
-                    loinc_code
+                    loinc_code,
+                    ob.get("source", "HL7")
                 ),
             )
 
