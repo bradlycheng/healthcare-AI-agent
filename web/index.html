@@ -42,39 +42,42 @@
         <div class="hero-content">
             <div class="badge">
                 <span class="pulse"></span>
-                v1.0 Now Available
+                v1.0 Available
             </div>
-            <h1>The Future of <br><span class="gradient-text">Healthcare Interoperability</span></h1>
+            <h1>Health Data <br><span class="gradient-text">Agent</span></h1>
             <p class="hero-sub">
-                Transform raw HL7 messages into structured FHIR resources and actionable clinical insights using
-                advanced AI agents.
+                Clinical Intelligence. Process HL7 data streams, convert to FHIR R4, and unlock patient insights with
+                AI.
             </p>
             <div class="hero-actions">
-                <a href="/process-data.html" class="btn-primary large">Get Started</a>
-                <a href="#features" class="btn-secondary large">Learn More</a>
+                <a href="/dashboard.html" class="btn-primary large">Launch Dashboard</a>
+                <a href="/process-data.html" class="btn-secondary large">Process HL7 Message</a>
             </div>
-
-
         </div>
         <div class="hero-visual">
-            <div class="glass-card float-animation">
-                <div class="code-snippet">
-                    <div class="code-header">
-                        <span class="dot red"></span>
-                        <span class="dot yellow"></span>
-                        <span class="dot green"></span>
+            <div class="glass-card mini-dashboard float-animation">
+                <div class="dashboard-header">
+                    <div class="dot red"></div>
+                    <div class="dot yellow"></div>
+                    <div class="dot green"></div>
+                    <span>AI Assistant</span>
+                </div>
+                <div class="chat-interface">
+                    <div class="chat-message user-msg">
+                        <p>Latest vitals for John?</p>
                     </div>
-                    <pre><code>MSH|^~\&|HIS|MedCenter|...
-PID|1|99001|SMITH^JOHN...
-OBX|1|NM|GLUCOSE||105|...</code></pre>
-                </div>
-                <div class="arrow-down">
-                    <i class="fa-solid fa-arrow-down"></i>
-                </div>
-                <div class="fhir-preview">
-                    <i class="fa-solid fa-fire"></i>
-                    <span>FHIR Bundle Generated</span>
-                    <div class="status-badge success">Success</div>
+                    <div class="chat-message ai-msg">
+                        <p>BP 120/80, HR 72. Glucose steady at 98 mg/dL.</p>
+                    </div>
+                    <div class="chat-message user-msg delayed-1">
+                        <p>Any cardiac events?</p>
+                    </div>
+                    <div class="chat-message ai-msg delayed-2">
+                        <p>Negative. Troponin levels normal.</p>
+                    </div>
+                    <div class="typing-indicator">
+                        <span></span><span></span><span></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -82,33 +85,30 @@ OBX|1|NM|GLUCOSE||105|...</code></pre>
 
     <section id="features" class="features">
         <div class="section-header">
-            <h2>Capabilities</h2>
-            <p>Powered by modern LLMs and robust parsing logic.</p>
+            <h2>Use Cases</h2>
+            <p>From ingestion to insight.</p>
         </div>
         <div class="feature-grid">
             <div class="feature-card">
                 <div class="icon-box">
-                    <i class="fa-solid fa-dna"></i>
-                </div>
-                <h3>Intelligent Parsing</h3>
-                <p>Seamlessly ingest ORU^R01 HL7 messages and extract patient demographics and observations with 99%
-                    accuracy.</p>
-            </div>
-            <div class="feature-card">
-                <div class="icon-box">
-                    <i class="fa-solid fa-brain"></i>
-                </div>
-                <h3>Clinical Reasoning</h3>
-                <p>The agent generates concise clinical summaries, flagging abnormalities and suggesting potential
-                    diagnoses.</p>
-            </div>
-            <div class="feature-card">
-                <div class="icon-box">
                     <i class="fa-solid fa-fire-flame-curved"></i>
                 </div>
-                <h3>Native FHIR Conversion</h3>
-                <p>Automatically convert legacy HL7 v2 data into standard HL7 FHIR R4 Bundles for modern
-                    interoperability.</p>
+                <h3>FHIR Transformation</h3>
+                <p>Convert raw HL7 v2 messages to standard FHIR R4.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon-box">
+                    <i class="fa-solid fa-check-double"></i>
+                </div>
+                <h3>Review AI Analysis</h3>
+                <p>Review and validate AI analysis on clinical notes.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon-box">
+                    <i class="fa-solid fa-comments"></i>
+                </div>
+                <h3>Chat with Data</h3>
+                <p>Ask the dashboard: "Show me patients I should be worried about"</p>
             </div>
         </div>
     </section>
@@ -135,37 +135,37 @@ OBX|1|NM|GLUCOSE||105|...</code></pre>
             <div class="line"></div>
             <div class="step">
                 <div class="step-number">03</div>
-                <h3>Deliver</h3>
-                <p>Receive JSON FHIR bundles and physician-ready summaries.</p>
+                <h3>Interact</h3>
+                <p>Chat with your agent to uncover trends, risks, and clinical summaries.</p>
             </div>
         </div>
     </section>
 
     <section id="tech-stack" class="tech-stack">
         <div class="section-header">
-            <h2>Built for Scale & Security</h2>
-            <p>Enterprise-grade architecture designed for modern healthcare systems.</p>
+            <h2>Technology</h2>
+            <p>Modern stack.</p>
         </div>
         <div class="tech-grid">
             <div class="tech-card">
+                <i class="fa-solid fa-robot"></i>
+                <h4>AWS Bedrock</h4>
+                <p>Powering the clinical agent.</p>
+            </div>
+            <div class="tech-card">
+                <i class="fa-solid fa-database"></i>
+                <h4>ChromaDB</h4>
+                <p>Long-term conversation memory.</p>
+            </div>
+            <div class="tech-card">
                 <i class="fa-brands fa-python"></i>
-                <h4>Python Core</h4>
-                <p>Robust backend processing with advanced NLP libraries.</p>
+                <h4>FastAPI</h4>
+                <p>Real-time data streaming.</p>
             </div>
             <div class="tech-card">
                 <i class="fa-brands fa-docker"></i>
-                <h4>Dockerized</h4>
-                <p>Containerized for consistant deployment anywhere.</p>
-            </div>
-            <div class="tech-card">
-                <i class="fa-solid fa-fire"></i>
-                <h4>FHIR Native</h4>
-                <p>First-class support for HL7 FHIR R4 standards.</p>
-            </div>
-            <div class="tech-card">
-                <i class="fa-solid fa-shield-halved"></i>
-                <h4>HIPAA Ready</h4>
-                <p>Secure data handling and encrypted transmission.</p>
+                <h4>Docker</h4>
+                <p>Secure containerization.</p>
             </div>
         </div>
     </section>
@@ -174,13 +174,12 @@ OBX|1|NM|GLUCOSE||105|...</code></pre>
 
     <section id="demo" class="cta-section">
         <div class="cta-content">
-            <h2>Ready to Transform Your Interoperability?</h2>
-            <p>Join leading healthcare providers using AI to modernize their data pipelines.</p>
-            <form class="cta-form">
-                <input type="email" placeholder="Enter your work email" required>
-                <button type="submit" class="btn-primary large">Request Early Access</button>
+            <h2>Start chatting with your data.</h2>
+            <p>Join the future of healthcare data.</p>
+            <form class="cta-form" action="/dashboard.html">
+                <button type="submit" class="btn-primary large">Open Dashboard</button>
             </form>
-            <p class="small-text">No credit card required. SOC2 Compliant.</p>
+            <p class="small-text">No login required for demo.</p>
         </div>
     </section>
 
