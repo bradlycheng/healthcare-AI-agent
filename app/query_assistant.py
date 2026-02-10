@@ -85,8 +85,8 @@ Table: diagnoses
 RULES:
 1. ONLY generate SELECT statements.
 2. **CRITICAL**: All names in DB are UPPERCASE. Use `UPPER(col) = 'NAME'` or `UPPER(col) LIKE '%NAME%'`.
-3. For "abnormal" or "high/low" results, check `flag IN ('H', 'L')` or `flag = 'H'`.
-4. **NEVER** filter by `patient_sex` unless the user explicitly uses words like "male", "female", "men", "women".
+3. **ABNORMAL VALUES**: Only check `flag IN ('H', 'L')` or `flag = 'H'` IF the user explicitly asks for "abnormal", "high", "low", or "elevated" results. Otherwise, do NOT filter by flag.
+4. **PATIENT SEX**: **NEVER** filter by `patient_sex` unless the user explicitly uses words like "male", "female", "men", "women".
 5. JOIN `observations` on `observations.message_id = hl7_messages.id`.
 6. For "recent" items, use `ORDER BY received_at DESC` or `ORDER BY observation_datetime DESC`.
 7. LIMIT results to 50.
@@ -99,7 +99,7 @@ RULES:
 11. **Medical term synonyms**:
     - "A1C" or "HbA1c" → search for `LIKE '%A1C%' OR LIKE '%HEMOGLOBIN A1C%' OR LIKE '%HBA1C%'`
     - "Pulse" → search for `LIKE '%PULSE%' OR LIKE '%HEART%RATE%'`
-    - "BP" or "blood pressure" → search for `LIKE '%BLOOD%PRESSURE%'` or `LIKE '%BP%'`
+    - "BP" or "blood pressure" → ALWAYS use `(UPPER(o.display) LIKE '%BLOOD%PRESSURE%' OR UPPER(o.display) LIKE '%BP%' OR UPPER(o.display) LIKE '%SYSTOLIC%' OR UPPER(o.display) LIKE '%DIASTOLIC%')`
     - "Blood sugar" → search for `LIKE '%GLUCOSE%'`
 12. **CRITICAL: Context and Pronouns.**
     - If the user implies a specific patient (e.g., "his", "her", "their", "the patient", "what about BP?"), you **MUST** identify the patient from the CHAT HISTORY.
