@@ -61,20 +61,28 @@
                 </div>
                 <div class="chat-interface">
                     <div class="chat-message user-msg">
-                        <p>Latest vitals for John?</p>
+                        <p>What patients should I be worried about?</p>
                     </div>
                     <div class="chat-message ai-msg">
-                        <p>BP 120/80, HR 72. Glucose steady at 98 mg/dL.</p>
+                        <p>3 patients flagged: Sarah Jenkins (BP 150/95), John Doe (Glucose 240), and...</p>
                     </div>
                     <div class="chat-message user-msg delayed-1">
-                        <p>Any cardiac events?</p>
+                        <p>Show me Sarah's details</p>
                     </div>
                     <div class="chat-message ai-msg delayed-2">
-                        <p>Negative. Troponin levels normal.</p>
+                        <p>Opening patient record P-SARAH...</p>
                     </div>
                     <div class="typing-indicator">
                         <span></span><span></span><span></span>
                     </div>
+                </div>
+                <!-- Visual-only suggestion chip representation -->
+                <div class="hero-chip" style="margin-top: 1rem; display: flex; justify-content: center; gap: 0.5rem;">
+                    <span
+                        style="background: rgba(255,255,255,0.1); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; border: 1px solid rgba(255,255,255,0.2); color: #e2e8f0;">
+                        <i class="fa-solid fa-sparkles" style="margin-right:0.3rem; color: #fbbf24;"></i> Critical
+                        Patients
+                    </span>
                 </div>
             </div>
         </div>
