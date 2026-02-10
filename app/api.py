@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import time
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from .agent import run_oru_pipeline
@@ -921,6 +923,52 @@ async def reset_demo_data(req: ResetRequest):
             return {"success": True, "message": "Database reset with 100 realistic patients and corresponding clinical data."}
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Reset failed: {str(e)}")
+
+# ---------- Contact and Lead Gen ----------
+
+class ContactRequest(BaseModel):
+    email: str
+    nickname: Optional[str] = None # Honeypot
+
+@app.post("/api/contact")
+async def handle_contact(req: ContactRequest, request: Request):
+    """
+    Handle contact form submissions.
+    Includes a honeypot field 'nickname' which must be empty.
+    """
+    # 1. Honeypot check
+    if req.nickname:
+        print(f"Honeypot triggered by IP {request.client.host}")
+        # Return success to fool bot, but don't save
+        return {"status": "received"}
+
+    # 2. Rate Limit (Simple IP-based)
+    client_ip = request.client.host
+    now = time.time()
+    last_request = _RATE_LIMIT_STORE.get(client_ip, 0)
+    
+    if now - last_request < 60.0: # 1 minute cooldown for contacts
+        raise HTTPException(status_code=429, detail="Please wait a minute before sending another request.")
+    
+    _RATE_LIMIT_STORE[client_ip] = now
+
+    # 3. Save to DB
+    from .db import get_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO contacts (email, ip_address, created_at) VALUES (?, ?, ?)",
+            (req.email, client_ip, datetime.now().isoformat())
+        )
+        conn.commit()
+        print(f"New contact saved: {req.email}")
+        return {"status": "saved"}
+    except Exception as e:
+        print(f"Error saving contact: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save contact information.")
+    finally:
+        conn.close()
 
 # Mount the web directory for static assets (css, js)
 app.mount("/", StaticFiles(directory="web"), name="static")
