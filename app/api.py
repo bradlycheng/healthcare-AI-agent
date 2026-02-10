@@ -196,6 +196,11 @@ class PatientSummaryResponse(BaseModel):
     summary: str
 
 
+class ContactRequest(BaseModel):
+    email: str
+    nickname: Optional[str] = None # Honeypot field (should be empty)
+
+
 # ---------- DB Helpers ----------
 
 from .db import get_connection as _conn
@@ -245,6 +250,46 @@ async def startup_event():
 @app.get("/health")
 def health_check() -> Dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/api/contact", status_code=201)
+def contact_endpoint(req: ContactRequest, request: Request):
+    """
+    Save a contact request (email) to the database.
+    Rate limited to prevent abuse.
+    """
+    # 0. Honeypot Check (Spam Protection)
+    if req.nickname:
+        # Silently fail (pretend it worked to confuse bots) or 400
+        # Returning 201 keeps them guessing, but for now let's just return.
+        print(f"SPAM BLOCK: Honeypot filled by {request.client.host}")
+        return {"status": "received", "message": "Thanks!"}
+
+    # 1. Input Validation
+    if not req.email or "@" not in req.email or "." not in req.email:
+        raise HTTPException(status_code=400, detail="Invalid email address.")
+
+    # 2. Rate Limiting
+    client_ip = request.client.host if request.client else "unknown"
+    now_ts = __import__("time").time()
+    limit_key = f"contact_{client_ip}"
+    last_ts = _RATE_LIMIT_STORE.get(limit_key, 0.0)
+    
+    # Strict rate limit: 1 request per minute per IP
+    if now_ts - last_ts < 60.0:
+        raise HTTPException(status_code=429, detail="Too many contact requests. Please wait a minute.")
+    
+    _RATE_LIMIT_STORE[limit_key] = now_ts
+
+    # 3. Save to DB
+    from .db import save_contact_request
+    success = save_contact_request(req.email, client_ip)
+    
+    if not success:
+        # likely due to overflow limit
+        raise HTTPException(status_code=503, detail="Contact list is full. Please try again later.")
+        
+    return {"status": "received", "message": "Thanks for your interest! We've saved your request."}
 
 
 @app.post("/api/query", response_model=QueryResponse)

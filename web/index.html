@@ -17,11 +17,8 @@
 <body>
     <div class="background-glow"></div>
 
-    <!-- Creator Banner -->
-    <div class="creator-banner">
-        💼 Built by <a href="/about.html">Bradly Cheng</a> |
-        Software Engineer
-    </div>
+    <div class="background-glow"></div>
+
 
     <nav class="navbar">
         <a href="/" class="logo">
@@ -176,19 +173,24 @@
         <div class="cta-content">
             <h2>Ready for the Future?</h2>
             <p>Join the waitlist.</p>
-            <form class="cta-form">
-                <input type="email" placeholder="Enter your email" required>
+            <form class="cta-form" id="contact-form">
+                <input type="email" id="contact-email" placeholder="Enter your email" required>
+                <!-- Honeypot field for spam bots -->
+                <input type="text" id="contact-nickname" name="nickname" style="display:none;" tabindex="-1"
+                    autocomplete="off">
                 <button type="submit" class="btn-primary large">Request Access</button>
             </form>
+            <p style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
+                Or email us at <a href="mailto:healthdataagent@gmail.com"
+                    style="color: var(--primary);">healthdataagent@gmail.com</a>
+            </p>
         </div>
     </section>
 
     <footer class="footer">
         <p>&copy; 2024 Health Data Agent | Created by Bradly Cheng</p>
         <div class="social-links">
-            <a href="https://github.com/bradlycheng" target="_blank" rel="noopener"><i
-                    class="fa-brands fa-github"></i></a>
-            <a href="https://linkedin.com/in/bradlycheng" target="_blank" rel="noopener"><i
+            <a href="https://www.linkedin.com/in/bradly-cheng/" target="_blank" rel="noopener"><i
                     class="fa-brands fa-linkedin"></i></a>
         </div>
     </footer>

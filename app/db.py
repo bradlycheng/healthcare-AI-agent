@@ -128,6 +128,17 @@ def init_db(db_path: str = DB_PATH) -> None:
             );
             """
         )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS contacts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT,
+                ip_address TEXT,
+                created_at TEXT
+            );
+            """
+        )
         
         # Migration for existing tables
         try:
@@ -139,7 +150,7 @@ def init_db(db_path: str = DB_PATH) -> None:
             conn.execute("ALTER TABLE observations ADD COLUMN alert_message VARCHAR")
         except sqlite3.OperationalError:
             pass # Column likely exists
-
+ 
         try:
             conn.execute("ALTER TABLE observations ADD COLUMN loinc_code VARCHAR")
         except sqlite3.OperationalError:
@@ -151,6 +162,36 @@ def init_db(db_path: str = DB_PATH) -> None:
             pass # Column likely exists
             
         conn.commit()
+    finally:
+        conn.close()
+
+
+def save_contact_request(email: str, ip_address: str, db_path: str = DB_PATH) -> bool:
+    """
+    Save a contact request to the database.
+    Enforces a strict limit of 1000 requests to prevent overflow.
+    """
+    conn = get_connection(db_path)
+    try:
+        cur = conn.cursor()
+        
+        # 1. Overflow Protection: Check total count
+        count = cur.execute("SELECT COUNT(*) FROM contacts").fetchone()[0]
+        if count >= 1000:
+            print("WARNING: Contact table full (1000 limit reached). Rejecting request.")
+            return False
+
+        # 2. Insert
+        created_at = datetime.utcnow().isoformat()
+        cur.execute(
+            "INSERT INTO contacts (email, ip_address, created_at) VALUES (?, ?, ?)",
+            (email, ip_address, created_at)
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error saving contact: {e}")
+        return False
     finally:
         conn.close()
 
@@ -205,11 +246,15 @@ def delete_all_messages(db_path: str = DB_PATH) -> None:
         print(f"DEBUG: Deleted {cur.rowcount} medications", flush=True)
         cur.execute("DELETE FROM diagnoses")
         print(f"DEBUG: Deleted {cur.rowcount} diagnoses", flush=True)
+        cur.execute("DELETE FROM contacts")
+        print(f"DEBUG: Deleted {cur.rowcount} contacts", flush=True)
+        
         # Reset sequences for auto-increment IDs
         cur.execute("DELETE FROM sqlite_sequence WHERE name='hl7_messages'")
         cur.execute("DELETE FROM sqlite_sequence WHERE name='observations'")
         cur.execute("DELETE FROM sqlite_sequence WHERE name='medications'")
         cur.execute("DELETE FROM sqlite_sequence WHERE name='diagnoses'")
+        cur.execute("DELETE FROM sqlite_sequence WHERE name='contacts'")
         conn.commit()
     finally:
         conn.close()

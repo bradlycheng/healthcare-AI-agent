@@ -31,13 +31,49 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Toast Notification Logic
-    const ctaForm = document.querySelector('.cta-form');
-    if (ctaForm) {
-        ctaForm.addEventListener('submit', (e) => {
+    const ctaForm = document.getElementById('contact-form');
+    // Fallback for older class-based selection if ID missing
+    const formRef = ctaForm || document.querySelector('.cta-form');
+
+    if (formRef) {
+        formRef.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const email = ctaForm.querySelector('input').value;
-            showToast(`Thanks! We've added ${email} to the waitlist.`, 'success');
-            ctaForm.reset();
+            const emailInput = formRef.querySelector('input[type="email"]');
+            const email = emailInput.value;
+            const honeyInput = formRef.querySelector('#contact-nickname');
+            const nickname = honeyInput ? honeyInput.value : '';
+
+            const btn = formRef.querySelector('button');
+
+            const originalText = btn.innerText;
+            btn.innerText = 'Sending...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/contact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email, nickname: nickname })
+                });
+
+                if (res.ok) {
+                    showToast(`Thanks! We've saved ${email} to our list.`, 'success');
+                    formRef.reset();
+                } else {
+                    const err = await res.json();
+                    if (res.status === 429) {
+                        showToast(err.detail || 'Too many requests. Please wait a bit.', 'warning');
+                    } else {
+                        showToast(err.detail || 'Something went wrong.', 'error');
+                    }
+                }
+            } catch (error) {
+                console.error(error);
+                showToast('Network error. Please try again.', 'error');
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
         });
     }
 
