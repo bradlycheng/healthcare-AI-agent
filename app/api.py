@@ -48,6 +48,12 @@ async def add_process_time_header(request: Request, call_next):
     # response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
     # response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
     return response
+    
+@app.on_event("startup")
+def on_startup():
+    from .db import init_db
+    init_db()
+    print("DEBUG: Database initialized", flush=True)
 
 # ---------- Pydantic Models ----------
 

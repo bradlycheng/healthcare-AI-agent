@@ -246,15 +246,22 @@ def delete_all_messages(db_path: str = DB_PATH) -> None:
         print(f"DEBUG: Deleted {cur.rowcount} medications", flush=True)
         cur.execute("DELETE FROM diagnoses")
         print(f"DEBUG: Deleted {cur.rowcount} diagnoses", flush=True)
-        cur.execute("DELETE FROM contacts")
-        print(f"DEBUG: Deleted {cur.rowcount} contacts", flush=True)
+        
+        try:
+            cur.execute("DELETE FROM contacts")
+            print(f"DEBUG: Deleted {cur.rowcount} contacts", flush=True)
+        except sqlite3.OperationalError:
+            print("DEBUG: contacts table not found, skipping delete", flush=True)
         
         # Reset sequences for auto-increment IDs
         cur.execute("DELETE FROM sqlite_sequence WHERE name='hl7_messages'")
         cur.execute("DELETE FROM sqlite_sequence WHERE name='observations'")
         cur.execute("DELETE FROM sqlite_sequence WHERE name='medications'")
         cur.execute("DELETE FROM sqlite_sequence WHERE name='diagnoses'")
-        cur.execute("DELETE FROM sqlite_sequence WHERE name='contacts'")
+        try:
+            cur.execute("DELETE FROM sqlite_sequence WHERE name='contacts'")
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
     finally:
         conn.close()
