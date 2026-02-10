@@ -124,9 +124,9 @@ AVAILABLE TOOLS:
    - Input: {"question": "What measurement?", "options": ["Glucose", "Blood Pressure"]}
 
 TOOL SELECTION RULES:
-- Simple data queries (patients, meds, visits, providers) → query_database ONLY
-- Interpretation needed → query_database + search_guidelines
 - Patient-specific with history → get_patient_context
+- **NAMED PATIENT** (e.g. "Sarah Jenkins", "John Smith") → **MUST** use `get_patient_context` first.
+- simple data queries (patients, meds, visits, providers) → query_database ONLY
 - Calculation requested → clinical_calculator
 - Truly ambiguous → ask_clarification (use sparingly!)
 
