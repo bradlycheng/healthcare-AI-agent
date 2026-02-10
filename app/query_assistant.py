@@ -87,7 +87,9 @@ RULES:
 2. **CRITICAL**: All names in DB are UPPERCASE. Use `UPPER(col) = 'NAME'` or `UPPER(col) LIKE '%NAME%'`.
 3. **ABNORMAL VALUES**: Only check `flag IN ('H', 'L')` or `flag = 'H'` IF the user explicitly asks for "abnormal", "high", "low", or "elevated" results. Otherwise, do NOT filter by flag.
 4. **PATIENT SEX**: **NEVER** filter by `patient_sex` unless the user explicitly uses words like "male", "female", "men", "women".
-5. JOIN `observations` on `observations.message_id = hl7_messages.id`.
+5. **JOIN OR DIE**: When asked fo clinical data (vital, result, test, etc.), you **MUST** JOIN `observations` on `observations.message_id = hl7_messages.id`.
+   - **WRONG**: `SELECT * FROM hl7_messages WHERE ...` (No clinical data)
+   - **RIGHT**: `SELECT h.patient_first_name, o.display, o.value_num, o.unit FROM hl7_messages h JOIN observations o ON ...`
 6. For "recent" items, use `ORDER BY received_at DESC` or `ORDER BY observation_datetime DESC`.
 7. LIMIT results to 50.
 8. **DO NOT** use `DATE(patient_dob)` as it is a custom string format. Sort directly on the string: `ORDER BY patient_dob ASC` (oldest) or `DESC` (youngest).
@@ -99,8 +101,8 @@ RULES:
 11. **Medical term synonyms**:
     - "A1C" or "HbA1c" → search for `LIKE '%A1C%' OR LIKE '%HEMOGLOBIN A1C%' OR LIKE '%HBA1C%'`
     - "Pulse" → search for `LIKE '%PULSE%' OR LIKE '%HEART%RATE%'`
-    - "BP" or "blood pressure" → ALWAYS use `(UPPER(o.display) LIKE '%BLOOD%PRESSURE%' OR UPPER(o.display) LIKE '%BP%' OR UPPER(o.display) LIKE '%SYSTOLIC%' OR UPPER(o.display) LIKE '%DIASTOLIC%')`
-    - "Blood sugar" → search for `LIKE '%GLUCOSE%'`
+    - "BP" or "blood pressure" → **MUST** use: `(UPPER(o.display) LIKE '%BLOOD%PRESSURE%' OR UPPER(o.display) LIKE '%BP%' OR UPPER(o.display) LIKE '%SYSTOLIC%' OR UPPER(o.display) LIKE '%DIASTOLIC%')`
+    - "Blood sugar" → `LIKE '%GLUCOSE%'`
 12. **CRITICAL: Context and Pronouns.**
     - If the user implies a specific patient (e.g., "his", "her", "their", "the patient", "what about BP?"), you **MUST** identify the patient from the CHAT HISTORY.
     - Look at the **ASSISTANT's previous answers** to see which patient was just discussed.
@@ -108,6 +110,14 @@ RULES:
     - Example: User "Show John Smith" -> Assistant "John Smith (P123)..." -> User "What about glucose?" -> SEARCH FOR JOHN SMITH.
     - If you cannot find a patient in history, do NOT filter by patient.
 13. **AMBIGUITY:**
+    - If ambiguous, choose the most likely interpretation.
+
+EXAMPLES:
+User: "What is Sarah's BP?"
+SQL: `SELECT h.patient_first_name, o.display, o.value_num, o.unit FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE UPPER(h.patient_first_name) = 'SARAH' AND (UPPER(o.display) LIKE '%BP%' OR UPPER(o.display) LIKE '%SYSTOLIC%' OR UPPER(o.display) LIKE '%DIASTOLIC%')`
+
+User: "Show high glucose"
+SQL: `SELECT h.patient_first_name, o.value_num, o.unit FROM hl7_messages h JOIN observations o ON ... WHERE UPPER(o.display) LIKE '%GLUCOSE%' AND o.flag = 'H'`
     - If the user asks about a number without context (e.g., "Is 85 good?") and there is no history, DO NOT GUESS.
     - Return an empty SQL query and explanation: "Please specify what measurement you are referring to (e.g., Glucose, Diastolic BP, Heart Rate)."
 14. **PROVIDERS vs PATIENTS**:
