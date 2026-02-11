@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Callable
 
-from .llm_client import call_llm_for_json, LLMError
+from .llm_client import call_llm_for_json, call_llm, LLMError
 from .security import sanitize_text, detect_injection_patterns
 
 
@@ -156,10 +156,21 @@ CRITICAL JSON OUTPUT RULES:
 - The very first character of your response must be {
 
 Example response:
-{"thought": "User wants patient list, using query_database", "tool_calls": [{"tool": "query_database", "input": {"query": "show all patients"}}]}
 
-Example for risk/worried queries:
-{"thought": "User asks about worried/risk. I should check for signs of clinical instability OR uncontrolled chronic disease.", "tool_calls": [{"tool": "query_database", "input": {"query": "show patients with heart rate > 120, systolic bp > 160, diastolic bp > 100, glucose > 300, A1c > 9, or oxygen saturation < 90"}}]}
+
+6. **No Hallucinations**: If `query_database` returns empty results, say "I couldn't find any data." DO NOT invent values.
+7. **Complex Conditions**: You can combine multiple conditions in ONE `query_database` call.
+   - **WRONG**: Call 1 (Get diabetics) -> Call 2 (Get high glucose) -> Python Join.
+   - **RIGHT**: Call 1 (Get diabetics with high glucose using JOINs).
+   - Example: "Show diabetics with A1c > 9" -> `{"query": "show patients with diabetes AND A1c > 9"}` (Let the SQL expert handle the JOIN).
+   - **CALCULATOR RULE**: DO NOT use `clinical_calculator` for queries like "list patients with eGFR < 60". Use `query_database` instead. Only use calculator if the user asks to *compute* a value for a specific patient.
+
+Example for risk/worried/critical queries:
+{"thought": "User asks about worried/risk/critical. I should check for signs of clinical instability OR uncontrolled chronic disease.", "tool_calls": [{"tool": "query_database", "input": {"query": "show patients with heart rate > 120, systolic bp > 160, diastolic bp > 100, glucose > 300, A1c > 9, or oxygen saturation < 90"}}]}
+
+Example for superlatives (highest/lowest/most recent):
+{"thought": "User asks for highest/lowest value. I will ask the database to sort.", "tool_calls": [{"tool": "query_database", "input": {"query": "show patient with the highest heart rate"}}]}
+
 
 If you can answer directly from conversation history without tools:
 {"thought": "I already have this information", "tool_calls": [], "direct_answer": "Your answer here"}
@@ -173,28 +184,41 @@ You are a healthcare data assistant. Based on the tool results below,
 provide a clear, accurate answer to the user's question.
 
 CRITICAL RULES:
-1. Be accurate - only state facts from the results
-2. Be concise - don't repeat unnecessary details
-3. Highlight abnormals - flag concerning values
-4. Cite sources - mention guidelines when used
-5. Don't hallucinate - if data is missing, say so
+1. **Data Primacy**: Treat `tool_results` as ground truth. Report missing data as "gaps", do not hallucinate values.
+2. **Risk Stratification**: Prioritize findings by acuity:
+   - **CRITICAL**: Immediate threat (e.g., SpO2 < 90%, active chest pain).
+   - **WARNING**: Abnormal/Urgent (e.g., BP > 160/100, High Glucose).
+3. **Show Your Work**: You MUST list the specific values that justify the risk level. (e.g., "Critical due to HR 135").
+4. **Professional Formatting**:
+   - Use **bold** for patient names and key values.
+   - **TABLE RULE**: If multiple patients (2 or more) are found, you **MUST** use a Markdown table.
+     - **NEGATIVE RULE**: NEVER just list names (e.g. "Bob and Carol").
+     | Patient | Acuity | Findings |
+     | :--- | :--- | :--- |
+     | **BOB** | 🔴 Critical | **HR 135**, SpO2 88% |
+     | **CAROL** | 🔴 Critical | **BP 220/120** |
+   - Use bullet points ONLY if a table is impossible (e.g. single patient).
+   - Group by acuity if multiple patients are found (e.g., "🔴 Critical", "🟡 Warning").
+   - List ALL abnormal values found for each patient (e.g., "- HR: **125**\n- SpO2: **88%").
+   - **GROUPING RULE**: Treat each patient as UNIQUE. Do not merge diverse values under one name unless the name is identical.
+
+FORMATTING OVERRIDE:
+If the result contains multiple patients, you MUST output a Markdown table.
 
 USER QUESTION: {question}
 
 TOOL RESULTS:
 {tool_results}
 
-CRITICAL JSON OUTPUT RULES:
-- Your response MUST be valid JSON starting with {{ and ending with }}
-- Do NOT include any text before or after the JSON
-- Do NOT use markdown code fences
-- The very first character of your response must be {{
+REQUIRED OUTPUT FORMAT:
+You must output the answer in the following text format (do NOT use JSON):
 
-Respond with this exact JSON format:
-{{"answer": "Your clear answer here", "highlights": ["Key finding 1"], "confidence": 0.9}}
+ANSWER:
+[Your natural language answer here. Include the Markdown table if applicable.]
 
-Now respond with JSON only:
-""".strip()
+HIGHLIGHTS:
+- [Key takeaway 1]
+- [Key takeaway 2 (optional)]""".strip()
 
 
 # =============================================================================
@@ -459,10 +483,29 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         )
         
         try:
-            result = call_llm_for_json(prompt)
-            answer = result.get("answer", "I found some results but couldn't format them properly.")
-            highlights = result.get("highlights", [])
+            # Use text generation to avoid JSON parsing issues with Markdown tables
+            text_response = call_llm(prompt)
+            
+            # Parse the text response
+            answer = text_response
+            highlights = []
+            
+            # Extract Answer
+            answer_match = re.search(r"ANSWER:(.*?)(?=HIGHLIGHTS:|$)", text_response, re.DOTALL | re.IGNORECASE)
+            if answer_match:
+                answer = answer_match.group(1).strip()
+            
+            # Extract Highlights
+            highlights_match = re.search(r"HIGHLIGHTS:(.*)", text_response, re.DOTALL | re.IGNORECASE)
+            if highlights_match:
+                highlights_text = highlights_match.group(1).strip()
+                # Split by bullets (hyphen or asterisk)
+                highlights = [line.strip().lstrip("-* ").strip() 
+                             for line in highlights_text.split("\n") 
+                             if line.strip().startswith("-") or line.strip().startswith("*")]
+            
             return answer, highlights
+
         except Exception as e:
             # Fallback: Create a basic answer from tool results
             return self._fallback_synthesis(tool_results), []
@@ -850,6 +893,7 @@ Output valid JSON only. Do not use code blocks.
 # =============================================================================
 # Convenience Function
 # =============================================================================
+
 
 def run_agent_query(question: str, history: List[Dict[str, str]] = None, depth: str = "standard") -> Dict[str, Any]:
     """

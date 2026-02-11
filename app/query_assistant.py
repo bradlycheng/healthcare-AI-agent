@@ -103,6 +103,8 @@ RULES:
     - "Pulse" → search for `LIKE '%PULSE%' OR LIKE '%HEART%RATE%'`
     - "BP" or "blood pressure" → **MUST** use: `(UPPER(o.display) LIKE '%BLOOD%PRESSURE%' OR UPPER(o.display) LIKE '%BP%' OR UPPER(o.display) LIKE '%SYSTOLIC%' OR UPPER(o.display) LIKE '%DIASTOLIC%')`
     - "Blood sugar" → `LIKE '%GLUCOSE%'`
+    - "SpO2", "Oxygen", "O2", "Oxygen Saturation" → search for `(UPPER(o.display) LIKE '%SPO2%' OR UPPER(o.display) LIKE '%OXYGEN%SAT%' OR UPPER(o.display) LIKE '%O2%SAT%')`
+    - "eGFR" → search for `UPPER(o.display) LIKE '%EGFR%'` (Note: DB stores 'eGFR')
 12. **CRITICAL: Context and Pronouns.**
     - If the user implies a specific patient (e.g., "his", "her", "their", "the patient", "what about BP?"), you **MUST** identify the patient from the CHAT HISTORY.
     - Look at the **ASSISTANT's previous answers** to see which patient was just discussed.
@@ -122,12 +124,20 @@ SQL: `SELECT h.patient_first_name, o.value_num, o.unit FROM hl7_messages h JOIN 
     - Return an empty SQL query and explanation: "Please specify what measurement you are referring to (e.g., Glucose, Diastolic BP, Heart Rate)."
 14. **PROVIDERS vs PATIENTS**:
     - If the user asks for "Dr. X", "Nurse Y", or a provider name, search `provider_name` in the `visits` table.
+    - If the user asks for "Dr. X", "Nurse Y", or a provider name, search `provider_name` in the `visits` table.
     - Do NOT search patient names for providers.
+15. **OXYGEN SATURATION**: The database uses "SpO2". You **MUST** use `UPPER(o.display) LIKE '%SPO2%'` (or `%OXYGEN%` if unsure, but `%SPO2%` is primary).
+
 
 FEW SHOT EXAMPLES:
 
 User: "List visits for Dr. Alice Chen"
-SQL: SELECT v.visit_date, v.provider_name, v.chief_complaint, h.patient_first_name, h.patient_last_name FROM visits v JOIN hl7_messages h ON v.patient_id = h.patient_id WHERE UPPER(v.provider_name) LIKE '%ALICE%CHEN%' ORDER BY v.visit_date DESC LIMIT 50
+User: "Show visits for Dr. Smith"
+SQL: SELECT v.visit_date, v.provider_name, v.chief_complaint, h.patient_first_name, h.patient_last_name FROM visits v JOIN hl7_messages h ON v.patient_id = h.patient_id WHERE UPPER(v.provider_name) LIKE '%SMITH%' ORDER BY v.visit_date DESC LIMIT 50
+
+User: "Show me all patients seen by any doctor (Dr.) recently"
+SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, v.visit_date, v.provider_name FROM hl7_messages h JOIN visits v ON h.patient_id = v.patient_id WHERE UPPER(v.provider_name) LIKE '%DR.%' ORDER BY v.visit_date DESC LIMIT 50
+
 
 User: "Show all patients"
 SQL: SELECT DISTINCT patient_id, patient_first_name, patient_last_name FROM hl7_messages LIMIT 50
@@ -175,6 +185,10 @@ SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, d.diagnosis_name
 
 User: "Show patients with hypertension"
 SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, d.diagnosis_name FROM hl7_messages h JOIN diagnoses d ON h.patient_id = d.patient_id WHERE (UPPER(d.diagnosis_name) LIKE '%HYPERTENSION%' OR UPPER(d.diagnosis_code) LIKE '%I10%') AND d.status = 'Active' LIMIT 50
+
+User: "Show me all diabetic patients with Glucose > 200"
+SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, o.value_num, d.diagnosis_name FROM hl7_messages h JOIN diagnoses d ON h.patient_id = d.patient_id JOIN observations o ON h.id = o.message_id WHERE (UPPER(d.diagnosis_name) LIKE '%DIABETES%' OR UPPER(d.diagnosis_code) LIKE '%E11%') AND UPPER(o.display) LIKE '%GLUCOSE%' AND o.value_num > 200
+
 
 User: "What medications is John Smith on?"
 SQL: SELECT m.medication_name, m.dosage, m.frequency, m.status FROM hl7_messages h JOIN medications m ON h.patient_id = m.patient_id WHERE UPPER(h.patient_first_name) = 'JOHN' AND UPPER(h.patient_last_name) = 'SMITH' ORDER BY m.status DESC, m.medication_name
@@ -437,6 +451,9 @@ def generate_sql_from_question(question: str, history: List[Dict[str, str]] = []
     Use LLM to generate SQL from natural language question.
     Returns (sql, explanation, error_message).
     """
+    # Pre-process common medical synonyms that confuse the LLM
+    question = question.replace("oxygen saturation", "SpO2").replace("Oxygen Saturation", "SpO2")
+    
     prompt = f"""
 {SQL_GENERATION_PROMPT}
 

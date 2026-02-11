@@ -123,9 +123,9 @@
                         <div class="message-content">
                             <p>Hi! I can help you explore your patient data. Try asking:</p>
                             <ul class="message-examples">
-                                <li>"Analyze blood pressure trends for Sarah Jenkins"</li>
-                                <li>"What is John Smith's latest glucose?"</li>
                                 <li>"Who has the highest heart rate?"</li>
+                                <li>"Show me patients with critical vitals"</li>
+                                <li>"Show all patients with Diabetes"</li>
                             </ul>
                         </div>
                     </div>
@@ -144,14 +144,14 @@
                     </button>
                 </div>
                 <div class="query-suggestions">
-                    <button class="suggestion-chip" data-query="What is Sarah Jenkins blood pressure?">Sarah Jenkins'
-                        Blood
-                        Pressure</button>
-                    <button class="suggestion-chip" data-query="Which patients should I worry about?">Which patients
-                        should I
-                        worry about?</button>
-                    <button class="suggestion-chip" data-query="Who has the highest heart rate?">Highest heart
-                        rate</button>
+                    <button class="suggestion-chip" data-query="Which patients should I be worried about?">Patients I
+                        should worry about</button>
+                    <button class="suggestion-chip" data-query="Show patients with diabetes AND Glucose > 150">Diabetics
+                        with High Glucose</button>
+                    <button class="suggestion-chip" data-query="Show patients with HR > 100 or SpO2 < 95">Critical
+                        Vitals</button>
+                    <button class="suggestion-chip" data-query="Show list of patients with eGFR < 60">CKD Risk (Low
+                        eGFR)</button>
                 </div>
             </div>
         </section>

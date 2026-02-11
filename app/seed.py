@@ -87,6 +87,33 @@ def seed_database(verbose=True, use_llm=False):
     db_path = os.getenv("DATABASE_PATH", DB_PATH)
     conn = get_connection(db_path)
     cursor = conn.cursor()
+
+    # --- EXPERT SCENARIO PATIENTS (Data Primed for Dashboard) ---
+    print("Seeding Expert Scenario Patients...")
+    
+    # 1. Diabetic Dave (High Glucose)
+    cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-DIABETIC", "Diabetic", "Dave", "1970-01-01", "M", "{}"))
+    msg_id = cursor.lastrowid
+    cursor.execute("INSERT INTO diagnoses (patient_id, diagnosis_code, diagnosis_name, diagnosis_date, status) VALUES ('P-DIABETIC', 'E11.9', 'Type 2 diabetes mellitus', '2025-01-01', 'Active')")
+    cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '2339-0', 'Glucose', 250, 'mg/dL', ?, 'F', 'H', 'WARNING')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
+    # 2. Critical Bob (Critical Vitals)
+    cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-CRITICAL", "Critical", "Bob", "1965-05-05", "M", "{}"))
+    msg_id = cursor.lastrowid
+    cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '8867-4', 'Heart Rate', 135, 'bpm', ?, 'F', 'H', 'CRITICAL')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '2708-6', 'SpO2', 88, '%', ?, 'F', 'L', 'CRITICAL')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
+    # 4. CKD Charlie (Low eGFR)
+    cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-CKD", "CKD", "Charlie", "1955-08-20", "M", "{}"))
+    msg_id = cursor.lastrowid
+    cursor.execute("INSERT INTO diagnoses (patient_id, diagnosis_code, diagnosis_name, diagnosis_date, status) VALUES ('P-CKD', 'N18.3', 'Chronic kidney disease, stage 3', '2024-06-01', 'Active')")
+    cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '33914-3', 'eGFR', 45, 'mL/min/1.73m2', ?, 'F', 'L', 'WARNING')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
+    conn.commit()
+
     
     # Generate 100 Patients (Deterministic)
     if verbose:
