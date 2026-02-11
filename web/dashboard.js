@@ -695,6 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = await response.json();
+            console.log("DEBUG: Assistant Response Raw Data:", data);
 
             if (data.success) {
                 // Handle clarification requests inline
@@ -736,7 +737,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const avatarIcon = sender === 'ai' ? 'fa-robot' : 'fa-user';
 
-        let contentHtml = `<p>${escapeHtml(text)}</p>`;
+        let processedText = text;
+        if (sender === 'ai' && typeof marked !== 'undefined') {
+            // Configure marked for health data safety (prevent bold wrapping but allow tables)
+            processedText = marked.parse(text, { gfm: true, breaks: true });
+        } else {
+            processedText = `<p>${escapeHtml(text)}</p>`;
+        }
+
+        let contentHtml = processedText;
 
         // Add tool usage badge if present
         if (options.toolsUsed && options.toolsUsed.length > 0) {
@@ -793,7 +802,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (options.highlights && options.highlights.length > 0) {
             contentHtml += '<ul class="message-highlights">';
             options.highlights.forEach(h => {
-                contentHtml += `<li>${escapeHtml(h)}</li>`;
+                // Parse markdown in highlights as well for better consistency
+                const processedH = typeof marked !== 'undefined' ? marked.parse(h) : escapeHtml(h);
+                contentHtml += `<li>${processedH}</li>`;
             });
             contentHtml += '</ul>';
         }

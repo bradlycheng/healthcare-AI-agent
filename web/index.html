@@ -61,17 +61,29 @@
                 </div>
                 <div class="chat-interface">
                     <div class="chat-message user-msg">
-                        <p>What patients should I be worried about?</p>
+                        <p>Which patients should I be worried about?</p>
                     </div>
                     <div class="chat-message ai-msg">
-                        <p>I identified <strong>John Smith</strong> with concerning vitals:<br>• HR: 110 bpm (High)<br>•
-                            BP: 160/95 (High)<br>• SpO2: 94% (Low)</p>
-                    </div>
-                    <div class="chat-message user-msg delayed-1">
-                        <p>Show me John's details</p>
-                    </div>
-                    <div class="chat-message ai-msg delayed-2">
-                        <p>Opening patient record P-12345...</p>
+                        <p>I identified 2 patients who require immediate attention:</p>
+                        <div class="mini-table">
+                            <table>
+                                <tr>
+                                    <th>Patient</th>
+                                    <th>Acuity</th>
+                                    <th>Findings</th>
+                                </tr>
+                                <tr>
+                                    <td><strong>Critical Bob</strong></td>
+                                    <td>🔴 Critical</td>
+                                    <td><strong>HR 135</strong>, SpO2 88%</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Robert Miller</strong></td>
+                                    <td>🔴 Warning</td>
+                                    <td><strong>BP 166/105</strong></td>
+                                </tr>
+                            </table>
+                        </div>
                     </div>
                     <div class="typing-indicator">
                         <span></span><span></span><span></span>
@@ -107,7 +119,7 @@
                     <i class="fa-solid fa-comments"></i>
                 </div>
                 <h3>Chat with Data</h3>
-                <p>Ask the dashboard: "What patients should I be worried about?"</p>
+                <p>Ask the dashboard: "Which patients should I be worried about?"</p>
             </div>
         </div>
     </section>

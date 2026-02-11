@@ -179,46 +179,8 @@ Now respond with JSON only:
 """.strip()
 
 
-SYNTHESIS_PROMPT = """
-You are a healthcare data assistant. Based on the tool results below, 
-provide a clear, accurate answer to the user's question.
-
-CRITICAL RULES:
-1. **Data Primacy**: Treat `tool_results` as ground truth. Report missing data as "gaps", do not hallucinate values.
-2. **Risk Stratification**: Prioritize findings by acuity:
-   - **CRITICAL**: Immediate threat (e.g., SpO2 < 90%, active chest pain).
-   - **WARNING**: Abnormal/Urgent (e.g., BP > 160/100, High Glucose).
-3. **Show Your Work**: You MUST list the specific values that justify the risk level. (e.g., "Critical due to HR 135").
-4. **Professional Formatting**:
-   - Use **bold** for patient names and key values.
-   - **TABLE RULE**: If multiple patients (2 or more) are found, you **MUST** use a Markdown table.
-     - **NEGATIVE RULE**: NEVER just list names (e.g. "Bob and Carol").
-     | Patient | Acuity | Findings |
-     | :--- | :--- | :--- |
-     | **BOB** | 🔴 Critical | **HR 135**, SpO2 88% |
-     | **CAROL** | 🔴 Critical | **BP 220/120** |
-   - Use bullet points ONLY if a table is impossible (e.g. single patient).
-   - Group by acuity if multiple patients are found (e.g., "🔴 Critical", "🟡 Warning").
-   - List ALL abnormal values found for each patient (e.g., "- HR: **125**\n- SpO2: **88%").
-   - **GROUPING RULE**: Treat each patient as UNIQUE. Do not merge diverse values under one name unless the name is identical.
-
-FORMATTING OVERRIDE:
-If the result contains multiple patients, you MUST output a Markdown table.
-
-USER QUESTION: {question}
-
-TOOL RESULTS:
-{tool_results}
-
-REQUIRED OUTPUT FORMAT:
-You must output the answer in the following text format (do NOT use JSON):
-
-ANSWER:
-[Your natural language answer here. Include the Markdown table if applicable.]
-
-HIGHLIGHTS:
-- [Key takeaway 1]
-- [Key takeaway 2 (optional)]""".strip()
+from app.healthcare_agent_prompt import SYNTHESIS_PROMPT
+# Note: SYNTHESIS_PROMPT is imported from healthcare_agent_prompt.py
 
 
 # =============================================================================
@@ -494,6 +456,15 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
             answer_match = re.search(r"ANSWER:(.*?)(?=HIGHLIGHTS:|$)", text_response, re.DOTALL | re.IGNORECASE)
             if answer_match:
                 answer = answer_match.group(1).strip()
+                # Clean up bold wrapping if LLM insists on it
+                if answer.startswith("**") and answer.endswith("**"):
+                    answer = answer[2:-2].strip()
+                elif answer.startswith("```json") and answer.endswith("```"):
+                    # Emergency fix if it outputs JSON instead of text
+                    try:
+                        data = json.loads(answer[7:-3])
+                        answer = data.get("answer", answer)
+                    except: pass
             
             # Extract Highlights
             highlights_match = re.search(r"HIGHLIGHTS:(.*)", text_response, re.DOTALL | re.IGNORECASE)
@@ -655,26 +626,43 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         patient_id = input_data.get("patient_id")
         patient_name = input_data.get("patient_name")
         
-        # If name provided, try to find patient ID
+        # Search strategy:
+        # 1. If patient_id looks like a name (no P- prefix), treat as patient_name
+        if patient_id and not str(patient_id).startswith('P-') and not patient_name:
+            patient_name = patient_id
+            patient_id = None
+
+        # 2. If name provided, try to find patient ID
         if patient_name and not patient_id:
-            # Search for patient by name
             from .db import get_connection
             conn = get_connection()
             try:
-                # Handle "First Last" format
-                parts = patient_name.upper().split()
-                if len(parts) >= 2:
-                    first_name = parts[0]
-                    last_name = parts[-1]
+                # Try full name exact match
+                row = conn.execute(
+                    "SELECT DISTINCT patient_id FROM hl7_messages WHERE UPPER(patient_first_name || ' ' || patient_last_name) = ?",
+                    (patient_name.upper(),)
+                ).fetchone()
+                
+                if not row:
+                    # Try last name match
                     row = conn.execute(
-                        """SELECT DISTINCT patient_id FROM hl7_messages 
-                           WHERE UPPER(patient_first_name) = ? 
-                           AND UPPER(patient_last_name) = ?
-                           LIMIT 1""",
-                        (first_name, last_name)
+                        "SELECT DISTINCT patient_id FROM hl7_messages WHERE UPPER(patient_last_name) = ?",
+                        (patient_name.upper(),)
                     ).fetchone()
-                    if row:
-                        patient_id = row["patient_id"]
+                
+                if not row:
+                    # Handle "First Last" format
+                    parts = patient_name.upper().split()
+                    if len(parts) >= 2:
+                        first_name = parts[0]
+                        last_name = parts[-1]
+                        row = conn.execute(
+                            "SELECT DISTINCT patient_id FROM hl7_messages WHERE UPPER(patient_first_name) = ? AND UPPER(patient_last_name) = ?",
+                            (first_name, last_name)
+                        ).fetchone()
+                
+                if row:
+                    patient_id = row["patient_id"]
             finally:
                 conn.close()
         

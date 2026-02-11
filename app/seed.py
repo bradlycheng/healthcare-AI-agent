@@ -112,6 +112,13 @@ def seed_database(verbose=True, use_llm=False):
     cursor.execute("INSERT INTO diagnoses (patient_id, diagnosis_code, diagnosis_name, diagnosis_date, status) VALUES ('P-CKD', 'N18.3', 'Chronic kidney disease, stage 3', '2024-06-01', 'Active')")
     cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '33914-3', 'eGFR', 45, 'mL/min/1.73m2', ?, 'F', 'L', 'WARNING')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
+    # 4. Sarah Jenkins (High Glucose) - NEW Expert Patient
+    cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-SARAH", "Sarah", "Jenkins", "1980-03-12", "F", "{}"))
+    msg_id = cursor.lastrowid
+    cursor.execute("INSERT INTO diagnoses (patient_id, diagnosis_code, diagnosis_name, diagnosis_date, status) VALUES ('P-SARAH', 'E11.65', 'Type 2 diabetes mellitus with hyperglycemia', '2025-02-01', 'Active')")
+    cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '2339-0', 'Glucose', 310, 'mg/dL', ?, 'F', 'H', 'CRITICAL')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
     conn.commit()
 
     

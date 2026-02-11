@@ -3160,3 +3160,47 @@ mark.highlight {
         transform: scale(1);
     }
 }
+
+/* AI Chat Message Markdown Table Styling */
+.message-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.message-content th {
+    background: rgba(0, 242, 255, 0.1);
+    color: var(--primary);
+    padding: 0.75rem;
+    text-align: left;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 2px solid rgba(0, 242, 255, 0.2);
+}
+
+.message-content td {
+    padding: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.9rem;
+}
+
+.message-content tr:last-child td {
+    border-bottom: none;
+}
+
+.message-content tr:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.message-content p {
+    margin-bottom: 0.5rem;
+}
+
+.message-content strong {
+    color: var(--primary);
+}
