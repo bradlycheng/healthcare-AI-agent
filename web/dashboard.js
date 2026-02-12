@@ -736,7 +736,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const avatarIcon = sender === 'ai' ? 'fa-robot' : 'fa-user';
 
-        let contentHtml = `<p>${escapeHtml(text)}</p>`;
+        let contentHtml = sender === 'ai'
+            ? `<div class="markdown-content">${marked.parse(text)}</div>`
+            : `<p>${escapeHtml(text)}</p>`;
 
         // Add tool usage badge if present
         if (options.toolsUsed && options.toolsUsed.length > 0) {
@@ -793,7 +795,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (options.highlights && options.highlights.length > 0) {
             contentHtml += '<ul class="message-highlights">';
             options.highlights.forEach(h => {
-                contentHtml += `<li>${escapeHtml(h)}</li>`;
+                contentHtml += `<li>${marked.parseInline(h)}</li>`;
             });
             contentHtml += '</ul>';
         }

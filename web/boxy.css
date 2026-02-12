@@ -1,0 +1,72 @@
+/* --- Boxy Table Styles (Paste-friendly) --- */
+.markdown-content {
+    line-height: 1.5 !important;
+    font-size: 0.95rem !important;
+}
+
+.markdown-content p {
+    margin-bottom: 0.75rem !important;
+}
+
+/* Functional Boxy Table for Excel - STRONG BORDERS */
+.markdown-content table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 1.5rem 0 !important;
+    border: 4px solid #ffffff !important;
+    /* Ultra boxy white border */
+    background-color: #000000 !important;
+    display: table !important;
+    color: #ffffff !important;
+}
+
+.markdown-content th,
+.markdown-content td {
+    padding: 12px 18px !important;
+    text-align: left !important;
+    border: 2px solid #ffffff !important;
+    /* Sharp white grid lines */
+    color: #ffffff !important;
+}
+
+.markdown-content th {
+    background-color: #444444 !important;
+    font-weight: 900 !important;
+    text-transform: uppercase !important;
+    color: #00f2ff !important;
+}
+
+.markdown-content tr:nth-child(even) {
+    background-color: #1a1a1a !important;
+}
+
+.markdown-content strong {
+    color: #00f2ff !important;
+    font-weight: 800 !important;
+}
+
+/* Ensure no glassmorphism or blur is interfering with the boxy look */
+.message {
+    backdrop-filter: none !important;
+    background: #000000 !important;
+    border: 2px solid #ffffff !important;
+    /* White border for the whole bubble too! */
+    border-radius: 4px !important;
+    box-shadow: none !important;
+}
+
+.message-ai .message-content {
+    background: #000000 !important;
+    color: #ffffff !important;
+}
+
+.message-user .message-content {
+    background: #222222 !important;
+    color: #ffffff !important;
+}
+
+/* Override any glassmorphism from style.css */
+.message-content {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}

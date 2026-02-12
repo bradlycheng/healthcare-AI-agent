@@ -191,19 +191,23 @@ CRITICAL RULES:
 3. **Show Your Work**: You MUST list the specific values that justify the risk level. (e.g., "Critical due to HR 135").
 4. **Professional Formatting**:
    - Use **bold** for patient names and key values.
-   - **TABLE RULE**: If multiple patients (2 or more) are found, you **MUST** use a Markdown table.
-     - **NEGATIVE RULE**: NEVER just list names (e.g. "Bob and Carol").
-     | Patient | Acuity | Findings |
+   - **TABLE RULE (ALWAYS)**: You **MUST** use a Markdown table for any patient data. 
+     - **MARKDOWN SYNTAX**: You MUST include the header row, the delimiter row `|:---|:---|:---|`, and the data rows.
+     - **PIPES**: Every line of the table (header, delimiter, and data) MUST start and end with a pipe `|` and have pipes between columns.
+     - **NO EXCEPTIONS**: Even if only one patient exists, you MUST use the table.
+     - **STRICT GRID**: Do NOT omit the pipes at the beginning and end of the lines. 
+     
+     EXAMPLE OF REQUIRED VERBATIM SYNTAX:
+     | Patient | Status | Findings |
      | :--- | :--- | :--- |
-     | **BOB** | 🔴 Critical | **HR 135**, SpO2 88% |
-     | **CAROL** | 🔴 Critical | **BP 220/120** |
-   - Use bullet points ONLY if a table is impossible (e.g. single patient).
-   - Group by acuity if multiple patients are found (e.g., "🔴 Critical", "🟡 Warning").
-   - List ALL abnormal values found for each patient (e.g., "- HR: **125**\n- SpO2: **88%").
-   - **GROUPING RULE**: Treat each patient as UNIQUE. Do not merge diverse values under one name unless the name is identical.
+     | **BOB** | [CRITICAL] | **HR 135**, SpO2 88% |
+
+   - List ALL abnormal values in the Findings column.
+   - Use `[CRITICAL]` or `[WARNING]` tags. NO EMOJIS.
 
 FORMATTING OVERRIDE:
-If the result contains multiple patients, you MUST output a Markdown table.
+- **STRICT TABLE**: You MUST use `|` pipes and the `|---|---|---|` delimiter row. 
+- **NO PIPES = SYSTEM FAILURE**: If you output a table without the leading and trailing `|` pipes, it won't render. ALWAYS use pipes.
 
 USER QUESTION: {question}
 
@@ -214,7 +218,11 @@ REQUIRED OUTPUT FORMAT:
 You must output the answer in the following text format (do NOT use JSON):
 
 ANSWER:
-[Your natural language answer here. Include the Markdown table if applicable.]
+[Concise intro sentence.]
+
+| Patient | Status | Findings |
+| :--- | :--- | :--- |
+[Your data rows MUST start and end with | here]
 
 HIGHLIGHTS:
 - [Key takeaway 1]
@@ -485,18 +493,20 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         try:
             # Use text generation to avoid JSON parsing issues with Markdown tables
             text_response = call_llm(prompt)
+            print(f"DEBUG: Raw synthesis response:\n{text_response}")
             
             # Parse the text response
             answer = text_response
             highlights = []
             
             # Extract Answer
-            answer_match = re.search(r"ANSWER:(.*?)(?=HIGHLIGHTS:|$)", text_response, re.DOTALL | re.IGNORECASE)
+            # Look for ANSWER: and capture everything until HIGHLIGHTS: or end
+            answer_match = re.search(r"ANSWER:\s*(.*?)(?=\s*HIGHLIGHTS:|$)", text_response, re.DOTALL | re.IGNORECASE)
             if answer_match:
                 answer = answer_match.group(1).strip()
             
             # Extract Highlights
-            highlights_match = re.search(r"HIGHLIGHTS:(.*)", text_response, re.DOTALL | re.IGNORECASE)
+            highlights_match = re.search(r"HIGHLIGHTS:\s*(.*)", text_response, re.DOTALL | re.IGNORECASE)
             if highlights_match:
                 highlights_text = highlights_match.group(1).strip()
                 # Split by bullets (hyphen or asterisk)

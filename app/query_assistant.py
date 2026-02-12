@@ -89,7 +89,8 @@ RULES:
 4. **PATIENT SEX**: **NEVER** filter by `patient_sex` unless the user explicitly uses words like "male", "female", "men", "women".
 5. **JOIN OR DIE**: When asked fo clinical data (vital, result, test, etc.), you **MUST** JOIN `observations` on `observations.message_id = hl7_messages.id`.
    - **WRONG**: `SELECT * FROM hl7_messages WHERE ...` (No clinical data)
-   - **RIGHT**: `SELECT h.patient_first_name, o.display, o.value_num, o.unit FROM hl7_messages h JOIN observations o ON ...`
+   - **RIGHT**: `SELECT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o.unit, o.flag, o.alert_level FROM hl7_messages h JOIN observations o ON ...`
+   - **CRITICAL**: Always include `o.flag`, `o.alert_level`, `o.reference_low`, and `o.reference_high` in your SELECT list if querying observations.
 6. For "recent" items, use `ORDER BY received_at DESC` or `ORDER BY observation_datetime DESC`.
 7. LIMIT results to 50.
 8. **DO NOT** use `DATE(patient_dob)` as it is a custom string format. Sort directly on the string: `ORDER BY patient_dob ASC` (oldest) or `DESC` (youngest).
@@ -104,7 +105,9 @@ RULES:
     - "BP" or "blood pressure" → **MUST** use: `(UPPER(o.display) LIKE '%BLOOD%PRESSURE%' OR UPPER(o.display) LIKE '%BP%' OR UPPER(o.display) LIKE '%SYSTOLIC%' OR UPPER(o.display) LIKE '%DIASTOLIC%')`
     - "Blood sugar" → `LIKE '%GLUCOSE%'`
     - "SpO2", "Oxygen", "O2", "Oxygen Saturation" → search for `(UPPER(o.display) LIKE '%SPO2%' OR UPPER(o.display) LIKE '%OXYGEN%SAT%' OR UPPER(o.display) LIKE '%O2%SAT%')`
+    - "Oxygen Saturation" → search for `(UPPER(o.display) LIKE '%SPO2%' OR UPPER(o.display) LIKE '%OXYGEN%SAT%' OR UPPER(o.display) LIKE '%O2%SAT%')`
     - "eGFR" → search for `UPPER(o.display) LIKE '%EGFR%'` (Note: DB stores 'eGFR')
+    - "Worried about" or "worry about" → **MUST** use `(o.alert_level IN ('CRITICAL', 'WARNING'))`
 12. **CRITICAL: Context and Pronouns.**
     - If the user implies a specific patient (e.g., "his", "her", "their", "the patient", "what about BP?"), you **MUST** identify the patient from the CHAT HISTORY.
     - Look at the **ASSISTANT's previous answers** to see which patient was just discussed.
