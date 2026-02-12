@@ -105,9 +105,10 @@ RULES:
     - "BP" or "blood pressure" → **MUST** use: `(UPPER(o.display) LIKE '%BLOOD%PRESSURE%' OR UPPER(o.display) LIKE '%BP%' OR UPPER(o.display) LIKE '%SYSTOLIC%' OR UPPER(o.display) LIKE '%DIASTOLIC%')`
     - "Blood sugar" → `LIKE '%GLUCOSE%'`
     - "SpO2", "Oxygen", "O2", "Oxygen Saturation" → search for `(UPPER(o.display) LIKE '%SPO2%' OR UPPER(o.display) LIKE '%OXYGEN%SAT%' OR UPPER(o.display) LIKE '%O2%SAT%')`
-    - "Oxygen Saturation" → search for `(UPPER(o.display) LIKE '%SPO2%' OR UPPER(o.display) LIKE '%OXYGEN%SAT%' OR UPPER(o.display) LIKE '%O2%SAT%')`
-    - "eGFR" → search for `UPPER(o.display) LIKE '%EGFR%'` (Note: DB stores 'eGFR')
-    - "Worried about" or "worry about" → **MUST** use `(o.alert_level IN ('CRITICAL', 'WARNING'))`
+    - "eGFR", "CKD", "CDK", "Kidney Function" → search for `UPPER(o.display) LIKE '%EGFR%'`
+    - **CRITICAL: No Display Filters**: For general questions about "abnormal", "worried", "at risk", or "critical" patients, you **MUST NOT** filter by `o.display`. (e.g., Do NOT add any `LIKE '%GLUCOSE%'` or `LIKE '%BP%'` filters). You MUST search every single observation in the table.
+    - **CRITICAL: Acuity Sorting**: For "worried about" or "at risk" queries, you **MUST** prioritize by acuity. Use: `ORDER BY (CASE WHEN o.alert_level = 'CRITICAL' THEN 1 WHEN o.alert_level = 'WARNING' THEN 2 ELSE 3 END), h.received_at DESC`.
+    - "Worried about" or "worry about" → **MUST** include all patients where `o.flag IN ('H', 'L')` OR `o.alert_level IS NOT NULL`. Do NOT use any other filters unless explicitly asked.
 12. **CRITICAL: Context and Pronouns.**
     - If the user implies a specific patient (e.g., "his", "her", "their", "the patient", "what about BP?"), you **MUST** identify the patient from the CHAT HISTORY.
     - Look at the **ASSISTANT's previous answers** to see which patient was just discussed.
@@ -163,7 +164,7 @@ User: "Which patients have high cholesterol and high triglycerides?"
 SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name FROM hl7_messages h JOIN observations o1 ON h.id = o1.message_id JOIN observations o2 ON h.id = o2.message_id WHERE (UPPER(o1.display) LIKE '%CHOLESTEROL%' AND o1.flag = 'H') AND (UPPER(o2.display) LIKE '%TRIGLYCERIDE%' AND o2.flag = 'H')
 
 User: "Who has kidney problems?"
-SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o.flag FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE (UPPER(o.display) LIKE '%CREATININE%' OR UPPER(o.display) LIKE '%BUN%' OR UPPER(o.display) LIKE '%GFR%') AND o.flag IN ('H', 'L')
+SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o.flag FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE (UPPER(o.display) LIKE '%CREATININE%' OR UPPER(o.display) LIKE '%BUN%' OR UPPER(o.display) LIKE '%EGFR%' OR UPPER(o.display) LIKE '%CKD%') AND o.flag IN ('H', 'L')
 
 User: "Show me messages from today"
 SQL: SELECT * FROM hl7_messages WHERE DATE(received_at) = DATE('now') ORDER BY received_at DESC
@@ -176,6 +177,9 @@ SQL: SELECT DISTINCT h.patient_first_name, h.patient_last_name FROM hl7_messages
 
 User: "Show me all critical alerts"
 SQL: SELECT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o.alert_message FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE o.alert_level = 'CRITICAL'
+
+User: "Which patients should I be worried about?"
+SQL: SELECT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o.flag, o.alert_level FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE (o.flag IN ('H', 'L') OR o.alert_level IS NOT NULL) ORDER BY (CASE WHEN o.alert_level = 'CRITICAL' THEN 1 WHEN o.alert_level = 'WARNING' THEN 2 ELSE 3 END), h.received_at DESC LIMIT 50
 
 User: "Who has a warning?"
 SQL: SELECT h.patient_first_name, h.patient_last_name, o.display, o.value_num, o.alert_message FROM hl7_messages h JOIN observations o ON o.message_id = h.id WHERE o.alert_level = 'WARNING'

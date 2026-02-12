@@ -165,8 +165,8 @@ Example response:
    - Example: "Show diabetics with A1c > 9" -> `{"query": "show patients with diabetes AND A1c > 9"}` (Let the SQL expert handle the JOIN).
    - **CALCULATOR RULE**: DO NOT use `clinical_calculator` for queries like "list patients with eGFR < 60". Use `query_database` instead. Only use calculator if the user asks to *compute* a value for a specific patient.
 
-Example for risk/worried/critical queries:
-{"thought": "User asks about worried/risk/critical. I should check for signs of clinical instability OR uncontrolled chronic disease.", "tool_calls": [{"tool": "query_database", "input": {"query": "show patients with heart rate > 120, systolic bp > 160, diastolic bp > 100, glucose > 300, A1c > 9, or oxygen saturation < 90"}}]}
+Example for risk/worried/critical/abnormal queries:
+{"thought": "User asks about worried/risk/critical/abnormal patients. I should find ALL patients with flags or alert levels regardless of the test type.", "tool_calls": [{"tool": "query_database", "input": {"query": "show patients I should be worried about (include all abnormal flags and alerts)"}}]}
 
 Example for superlatives (highest/lowest/most recent):
 {"thought": "User asks for highest/lowest value. I will ask the database to sort.", "tool_calls": [{"tool": "query_database", "input": {"query": "show patient with the highest heart rate"}}]}
