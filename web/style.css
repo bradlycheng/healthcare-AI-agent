@@ -1994,6 +1994,14 @@ pre {
     }
 }
 
+.query-disclaimer {
+    margin-top: 1.25rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-align: center;
+    opacity: 0.5;
+}
+
 /* =====================================================
    PATIENT TIMELINE PAGE STYLES
    ===================================================== */
@@ -3041,7 +3049,7 @@ mark.highlight {
 
 .dashboard-header {
     background: rgba(255, 255, 255, 0.05);
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 1.25rem;
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -3056,14 +3064,13 @@ mark.highlight {
 }
 
 .chat-interface {
-    padding: 1.5rem;
+    padding: 1.25rem;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    height: 300px;
-    /* Fixed height for visual consistency */
-    justify-content: flex-end;
-    /* Start from bottom like a real chat */
+    gap: 0.75rem;
+    height: 380px;
+    /* Increased height for breathing room */
+    justify-content: flex-start;
 }
 
 .chat-message {
