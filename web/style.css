@@ -11,6 +11,48 @@
     --gradient-main: linear-gradient(135deg, #00f2ff 0%, #7000ff 100%);
 }
 
+/* --- Theme: Clinical Minimal --- */
+.theme-clinical-minimal {
+    --bg-dark: #f8fafc;
+    --bg-card: #ffffff;
+    --primary: #0284c7;
+    --primary-dim: rgba(2, 132, 199, 0.1);
+    --secondary: #0f172a;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --gradient-main: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+}
+
+.theme-clinical-minimal body {
+    background: #f1f5f9;
+}
+
+/* --- Theme: Elite Dark --- */
+.theme-elite-dark {
+    --bg-dark: #111111;
+    --bg-card: rgba(255, 255, 255, 0.02);
+    --primary: #d4af37;
+    /* Metallic Gold */
+    --primary-dim: rgba(212, 175, 55, 0.1);
+    --secondary: #1a1a1a;
+    --text-main: #f5f5f5;
+    --text-muted: #888888;
+    --gradient-main: linear-gradient(135deg, #d4af37 0%, #aa8a2e 100%);
+}
+
+/* --- Theme: Neon Matrix --- */
+.theme-neon-matrix {
+    --bg-dark: #000000;
+    --bg-card: rgba(0, 255, 65, 0.02);
+    --primary: #00ff41;
+    /* Matrix Green */
+    --primary-dim: rgba(0, 255, 65, 0.1);
+    --secondary: #003b00;
+    --text-main: #00ff41;
+    --text-muted: #008f11;
+    --gradient-main: linear-gradient(180deg, #00ff41 0%, #008f11 100%);
+}
+
 * {
     margin: 0;
     padding: 0;
