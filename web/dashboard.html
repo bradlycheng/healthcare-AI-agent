@@ -4,13 +4,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard | Healthcare AI Agent</title>
+    <title>Dashboard | Health Data Agent</title>
+    <meta name="description"
+        content="AI-powered medical data dashboard for clinical intelligence and patient analysis.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Dashboard | Health Data Agent">
+    <meta property="og:description"
+        content="AI-powered medical data dashboard for clinical intelligence and patient analysis.">
+    <meta property="og:image" content="og-image.png">
+
     <link rel="stylesheet" href="boxy.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -21,7 +33,7 @@
 
     <nav class="navbar">
         <a href="/" class="logo">
-            <i class="fa-solid fa-staff-snake"></i>
+            <img src="brain_transparent.png" alt="Health Data Agent Logo">
             <span>Health Data Agent</span>
         </a>
         <div class="nav-links">
@@ -31,7 +43,7 @@
             <a href="/dashboard.html" class="active">Dashboard</a>
             <a href="/about.html">About</a>
         </div>
-        <a href="/process-data.html" class="btn-primary">Get Started</a>
+        <a href="/dashboard.html" class="btn-primary">Get Started</a>
     </nav>
 
     <!-- Critical Alerts Banner -->
@@ -60,8 +72,8 @@
             </div>
         </header>
 
-        <!-- Active Alerts Banner -->
-        <div id="alerts-banner" class="active-alerts-banner">
+        <!-- Active Alerts Alert Box -->
+        <div id="active-alerts-box" class="active-alerts-banner">
             <i class="fa-solid fa-triangle-exclamation fa-beat"></i>
             <div>
                 <p>CRITICAL ALERTS DETECTED</p>
