@@ -248,6 +248,10 @@ class HealthcareAgent:
     def __init__(self):
         self._tools: Dict[str, Callable] = {}
         self._register_tools()
+        
+        # MCP Warden Sidecar — deterministic governance layer
+        from .warden import Warden
+        self.warden = Warden()
     
     def _register_tools(self):
         """Register all available tools."""
@@ -311,9 +315,22 @@ class HealthcareAgent:
         row_count = 0
         
         try:
-            # Step 1: Planning - decide which tools to use
-            plan = self._plan(question, history)
-            print(f"DEBUG: Plan result: {plan}")
+            # === MCP WARDEN: Create request-scoped security context ===
+            # PHITokenMap is session-pinned, ephemeral (RAM-only)
+            with self.warden.request_scope() as warden_ctx:
+            
+              # Step 1: Planning - decide which tools to use
+              # IN-GATE: Tokenize question + history before LLM sees it
+              safe_question = warden_ctx.anonymize(question)
+              safe_history = []
+              for msg in (history or []):
+                  safe_msg = dict(msg)
+                  if "content" in safe_msg:
+                      safe_msg["content"] = warden_ctx.anonymize(safe_msg["content"])
+                  safe_history.append(safe_msg)
+              
+              plan = self._plan(safe_question, safe_history)
+              print(f"DEBUG: Plan result: {plan}")
             
             if plan.get("error"):
                 return AgentResponse(
@@ -324,105 +341,158 @@ class HealthcareAgent:
             
             # Check for direct answer (no tools needed)
             if plan.get("direct_answer"):
-                return AgentResponse(
-                    answer=plan["direct_answer"],
-                    success=True,
-                    reasoning_trace=[AgentStep(
-                        thought=plan.get("thought", "Answered from context"),
-                        tool_calls=[],
-                        tool_results=[]
-                    )]
-                )
+                # Still retrieve RAG context so sources appear for knowledge questions
+              if plan.get("error"):
+                  return AgentResponse(
+                      answer="I had trouble understanding that question. Please try rephrasing.",
+                      success=False,
+                      error=f"Planning error: {plan['error']}"
+                  )
+              
+              # Check for direct answer (no tools needed)
+              if plan.get("direct_answer"):
+                  # Still retrieve RAG context so sources appear for knowledge questions
+                  from .query_assistant import retrieve_context
+                  _, direct_sources = retrieve_context(question)
+                  return AgentResponse(
+                      answer=plan["direct_answer"],
+                      success=True,
+                      sources=direct_sources,
+                      reasoning_trace=[AgentStep(
+                          thought=plan.get("thought", "Answered from context"),
+                          tool_calls=[],
+                          tool_results=[]
+                      )]
+                  )
+              
+              # Check for clarification needed
+              tool_calls = plan.get("tool_calls", [])
+              for tc in tool_calls:
+                  if tc.get("tool") == ToolName.ASK_CLARIFICATION.value:
+                      inp = tc.get("input", {})
+                      return AgentResponse(
+                          answer=inp.get("question", "Could you please clarify your question?"),
+                          success=True,
+                          needs_clarification=True,
+                          clarification_question=inp.get("question"),
+                          clarification_options=inp.get("options", []),
+                          reasoning_trace=[AgentStep(
+                              thought=plan.get("thought", "Need clarification"),
+                              tool_calls=[ToolCall(tool=tc["tool"], input=inp)],
+                              tool_results=[]
+                          )]
+                      )
             
-            # Check for clarification needed
-            tool_calls = plan.get("tool_calls", [])
-            for tc in tool_calls:
-                if tc.get("tool") == ToolName.ASK_CLARIFICATION.value:
-                    inp = tc.get("input", {})
-                    return AgentResponse(
-                        answer=inp.get("question", "Could you please clarify your question?"),
-                        success=True,
-                        needs_clarification=True,
-                        clarification_question=inp.get("question"),
-                        clarification_options=inp.get("options", []),
-                        reasoning_trace=[AgentStep(
-                            thought=plan.get("thought", "Need clarification"),
-                            tool_calls=[ToolCall(tool=tc["tool"], input=inp)],
-                            tool_results=[]
-                        )]
-                    )
+              # Step 2: Execute tools
+              step = AgentStep(
+                  thought=plan.get("thought", ""),
+                  tool_calls=[ToolCall(tool=tc["tool"], input=tc.get("input", {})) 
+                             for tc in tool_calls]
+              )
+              
+              for tc in tool_calls:
+                  tool_name = tc.get("tool", "")
+                  tool_input = tc.get("input", {})
+                  
+                  # === POLICY GATE: Validate tool call before execution ===
+                  decision = warden_ctx.intercept(tool_name, tool_input)
+                  if decision.action == "DENY":
+                      step.tool_results.append(ToolResult(
+                          tool=tool_name,
+                          success=False,
+                          result={},
+                          error=f"Warden DENY: {decision.reason}"
+                      ))
+                      print(f"[WARDEN] DENY {tool_name}: {decision.reason}")
+                      continue
+                  
+                  # Validate tool exists
+                  if tool_name not in self._tools:
+                      step.tool_results.append(ToolResult(
+                          tool=tool_name,
+                          success=False,
+                          result={},
+                          error=f"Unknown tool: {tool_name}"
+                      ))
+                      continue
+                  
+                  # Execute tool with timing
+                  start_time = time.time()
+                  try:
+                      # Pass history for context-aware tools
+                      if tool_name == ToolName.QUERY_DATABASE.value:
+                          result = self._tools[tool_name](tool_input, history)
+                      else:
+                          result = self._tools[tool_name](tool_input)
+                      
+                      execution_time = int((time.time() - start_time) * 1000)
+                      
+                      step.tool_results.append(ToolResult(
+                          tool=tool_name,
+                          success=True,
+                          result=result,
+                          execution_time_ms=execution_time
+                      ))
+                      
+                      tools_used.append(tool_name)
+                      
+                      # Collect metadata
+                      if tool_name == ToolName.QUERY_DATABASE.value:
+                          sql_used = result.get("sql", "")
+                          row_count = result.get("row_count", 0)
+                          all_sources.extend(result.get("sources", []))
+                      if tool_name == ToolName.SEARCH_GUIDELINES.value:
+                          all_sources.extend(result.get("sources", []))
+                          
+                  except Exception as e:
+                      step.tool_results.append(ToolResult(
+                          tool=tool_name,
+                          success=False,
+                          result={},
+                          error=str(e)
+                      ))
+              
+              trace.append(step)
             
-            # Step 2: Execute tools
-            step = AgentStep(
-                thought=plan.get("thought", ""),
-                tool_calls=[ToolCall(tool=tc["tool"], input=tc.get("input", {})) 
-                           for tc in tool_calls]
-            )
-            
-            for tc in tool_calls:
-                tool_name = tc.get("tool", "")
-                tool_input = tc.get("input", {})
-                
-                # Validate tool exists
-                if tool_name not in self._tools:
-                    step.tool_results.append(ToolResult(
-                        tool=tool_name,
-                        success=False,
-                        result={},
-                        error=f"Unknown tool: {tool_name}"
-                    ))
-                    continue
-                
-                # Execute tool with timing
-                start_time = time.time()
-                try:
-                    # Pass history for context-aware tools
-                    if tool_name == ToolName.QUERY_DATABASE.value:
-                        result = self._tools[tool_name](tool_input, history)
-                    else:
-                        result = self._tools[tool_name](tool_input)
-                    
-                    execution_time = int((time.time() - start_time) * 1000)
-                    
-                    step.tool_results.append(ToolResult(
-                        tool=tool_name,
-                        success=True,
-                        result=result,
-                        execution_time_ms=execution_time
-                    ))
-                    
-                    tools_used.append(tool_name)
-                    
-                    # Collect metadata
-                    if tool_name == ToolName.QUERY_DATABASE.value:
-                        sql_used = result.get("sql", "")
-                        row_count = result.get("row_count", 0)
-                    if tool_name == ToolName.SEARCH_GUIDELINES.value:
-                        all_sources.extend(result.get("sources", []))
-                        
-                except Exception as e:
-                    step.tool_results.append(ToolResult(
-                        tool=tool_name,
-                        success=False,
-                        result={},
-                        error=str(e)
-                    ))
-            
-            trace.append(step)
-            
-            # Step 3: Synthesize answer
-            answer, highlights = self._synthesize(question, step.tool_results)
-            
-            return AgentResponse(
-                answer=answer,
-                success=True,
-                highlights=highlights,
-                reasoning_trace=trace,
-                tools_used=tools_used,
-                sources=all_sources,
-                sql_used=sql_used,
-                row_count=row_count
-            )
+              # Deduplicate sources by filename
+              seen_files = set()
+              unique_sources = []
+              for src in all_sources:
+                  key = src.get("filename", src.get("title", ""))
+                  if key not in seen_files:
+                      seen_files.add(key)
+                      unique_sources.append(src)
+              all_sources = unique_sources
+              
+              # Step 3: Synthesize answer
+              # IN-GATE: Tokenize tool results before LLM synthesis
+              safe_tool_results = []
+              for tr in step.tool_results:
+                  safe_tr = ToolResult(
+                      tool=tr.tool,
+                      success=tr.success,
+                      result=warden_ctx.anonymize_json(tr.result) if tr.success else tr.result,
+                      error=tr.error,
+                      execution_time_ms=tr.execution_time_ms
+                  )
+                  safe_tool_results.append(safe_tr)
+              
+              answer, highlights = self._synthesize(safe_question, safe_tool_results)
+              
+              # OUT-GATE: Detokenize LLM response for the user
+              answer = warden_ctx.deanonymize(answer)
+              highlights = [warden_ctx.deanonymize(h) for h in highlights]
+              
+              return AgentResponse(
+                  answer=answer,
+                  success=True,
+                  highlights=highlights,
+                  reasoning_trace=trace,
+                  tools_used=tools_used,
+                  sources=all_sources,
+                  sql_used=sql_used,
+                  row_count=row_count
+              )
             
         except LLMError as e:
             return AgentResponse(
@@ -636,11 +706,16 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         if exec_error:
             return {"error": exec_error, "results": [], "row_count": 0, "sql": sql}
         
+        # Also retrieve RAG context for source attribution
+        context_text, sources = retrieve_context(query)
+        
         return {
             "results": results[:50],  # Limit results
             "row_count": len(results),
             "sql": sql,
-            "explanation": explanation
+            "explanation": explanation,
+            "context": context_text,
+            "sources": sources,
         }
     
     def _tool_search_guidelines(self, input_data: Dict[str, Any]) -> Dict[str, Any]:

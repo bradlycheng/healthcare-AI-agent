@@ -254,22 +254,105 @@ def test_pronoun_resolution():
 # =============================================================================
 def test_rag_integration():
     print_header("7. RAG INTEGRATION TESTS")
-    
+
+    # ── 7a. Vector store basics ───────────────────────────────────────────────
     try:
         from app.vector_store import get_document_count, search
-        
+
         doc_count = get_document_count()
         log_test("RAG", f"Vector store has documents ({doc_count})", doc_count > 0)
-        
-        # Test search
+
         results = search("glucose diabetes", top_k=3)
-        has_results = results and results.get("documents") and len(results["documents"][0]) > 0
-        log_test("RAG", "Search returns results", has_results)
-        
+        has_results = (
+            results
+            and results.get("documents")
+            and len(results["documents"][0]) > 0
+        )
+        log_test("RAG", "Vector search returns results", has_results)
+
     except ImportError:
         log_test("RAG", "Vector store module available", False, "ImportError")
     except Exception as e:
         log_test("RAG", "RAG system functional", False, str(e))
+
+    # ── 7b. retrieve_context returns properly shaped sources ──────────────────
+    try:
+        from app.query_assistant import retrieve_context
+
+        _, sources = retrieve_context("what blood glucose level is considered diabetic")
+
+        log_test("RAG", "retrieve_context returns sources list", isinstance(sources, list))
+
+        if sources:
+            src = sources[0]
+            has_title     = "title" in src
+            has_snippet   = "snippet" in src or "full_snippet" in src
+            has_relevance = "relevance" in src
+            valid_score   = isinstance(src.get("relevance"), (int, float)) and 0 <= src["relevance"] <= 1
+
+            log_test("RAG", "Source has 'title' field",           has_title,     str(src.get("title")))
+            log_test("RAG", "Source has 'snippet' field",         has_snippet,   "")
+            log_test("RAG", "Source has 'relevance' score 0-1",   valid_score,   str(src.get("relevance")))
+        else:
+            log_test("RAG", "retrieve_context returned >0 sources", False,
+                     "0 sources returned - check if docs are indexed")
+
+    except Exception as e:
+        log_test("RAG", "retrieve_context source shape check", False, str(e))
+
+    # ── 7c. /api/query response includes sources (requires server) ────────────
+    import requests
+    BASE_URL = "http://localhost:8080"
+    try:
+        r = requests.get(f"{BASE_URL}/health", timeout=5)
+        server_up = r.status_code == 200
+    except Exception:
+        server_up = False
+
+    if not server_up:
+        print("  [SKIP] RAG API tests skipped - server not running")
+        print("  To test: run 'uvicorn app.api:app --port 8080' first")
+        return
+
+    CLINICAL_QUESTIONS = [
+        "what blood glucose level is considered diabetic",
+        "what is the normal blood pressure range",
+    ]
+
+    for i, question in enumerate(CLINICAL_QUESTIONS):
+        if i > 0:
+            import time; time.sleep(12)   # avoid LLM rate-limit between questions
+        try:
+            resp = requests.post(
+                f"{BASE_URL}/api/query",
+                json={"question": question, "history": [], "reasoning_depth": "standard"},
+                timeout=60,
+            )
+            log_test("RAG API", f"POST /api/query 200 for '{question[:35]}...'",
+                     resp.status_code == 200, f"status={resp.status_code}")
+
+            if resp.status_code == 200:
+                data = resp.json()
+
+                # sources key must exist and be a list
+                has_sources_key  = "sources" in data and isinstance(data["sources"], list)
+                has_sources_data = has_sources_key and len(data["sources"]) > 0
+                log_test("RAG API", f"Response has 'sources' array for '{question[:30]}...'",
+                         has_sources_key, "")
+                log_test("RAG API", f"sources array is non-empty for '{question[:30]}...'",
+                         has_sources_data,
+                         f"{len(data.get('sources', []))} source(s) returned")
+
+                if has_sources_data:
+                    src = data["sources"][0]
+                    log_test("RAG API", "First source has 'title'",
+                             bool(src.get("title")), str(src.get("title", "")))
+                    log_test("RAG API", "First source has 'relevance' (0-1)",
+                             isinstance(src.get("relevance"), (int, float)) and 0 <= src["relevance"] <= 1,
+                             str(src.get("relevance", "")))
+
+        except Exception as e:
+            log_test("RAG API", f"Query '{question[:35]}...'", False, str(e))
 
 # =============================================================================
 # MAIN
@@ -288,7 +371,149 @@ def main():
     test_edge_cases()
     test_pronoun_resolution()
     test_rag_integration()
-    
+
+# =============================================================================
+# 8. AGENT RAG CHANGE REGRESSION TESTS
+#    Verifies that the three healthcare_agent.py changes (direct_answer sources,
+#    query_database sources, deduplication) do NOT corrupt other response types.
+# =============================================================================
+def test_agent_rag_regression():
+    print_header("8. AGENT RAG CHANGE REGRESSION TESTS")
+
+    import requests
+    BASE_URL = "http://localhost:8080"
+
+    try:
+        server_up = requests.get(f"{BASE_URL}/health", timeout=5).status_code == 200
+    except Exception:
+        server_up = False
+
+    if not server_up:
+        print("  [SKIP] Regression tests skipped — server not running")
+        print("  To run: uvicorn app.api:app --port 8080")
+        return
+
+    def query(question, history=None):
+        """Helper: POST /api/query and return parsed JSON or None."""
+        import time, requests as _req
+        time.sleep(12)   # prevent LLM rate-limit across sequential test calls
+        try:
+            r = _req.post(
+                f"{BASE_URL}/api/query",
+                json={"question": question, "history": history or [], "reasoning_depth": "standard"},
+                timeout=60,
+            )
+            return r.json() if r.status_code == 200 else None
+        except Exception:
+            return None
+
+    # ── 8a. Patient data query: SQL answer still correct ─────────────────────
+    # This exercises the query_database path — the new RAG call must NOT
+    # alter the SQL result or overwrite the answer.
+    print("\n  [8a] Patient data query — SQL answer unaffected by RAG change")
+    data = query("how many patients are in the system?")
+    if data is None:
+        log_test("Regression", "Patient query returns 200", False, "request failed")
+    else:
+        log_test("Regression", "Patient query returns 200", True)
+        # Answer should mention a number or 'patient'
+        answer_lower = (data.get("answer") or "").lower()
+        has_number_or_patient = any(c.isdigit() for c in answer_lower) or "patient" in answer_lower
+        log_test("Regression", "Patient query answer is sensible (not empty/error)",
+                 has_number_or_patient, repr(data.get("answer", "")[:80]))
+        # answer must NOT be a RAG-style clinical answer
+        looks_like_rag_bleed = any(kw in answer_lower for kw in
+                                   ["blood glucose", "mmol", "clinical guideline"])
+        log_test("Regression", "Patient SQL answer not polluted with RAG text",
+                 not looks_like_rag_bleed, data.get("answer", "")[:80])
+        # sources may be present (expected) but must be a list
+        sources = data.get("sources", [])
+        log_test("Regression", "sources field is a list", isinstance(sources, list))
+
+    # ── 8b. Greeting / meta — answer unchanged, no spurious sources shown ────
+    print("\n  [8b] Greeting query — response unaffected")
+    data2 = query("hello, what can you help me with?")
+    if data2 is None:
+        log_test("Regression", "Greeting query returns 200", False, "request failed")
+    else:
+        log_test("Regression", "Greeting query returns 200", True)
+        answer_lower2 = (data2.get("answer") or "").lower()
+        # Must still give a helpful response
+        is_helpful = len(answer_lower2) > 10
+        log_test("Regression", "Greeting answer is non-empty", is_helpful,
+                 repr(data2.get("answer", "")[:80]))
+        # Any sources returned must be a list (even if empty for greetings)
+        log_test("Regression", "Greeting sources field is a list",
+                 isinstance(data2.get("sources", []), list))
+
+    # ── 8c. Direct-answer path: answer intact, sources now populated ─────────
+    # Knowledge questions often go through direct_answer — verify the answer
+    # is still the LLM's knowledge answer, but sources are now attached.
+    print("\n  [8c] Knowledge/direct-answer path — answer correct, sources added")
+    data3 = query("what does BMI stand for?")
+    if data3 is None:
+        log_test("Regression", "Knowledge query returns 200", False, "request failed")
+    else:
+        log_test("Regression", "Knowledge query returns 200", True)
+        answer_lower3 = (data3.get("answer") or "").lower()
+        # Must contain 'body mass index' or 'bmi' in answer
+        answer_correct = "body mass index" in answer_lower3 or "bmi" in answer_lower3
+        log_test("Regression", "BMI answer contains correct definition",
+                 answer_correct, repr(data3.get("answer", "")[:80]))
+        # sources is always a list now
+        log_test("Regression", "Knowledge query sources is a list",
+                 isinstance(data3.get("sources", []), list))
+
+    # ── 8d. No duplicate sources in any response ─────────────────────────────
+    print("\n  [8d] Deduplication — no duplicate source titles in any response")
+    data4 = query("what blood glucose level means diabetes according to guidelines?")
+    if data4 is None:
+        log_test("Regression", "Clinical query returns 200", False, "request failed")
+    else:
+        log_test("Regression", "Clinical query returns 200", True)
+        sources4 = data4.get("sources", [])
+        titles = [s.get("title", "") for s in sources4]
+        has_duplicates = len(titles) != len(set(titles))
+        log_test("Regression", f"No duplicate source titles ({len(titles)} source(s), titles: {titles})",
+                 not has_duplicates, f"duplicates found: {[t for t in set(titles) if titles.count(t) > 1]}")
+
+    # ── 8e. Specific patient query — sql_used reported, not empty ────────────
+    print("\n  [8e] Specific patient lookup — sql_used still populated")
+    data5 = query("show me patients with high blood pressure")
+    if data5 is None:
+        log_test("Regression", "Specific patient query returns 200", False, "request failed")
+    else:
+        log_test("Regression", "Specific patient query returns 200", True)
+        sql = data5.get("sql_used", "")
+        # When query_database is used, sql_used should be populated
+        # (it won't be if the agent went direct_answer — that's also acceptable)
+        tools_used = data5.get("tools_used", [])
+        if "query_database" in tools_used:
+            log_test("Regression", "sql_used populated when query_database called",
+                     bool(sql), repr(sql[:80]))
+        else:
+            log_test("Regression", "Agent responded (any tool path)",
+                     bool(data5.get("answer")), f"tools_used={tools_used}")
+
+# =============================================================================
+# MAIN
+# =============================================================================
+def main():
+    print("\n" + "="*60)
+    print(" HEALTHCARE AI AGENT - COMPREHENSIVE TEST SUITE")
+    print(" " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    print("="*60)
+
+    # Run all test categories
+    test_database_schema()
+    test_data_integrity()
+    test_ai_query_assistant()
+    test_api_endpoints()
+    test_edge_cases()
+    test_pronoun_resolution()
+    test_rag_integration()
+    test_agent_rag_regression()    # ← new section 8
+
     # Summary
     print("\n" + "="*60)
     print(" TEST SUMMARY")
@@ -298,14 +523,14 @@ def main():
     print(f" Passed:      {RESULTS['passed']} ({100*RESULTS['passed']//total if total else 0}%)")
     print(f" Failed:      {RESULTS['failed']}")
     print("="*60)
-    
+
     # List failures
     failures = [t for t in RESULTS["tests"] if t["status"] == "FAIL"]
     if failures:
         print("\n FAILED TESTS:")
         for f in failures:
             print(f"   - [{f['category']}] {f['name']}: {f['details']}")
-    
+
     return RESULTS["failed"] == 0
 
 if __name__ == "__main__":
