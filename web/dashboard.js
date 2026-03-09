@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let chatHistory = []; // Tracks user/AI conversation
     let currentPage = 1;
     const pageSize = 10;
+    let isCriticalBannerDismissed = false; // Tracks if user hid the banner
 
     // DOM Elements
     const messagesBody = document.getElementById('messages-body');
@@ -72,6 +73,17 @@ document.addEventListener('DOMContentLoaded', () => {
         filterFlag.addEventListener('change', applyFilters);
         filterDate.addEventListener('change', applyFilters);
         refreshBtn.addEventListener('click', loadMessages);
+
+        // Dismiss Critical Banner
+        const alertsDismiss = document.getElementById('alerts-dismiss');
+        if (alertsDismiss) {
+            alertsDismiss.addEventListener('click', (e) => {
+                e.stopPropagation(); // don't trigger banner click
+                isCriticalBannerDismissed = true;
+                const alertBanner = document.getElementById('alerts-banner');
+                if (alertBanner) alertBanner.classList.add('hidden');
+            });
+        }
 
         // Event Delegation for Delete Button (More robust)
         document.addEventListener('click', (e) => {
@@ -247,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        if (criticalCount > 0) {
+        if (criticalCount > 0 && !isCriticalBannerDismissed) {
             alertBanner.classList.remove('hidden');
             // Add click-to-filter hint
             alertBanner.title = "Click to show only critical patients";

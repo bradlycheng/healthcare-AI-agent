@@ -98,12 +98,37 @@ def seed_database(verbose=True, use_llm=False):
     cursor.execute("INSERT INTO diagnoses (patient_id, diagnosis_code, diagnosis_name, diagnosis_date, status) VALUES ('P-DIABETIC', 'E11.9', 'Type 2 diabetes mellitus', '2025-01-01', 'Active')")
     cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '2339-0', 'Glucose', 250, 'mg/dL', ?, 'F', 'H', 'WARNING')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
-    # 2. Critical Bob (Critical Vitals)
+    # 2. Feverish Fiona (High Temp)
     cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
-                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-CRITICAL", "Critical", "Bob", "1965-05-05", "M", "{}"))
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-FEVER", "Feverish", "Fiona", "1990-02-14", "F", "{}"))
     msg_id = cursor.lastrowid
-    cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '8867-4', 'Heart Rate', 135, 'bpm', ?, 'F', 'H', 'CRITICAL')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-    cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '2708-6', 'SpO2', 88, '%', ?, 'F', 'L', 'CRITICAL')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '8310-5', 'Body Temperature', 103.5, 'F', ?, 'F', 'H', 'WARNING')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
+    # 3. Normal Nancy (All Normal)
+    cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-NORMAL", "Normal", "Nancy", "1985-11-20", "F", "{}"))
+    msg_id = cursor.lastrowid
+    cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '8867-4', 'Heart Rate', 72, 'bpm', ?, 'F', 'N', NULL)", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '8480-6', 'Systolic BP', 115, 'mmHg', ?, 'F', 'N', NULL)", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    
+    # 4. Hypertensive Harry (High BP)
+    cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-HTN", "Hypertensive", "Harry", "1960-04-10", "M", "{}"))
+    msg_id = cursor.lastrowid
+    cursor.execute("INSERT INTO diagnoses (patient_id, diagnosis_code, diagnosis_name, diagnosis_date, status) VALUES ('P-HTN', 'I10', 'Essential (primary) hypertension', '2020-01-01', 'Active')")
+    cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '8480-6', 'Systolic BP', 185, 'mmHg', ?, 'F', 'H', 'CRITICAL')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    
+    # 5. Tachycardic Tom (High HR Warning)
+    cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-TACHY", "Tachycardic", "Tom", "1975-09-30", "M", "{}"))
+    msg_id = cursor.lastrowid
+    cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '8867-4', 'Heart Rate', 115, 'bpm', ?, 'F', 'H', 'WARNING')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
+    # 6. Hypoglycemic Hannah (Low Glucose)
+    cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-HYPO", "Hypoglycemic", "Hannah", "1988-06-15", "F", "{}"))
+    msg_id = cursor.lastrowid
+    cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '2339-0', 'Glucose', 55, 'mg/dL', ?, 'F', 'L', 'CRITICAL')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
     # 4. CKD Charlie (Low eGFR)
     cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 

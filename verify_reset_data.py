@@ -23,13 +23,13 @@ def verify_data():
     else:
         print(f"[FAIL] Diabetic Dave mismatch: {dave}")
 
-    # 2. Check Critical Bob
-    cursor.execute("SELECT patient_first_name, value_num FROM hl7_messages h JOIN observations o ON h.id = o.message_id WHERE h.patient_id = 'P-CRITICAL' AND o.display = 'Heart Rate'")
-    bob = cursor.fetchone()
-    if bob and bob[0] == 'Critical' and bob[1] == 135:
-        print("[OK] Critical Bob found with HR 135")
+    # 2. Check Feverish Fiona
+    cursor.execute("SELECT patient_first_name, value_num FROM hl7_messages h JOIN observations o ON h.id = o.message_id WHERE h.patient_id = 'P-FEVER' AND o.display = 'Body Temperature'")
+    fiona = cursor.fetchone()
+    if fiona and fiona[0] == 'Feverish' and fiona[1] == 103.5:
+        print("[OK] Feverish Fiona found with Temp 103.5")
     else:
-        print(f"[FAIL] Critical Bob mismatch: {bob}")
+        print(f"[FAIL] Feverish Fiona mismatch: {fiona}")
 
     # 3. Check CKD Charlie
     cursor.execute("SELECT patient_first_name, value_num FROM hl7_messages h JOIN observations o ON h.id = o.message_id WHERE h.patient_id = 'P-CKD' AND o.display = 'eGFR'")

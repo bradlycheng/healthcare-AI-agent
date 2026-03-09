@@ -204,6 +204,13 @@ CRITICAL RULES:
 
    - List ALL abnormal values in the Findings column.
    - Use `[CRITICAL]` or `[WARNING]` tags. NO EMOJIS.
+5. **COMPLETENESS**: When tool results contain patient rows, you MUST include
+   EVERY patient in the table. Do NOT summarize, abbreviate, or say
+   "and X more patients." If there are 15 results, there MUST be 15 rows.
+6. **CONDITIONAL TABLE**: When results contain patient data, present the
+   table at the END of your answer, after any explanatory text.
+   For guideline/knowledge queries with no patient rows,
+   use normal prose. Do NOT create empty tables.
 
 FORMATTING OVERRIDE:
 - **STRICT TABLE**: You MUST use `|` pipes and the `|---|---|---|` delimiter row. 
@@ -319,180 +326,180 @@ class HealthcareAgent:
             # PHITokenMap is session-pinned, ephemeral (RAM-only)
             with self.warden.request_scope() as warden_ctx:
             
-              # Step 1: Planning - decide which tools to use
-              # IN-GATE: Tokenize question + history before LLM sees it
-              safe_question = warden_ctx.anonymize(question)
-              safe_history = []
-              for msg in (history or []):
-                  safe_msg = dict(msg)
-                  if "content" in safe_msg:
-                      safe_msg["content"] = warden_ctx.anonymize(safe_msg["content"])
-                  safe_history.append(safe_msg)
-              
-              plan = self._plan(safe_question, safe_history)
-              print(f"DEBUG: Plan result: {plan}")
+                # Step 1: Planning - decide which tools to use
+                # IN-GATE: Tokenize question + history before LLM sees it
+                safe_question = warden_ctx.anonymize(question)
+                safe_history = []
+                for msg in (history or []):
+                    safe_msg = dict(msg)
+                    if "content" in safe_msg:
+                        safe_msg["content"] = warden_ctx.anonymize(safe_msg["content"])
+                    safe_history.append(safe_msg)
+                
+                plan = self._plan(safe_question, safe_history)
+                print(f"DEBUG: Plan result: {plan}")
             
-            if plan.get("error"):
-                return AgentResponse(
-                    answer="I had trouble understanding that question. Please try rephrasing.",
-                    success=False,
-                    error=plan["error"]
+                if plan.get("error"):
+                    return AgentResponse(
+                        answer="I had trouble understanding that question. Please try rephrasing.",
+                        success=False,
+                        error=plan["error"]
+                    )
+                
+                # Check for direct answer (no tools needed)
+                if plan.get("direct_answer"):
+                    # Still retrieve RAG context so sources appear for knowledge questions
+                    from .query_assistant import retrieve_context
+                    _, direct_sources = retrieve_context(question)
+                    return AgentResponse(
+                        answer=plan["direct_answer"],
+                        success=True,
+                        sources=direct_sources,
+                        reasoning_trace=[AgentStep(
+                            thought=plan.get("thought", "Answered from context"),
+                            tool_calls=[],
+                            tool_results=[]
+                        )]
+                    )
+                
+                # Check for clarification needed
+                tool_calls = plan.get("tool_calls", [])
+                for tc in tool_calls:
+                    if tc.get("tool") == ToolName.ASK_CLARIFICATION.value:
+                        inp = tc.get("input", {})
+                        return AgentResponse(
+                            answer=inp.get("question", "Could you please clarify your question?"),
+                            success=True,
+                            needs_clarification=True,
+                            clarification_question=inp.get("question"),
+                            clarification_options=inp.get("options", []),
+                            reasoning_trace=[AgentStep(
+                                thought=plan.get("thought", "Need clarification"),
+                                tool_calls=[ToolCall(tool=tc["tool"], input=inp)],
+                                tool_results=[]
+                            )]
+                        )
+                
+                # Step 2: Execute tools
+                step = AgentStep(
+                    thought=plan.get("thought", ""),
+                    tool_calls=[ToolCall(tool=tc["tool"], input=tc.get("input", {})) 
+                               for tc in tool_calls]
                 )
-            
-            # Check for direct answer (no tools needed)
-            if plan.get("direct_answer"):
-                # Still retrieve RAG context so sources appear for knowledge questions
-              if plan.get("error"):
-                  return AgentResponse(
-                      answer="I had trouble understanding that question. Please try rephrasing.",
-                      success=False,
-                      error=f"Planning error: {plan['error']}"
-                  )
-              
-              # Check for direct answer (no tools needed)
-              if plan.get("direct_answer"):
-                  # Still retrieve RAG context so sources appear for knowledge questions
-                  from .query_assistant import retrieve_context
-                  _, direct_sources = retrieve_context(question)
-                  return AgentResponse(
-                      answer=plan["direct_answer"],
-                      success=True,
-                      sources=direct_sources,
-                      reasoning_trace=[AgentStep(
-                          thought=plan.get("thought", "Answered from context"),
-                          tool_calls=[],
-                          tool_results=[]
-                      )]
-                  )
-              
-              # Check for clarification needed
-              tool_calls = plan.get("tool_calls", [])
-              for tc in tool_calls:
-                  if tc.get("tool") == ToolName.ASK_CLARIFICATION.value:
-                      inp = tc.get("input", {})
-                      return AgentResponse(
-                          answer=inp.get("question", "Could you please clarify your question?"),
-                          success=True,
-                          needs_clarification=True,
-                          clarification_question=inp.get("question"),
-                          clarification_options=inp.get("options", []),
-                          reasoning_trace=[AgentStep(
-                              thought=plan.get("thought", "Need clarification"),
-                              tool_calls=[ToolCall(tool=tc["tool"], input=inp)],
-                              tool_results=[]
-                          )]
-                      )
-            
-              # Step 2: Execute tools
-              step = AgentStep(
-                  thought=plan.get("thought", ""),
-                  tool_calls=[ToolCall(tool=tc["tool"], input=tc.get("input", {})) 
-                             for tc in tool_calls]
-              )
-              
-              for tc in tool_calls:
-                  tool_name = tc.get("tool", "")
-                  tool_input = tc.get("input", {})
-                  
-                  # === POLICY GATE: Validate tool call before execution ===
-                  decision = warden_ctx.intercept(tool_name, tool_input)
-                  if decision.action == "DENY":
-                      step.tool_results.append(ToolResult(
-                          tool=tool_name,
-                          success=False,
-                          result={},
-                          error=f"Warden DENY: {decision.reason}"
-                      ))
-                      print(f"[WARDEN] DENY {tool_name}: {decision.reason}")
-                      continue
-                  
-                  # Validate tool exists
-                  if tool_name not in self._tools:
-                      step.tool_results.append(ToolResult(
-                          tool=tool_name,
-                          success=False,
-                          result={},
-                          error=f"Unknown tool: {tool_name}"
-                      ))
-                      continue
-                  
-                  # Execute tool with timing
-                  start_time = time.time()
-                  try:
-                      # Pass history for context-aware tools
-                      if tool_name == ToolName.QUERY_DATABASE.value:
-                          result = self._tools[tool_name](tool_input, history)
-                      else:
-                          result = self._tools[tool_name](tool_input)
-                      
-                      execution_time = int((time.time() - start_time) * 1000)
-                      
-                      step.tool_results.append(ToolResult(
-                          tool=tool_name,
-                          success=True,
-                          result=result,
-                          execution_time_ms=execution_time
-                      ))
-                      
-                      tools_used.append(tool_name)
-                      
-                      # Collect metadata
-                      if tool_name == ToolName.QUERY_DATABASE.value:
-                          sql_used = result.get("sql", "")
-                          row_count = result.get("row_count", 0)
-                          all_sources.extend(result.get("sources", []))
-                      if tool_name == ToolName.SEARCH_GUIDELINES.value:
-                          all_sources.extend(result.get("sources", []))
-                          
-                  except Exception as e:
-                      step.tool_results.append(ToolResult(
-                          tool=tool_name,
-                          success=False,
-                          result={},
-                          error=str(e)
-                      ))
-              
-              trace.append(step)
-            
-              # Deduplicate sources by filename
-              seen_files = set()
-              unique_sources = []
-              for src in all_sources:
-                  key = src.get("filename", src.get("title", ""))
-                  if key not in seen_files:
-                      seen_files.add(key)
-                      unique_sources.append(src)
-              all_sources = unique_sources
-              
-              # Step 3: Synthesize answer
-              # IN-GATE: Tokenize tool results before LLM synthesis
-              safe_tool_results = []
-              for tr in step.tool_results:
-                  safe_tr = ToolResult(
-                      tool=tr.tool,
-                      success=tr.success,
-                      result=warden_ctx.anonymize_json(tr.result) if tr.success else tr.result,
-                      error=tr.error,
-                      execution_time_ms=tr.execution_time_ms
-                  )
-                  safe_tool_results.append(safe_tr)
-              
-              answer, highlights = self._synthesize(safe_question, safe_tool_results)
-              
-              # OUT-GATE: Detokenize LLM response for the user
-              answer = warden_ctx.deanonymize(answer)
-              highlights = [warden_ctx.deanonymize(h) for h in highlights]
-              
-              return AgentResponse(
-                  answer=answer,
-                  success=True,
-                  highlights=highlights,
-                  reasoning_trace=trace,
-                  tools_used=tools_used,
-                  sources=all_sources,
-                  sql_used=sql_used,
-                  row_count=row_count
-              )
+                
+                for tc in tool_calls:
+                    tool_name = tc.get("tool", "")
+                    tool_input = tc.get("input", {})
+                    
+                    # === POLICY GATE: Validate tool call before execution ===
+                    decision = warden_ctx.intercept(tool_name, tool_input)
+                    if decision.action == "DENY":
+                        step.tool_results.append(ToolResult(
+                            tool=tool_name,
+                            success=False,
+                            result={},
+                            error=f"Warden DENY: {decision.reason}"
+                        ))
+                        print(f"[WARDEN] DENY {tool_name}: {decision.reason}")
+                        continue
+                    
+                    # Validate tool exists
+                    if tool_name not in self._tools:
+                        step.tool_results.append(ToolResult(
+                            tool=tool_name,
+                            success=False,
+                            result={},
+                            error=f"Unknown tool: {tool_name}"
+                        ))
+                        continue
+                    
+                    # Execute tool with timing
+                    # DOUBLE-BLIND: Deanonymize tool_input before execution
+                    # The LLM plans with tokens (e.g., patient_name='Patient Bravo'),
+                    # but tools need real values to query the database.
+                    real_tool_input = {}
+                    for k, v in tool_input.items():
+                        if isinstance(v, str):
+                            real_tool_input[k] = warden_ctx.deanonymize(v)
+                        else:
+                            real_tool_input[k] = v
+                    
+                    start_time = time.time()
+                    try:
+                        # Pass history for context-aware tools
+                        if tool_name == ToolName.QUERY_DATABASE.value:
+                            result = self._tools[tool_name](real_tool_input, history)
+                        else:
+                            result = self._tools[tool_name](real_tool_input)
+                        
+                        execution_time = int((time.time() - start_time) * 1000)
+                        
+                        step.tool_results.append(ToolResult(
+                            tool=tool_name,
+                            success=True,
+                            result=result,
+                            execution_time_ms=execution_time
+                        ))
+                        
+                        tools_used.append(tool_name)
+                        
+                        # Collect metadata
+                        if tool_name == ToolName.QUERY_DATABASE.value:
+                            sql_used = result.get("sql", "")
+                            row_count = result.get("row_count", 0)
+                            all_sources.extend(result.get("sources", []))
+                        if tool_name == ToolName.SEARCH_GUIDELINES.value:
+                            all_sources.extend(result.get("sources", []))
+                            
+                    except Exception as e:
+                        step.tool_results.append(ToolResult(
+                            tool=tool_name,
+                            success=False,
+                            result={},
+                            error=str(e)
+                        ))
+                
+                trace.append(step)
+                
+                # Deduplicate sources by filename
+                seen_files = set()
+                unique_sources = []
+                for src in all_sources:
+                    key = src.get("filename", src.get("title", ""))
+                    if key not in seen_files:
+                        seen_files.add(key)
+                        unique_sources.append(src)
+                all_sources = unique_sources
+                
+                # Step 3: Synthesize answer
+                # IN-GATE: Tokenize tool results before LLM synthesis
+                safe_tool_results = []
+                for tr in step.tool_results:
+                    safe_tr = ToolResult(
+                        tool=tr.tool,
+                        success=tr.success,
+                        result=warden_ctx.anonymize_json(tr.result) if tr.success else tr.result,
+                        error=tr.error,
+                        execution_time_ms=tr.execution_time_ms
+                    )
+                    safe_tool_results.append(safe_tr)
+                
+                answer, highlights = self._synthesize(safe_question, safe_tool_results)
+                
+                # OUT-GATE: Detokenize LLM response for the user
+                answer = warden_ctx.deanonymize(answer)
+                highlights = [warden_ctx.deanonymize(h) for h in highlights]
+                
+                return AgentResponse(
+                    answer=answer,
+                    success=True,
+                    highlights=highlights,
+                    reasoning_trace=trace,
+                    tools_used=tools_used,
+                    sources=all_sources,
+                    sql_used=sql_used,
+                    row_count=row_count
+                )
             
         except LLMError as e:
             return AgentResponse(
@@ -584,14 +591,76 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
                              for line in highlights_text.split("\n") 
                              if line.strip().startswith("-") or line.strip().startswith("*")]
             
+            # P2 FALLBACK: If LLM failed to produce a table for multi-row results,
+            # append a deterministic table from raw data
+            row_count = self._count_patient_rows(tool_results)
+            if row_count > 3 and '|' not in answer:
+                print(f"DEBUG: LLM failed table format ({row_count} rows, no pipes). Appending fallback table.")
+                fallback_table = self._build_table_from_results(tool_results)
+                if fallback_table:
+                    answer = answer + "\n\n" + fallback_table
+            
             return answer, highlights
 
         except Exception as e:
             # Fallback: Create a basic answer from tool results
             return self._fallback_synthesis(tool_results), []
     
+    def _count_patient_rows(self, tool_results: List[ToolResult]) -> int:
+        """Count how many patient rows are in the tool results."""
+        for tr in tool_results:
+            if tr.success and tr.tool == ToolName.QUERY_DATABASE.value:
+                return tr.result.get("row_count", 0)
+        return 0
+    
+    def _build_table_from_results(self, tool_results: List[ToolResult]) -> str:
+        """Build a markdown table from raw query results."""
+        for tr in tool_results:
+            if not tr.success or tr.tool != ToolName.QUERY_DATABASE.value:
+                continue
+            
+            results = tr.result.get("results", [])
+            if not results or not isinstance(results[0], dict):
+                continue
+            
+            # Pick meaningful columns (prioritize patient-related fields)
+            all_keys = list(results[0].keys())
+            priority = ["patient_first_name", "patient_last_name", "patient_name",
+                       "full_name", "observation_type", "value", "unit", "flag",
+                       "alert_level", "alert_message", "status", "diagnosis_name",
+                       "medication_name", "dosage"]
+            
+            # Use priority columns that exist, then fill with remaining (max 6 cols)
+            cols = [k for k in priority if k in all_keys]
+            remaining = [k for k in all_keys if k not in cols]
+            cols = (cols + remaining)[:6]
+            
+            if not cols:
+                continue
+            
+            # Build header
+            header_names = [c.replace("_", " ").title() for c in cols]
+            header = "| " + " | ".join(header_names) + " |"
+            separator = "| " + " | ".join([":---"] * len(cols)) + " |"
+            
+            # Build rows (ALL rows, not just first 5)
+            rows = []
+            for row in results:
+                values = []
+                for col in cols:
+                    val = row.get(col, "--")
+                    if val is None:
+                        val = "--"
+                    values.append(str(val))
+                rows.append("| " + " | ".join(values) + " |")
+            
+            return header + "\n" + separator + "\n" + "\n".join(rows)
+        
+        return ""
+    
     def _fallback_synthesis(self, tool_results: List[ToolResult]) -> str:
-        """Create a fallback answer when LLM synthesis fails."""
+        """Create a fallback answer when LLM synthesis fails.
+        Uses markdown tables for multi-row results."""
         answers = []
         
         for tr in tool_results:
@@ -602,46 +671,14 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
             
             if tr.tool == ToolName.QUERY_DATABASE.value:
                 row_count = result.get("row_count", 0)
-                results = result.get("results", [])
                 if row_count == 0:
                     answers.append("No matching records found.")
-                elif row_count <= 5:
-                    # Format small result sets nicely
-                    items = []
-                    for row in results[:5]:
-                        if isinstance(row, dict):
-                            # Get patient name if available
-                            name = row.get("patient_name") or row.get("full_name")
-                            if not name:
-                                first = row.get("patient_first_name", "")
-                                last = row.get("patient_last_name", "")
-                                if first or last:
-                                    name = f"{first} {last}".strip()
-                            
-                            if name:
-                                items.append(name)
-                    if items:
-                        answers.append(f"Found {row_count} record(s): {', '.join(items)}")
+                else:
+                    table = self._build_table_from_results([tr])
+                    if table:
+                        answers.append(f"Found {row_count} record(s).\n\n{table}")
                     else:
                         answers.append(f"Found {row_count} record(s).")
-                else:
-                    # For larger sets, still show first 5
-                    items = []
-                    for row in results[:5]:
-                        if isinstance(row, dict):
-                            name = row.get("patient_name") or row.get("full_name")
-                            if not name:
-                                first = row.get("patient_first_name", "")
-                                last = row.get("patient_last_name", "")
-                                if first or last:
-                                    name = f"{first} {last}".strip()
-                            if name:
-                                items.append(name)
-                    
-                    if items:
-                        answers.append(f"Found {row_count} records, including: {', '.join(items)} and others.")
-                    else:
-                        answers.append(f"Found {row_count} records.")
                     
             elif tr.tool == ToolName.CLINICAL_CALCULATOR.value:
                 calc_result = result.get("result")
@@ -653,7 +690,6 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
             elif tr.tool == ToolName.SEARCH_GUIDELINES.value:
                 context = result.get("context", "")
                 if context:
-                    # Truncate if too long
                     if len(context) > 300:
                         context = context[:300] + "..."
                     answers.append(f"Guidelines: {context}")
@@ -661,7 +697,7 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         if not answers:
             return "I found some data but had trouble formatting the results. Please try rephrasing your question."
         
-        return " ".join(answers)
+        return "\n\n".join(answers)
     
     # =========================================================================
     # Tool Implementations
@@ -739,6 +775,13 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         
         patient_id = input_data.get("patient_id")
         patient_name = input_data.get("patient_name")
+        
+        # LLM sometimes puts the name in patient_id field — detect and fix
+        if patient_id and not patient_id.replace("-", "").isdigit():
+            # patient_id contains a name, not a numeric/UUID ID
+            if not patient_name:
+                patient_name = patient_id
+            patient_id = None
         
         # If name provided, try to find patient ID
         if patient_name and not patient_id:

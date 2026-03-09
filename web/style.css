@@ -2480,6 +2480,26 @@ pre {
     display: none;
 }
 
+.alerts-dismiss {
+    position: absolute;
+    right: 1.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+    padding: 0.5rem;
+    line-height: 1;
+}
+
+.alerts-dismiss:hover {
+    opacity: 1;
+}
+
 .alerts-content {
     display: flex;
     align-items: center;
@@ -3202,4 +3222,66 @@ mark.highlight {
     40% {
         transform: scale(1);
     }
+}
+
+/* ============================================
+   AI Chat Markdown Tables
+   Tables rendered by marked.parse() in chat
+   ============================================ */
+
+.markdown-content {
+    line-height: 1.6;
+}
+
+.markdown-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.markdown-content thead th {
+    background: rgba(0, 242, 255, 0.1);
+    color: var(--primary);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 2px solid rgba(0, 242, 255, 0.2);
+    white-space: nowrap;
+}
+
+.markdown-content tbody td {
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-main);
+}
+
+.markdown-content tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.markdown-content tbody tr:hover {
+    background: rgba(0, 242, 255, 0.05);
+}
+
+/* Responsive table wrapper for narrow chat bubbles */
+.markdown-content table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.markdown-content thead,
+.markdown-content tbody,
+.markdown-content tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+}
+
+.markdown-content strong {
+    color: var(--primary);
 }

@@ -46,13 +46,13 @@ WARDEN_CONFIG = {
 
 # NATO phonetic for patient names — LLM sees natural "first last" patterns
 _PATIENT_NAMES = [
-    "Patient Alpha", "Patient Bravo", "Patient Charlie", "Patient Delta",
-    "Patient Echo", "Patient Foxtrot", "Patient Golf", "Patient Hotel",
-    "Patient India", "Patient Juliet", "Patient Kilo", "Patient Lima",
-    "Patient Mike", "Patient November", "Patient Oscar", "Patient Papa",
-    "Patient Quebec", "Patient Romeo", "Patient Sierra", "Patient Tango",
-    "Patient Uniform", "Patient Victor", "Patient Whiskey", "Patient Xray",
-    "Patient Yankee", "Patient Zulu",
+    "Alpha", "Bravo", "Charlie", "Delta",
+    "Echo", "Foxtrot", "Golf", "Hotel",
+    "India", "Juliet", "Kilo", "Lima",
+    "Mike", "November", "Oscar", "Papa",
+    "Quebec", "Romeo", "Sierra", "Tango",
+    "Uniform", "Victor", "Whiskey", "Xray",
+    "Yankee", "Zulu",
 ]
 
 # Synthetic provider names — preserves "Dr." prefix
@@ -445,33 +445,30 @@ class WardenPolicy:
             )
 
     def _validate_query_database(self, tool_input: Dict[str, Any]) -> WardenDecision:
-        """Enforce SELECT-only, row limits, blocked tables."""
+        """Validate query_database tool input.
+        
+        NOTE: The 'query' field contains a NATURAL LANGUAGE question,
+        not SQL. SQL is generated later inside _tool_query_database.
+        We check for injection patterns only, not SQL syntax.
+        """
         query = tool_input.get("query", "")
         if not query:
             return WardenDecision(
                 action="DENY", tool_name="query_database",
-                reason="Empty query", evidence="No SQL provided",
+                reason="Empty query", evidence="No query provided",
             )
 
         query_upper = query.strip().upper()
 
-        # Must start with SELECT
-        if not query_upper.startswith("SELECT"):
-            return WardenDecision(
-                action="DENY", tool_name="query_database",
-                reason="Non-SELECT SQL blocked",
-                evidence="Query does not start with SELECT",
-            )
-
-        # Block write operations anywhere in query
-        write_ops = ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE"]
+        # Block write operation keywords in the NL query (injection attempt)
+        write_ops = ["INSERT INTO", "UPDATE SET", "DELETE FROM", "DROP TABLE", 
+                     "ALTER TABLE", "CREATE TABLE", "TRUNCATE"]
         for op in write_ops:
-            # Check for standalone keywords (not in column names)
-            if re.search(rf'\b{op}\b', query_upper):
+            if op in query_upper:
                 return WardenDecision(
                     action="DENY", tool_name="query_database",
                     reason=f"Write operation '{op}' blocked",
-                    evidence=f"SQL contains blocked keyword: {op}",
+                    evidence=f"Query contains blocked keyword: {op}",
                 )
 
         # Block access to restricted tables
@@ -485,7 +482,7 @@ class WardenPolicy:
 
         return WardenDecision(
             action="ALLOW", tool_name="query_database",
-            reason="SELECT-only, no restricted tables",
+            reason="Query validated — no injection patterns",
             evidence=f"Row limit: {self.config.get('max_query_rows', 50)}",
         )
 
