@@ -241,8 +241,12 @@ class WardenAnalyzer:
                     pid_counter += 1
 
                 # Map DOB
-                if dob and dob_idx < len(_SYNTHETIC_DOBS):
-                    token_map.add_mapping(dob, _SYNTHETIC_DOBS[dob_idx])
+                if dob:
+                    if dob_idx < len(_SYNTHETIC_DOBS):
+                        dob_token = _SYNTHETIC_DOBS[dob_idx]
+                    else:
+                        dob_token = f"1950-01-{(dob_idx % 28) + 1:02d}"
+                    token_map.add_mapping(dob, dob_token)
                     token_map._increment_category("patient_dob")
                     dob_idx += 1
 
@@ -257,8 +261,12 @@ class WardenAnalyzer:
 
             for row in providers:
                 provider = row["provider_name"] or ""
-                if provider and provider_idx < len(_PROVIDER_NAMES):
-                    token_map.add_mapping(provider, _PROVIDER_NAMES[provider_idx])
+                if provider:
+                    if provider_idx < len(_PROVIDER_NAMES):
+                        prov_token = _PROVIDER_NAMES[provider_idx]
+                    else:
+                        prov_token = f"Dr. Temp{provider_idx}"
+                    token_map.add_mapping(provider, prov_token)
                     token_map._increment_category("provider_name")
                     provider_idx += 1
 
@@ -460,15 +468,23 @@ class WardenPolicy:
 
         query_upper = query.strip().upper()
 
+        import re
         # Block write operation keywords in the NL query (injection attempt)
-        write_ops = ["INSERT INTO", "UPDATE SET", "DELETE FROM", "DROP TABLE", 
-                     "ALTER TABLE", "CREATE TABLE", "TRUNCATE"]
-        for op in write_ops:
-            if op in query_upper:
+        write_patterns = [
+            r'\bINSERT\s+INTO\b', 
+            r'\bUPDATE\s+.*?\s+SET\b', 
+            r'\bDELETE\s+FROM\b', 
+            r'\bDROP\s+(TABLE|DATABASE|VIEW)\b', 
+            r'\bALTER\s+TABLE\b', 
+            r'\bCREATE\s+(TABLE|DATABASE|VIEW)\b', 
+            r'\bTRUNCATE\s+TABLE\b'
+        ]
+        for pattern in write_patterns:
+            if re.search(pattern, query_upper):
                 return WardenDecision(
                     action="DENY", tool_name="query_database",
-                    reason=f"Write operation '{op}' blocked",
-                    evidence=f"Query contains blocked keyword: {op}",
+                    reason=f"Write operation blocked by regex",
+                    evidence=f"Query matches blocked pattern: {pattern}",
                 )
 
         # Block access to restricted tables
