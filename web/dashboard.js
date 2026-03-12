@@ -185,9 +185,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             console.log('Sending RESET request...');
-            console.log('Sending RESET request...');
-            const response = await fetch(`${API_BASE}/messages`, {
-                method: 'DELETE',
+            const response = await fetch(`${API_BASE}/admin/reset`, {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },

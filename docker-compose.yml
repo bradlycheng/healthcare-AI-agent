@@ -14,6 +14,7 @@ services:
       - DATABASE_PATH=/data/agent.db
       - AWS_REGION=us-east-1
       - BEDROCK_MODEL_ID=meta.llama3-8b-instruct-v1:0
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-d3m0th1s}
       # If running locally without IAM Role, mount your .aws folder or pass keys
       # - AWS_PROFILE=default 
 

@@ -7,6 +7,9 @@ from fastapi.testclient import TestClient
 # Add project root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), ".")))
 
+# Ensure the password is set in the environment before importing app
+os.environ["ADMIN_PASSWORD"] = "d3m0th1s"
+
 from app.api import app
 from app.db import get_connection, DB_PATH
 
@@ -28,7 +31,7 @@ def test_reset_button():
     # 1. Reset
     print("Simulating button click (sending DELETE request with password)...")
     # client.delete doesn't support json in some versions, using generic request
-    response = client.request("DELETE", "/messages", json={"password": "admin"})
+    response = client.request("DELETE", "/messages", json={"password": "d3m0th1s"})
     
     if response.status_code == 204:
         print("[OK] API returned 204 No Content (Success)")

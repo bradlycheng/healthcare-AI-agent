@@ -545,9 +545,15 @@ def clear_all_messages_endpoint(req: ResetRequest):
     from .db import delete_all_messages
     from .seed import seed_database
     
-    # Require an environment variable or default to a secure string that will fail if not set
+    # Require an environment variable to be explicitly set
     admin_password = os.environ.get("ADMIN_PASSWORD")
-    if not admin_password or req.password != admin_password:
+    if not admin_password:
+        print("SECURITY: Reset attempt blocked. ADMIN_PASSWORD is not configured.")
+        raise HTTPException(status_code=403, detail="Reset functionality is disabled. ADMIN_PASSWORD is not configured.")
+
+    if req.password != admin_password:
+        import time
+        time.sleep(1.0) # Anti-brute force delay
         print(f"SECURITY: Failed reset attempt. Invalid password.")
         raise HTTPException(status_code=401, detail="Invalid admin password")
 
@@ -896,8 +902,11 @@ async def reset_demo_data(req: ResetRequest):
     Deletes all messages and reseeds with sample data.
     Requires password.
     """
-    # Load password from env, default to d3m0th1s
-    admin_password = os.getenv("ADMIN_PASSWORD", "d3m0th1s")
+    # Load password from env, requires explicit configuration
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    if not admin_password:
+        print("SECURITY: Reset attempt blocked. ADMIN_PASSWORD is not configured.")
+        raise HTTPException(status_code=403, detail="Reset functionality is disabled. ADMIN_PASSWORD is not configured.")
 
     if req.password != admin_password:
         # Anti-brute force delay
