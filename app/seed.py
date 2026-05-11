@@ -154,7 +154,7 @@ def seed_database(verbose=True, use_llm=False):
         {"id": "P-JOHN", "first": "John", "last": "Smith", "sex": "M", "age": 62, "conditions": ["Diabetes", "CKD"]}
     ]
     
-    for i in range(30):
+    for i in range(15):
         if i < len(DEMO_PATIENTS):
             dp = DEMO_PATIENTS[i]
             pid, first, last, sex, age, patient_conditions = dp["id"], dp["first"], dp["last"], dp["sex"], dp["age"], dp["conditions"]
