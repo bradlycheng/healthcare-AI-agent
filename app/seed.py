@@ -89,50 +89,52 @@ def seed_database(verbose=True, use_llm=False):
     cursor = conn.cursor()
 
     # --- EXPERT SCENARIO PATIENTS (Data Primed for Dashboard) ---
+    # NOTE: Use realistic names. Condition-as-name patterns (e.g. "Diabetic Dave")
+    # collide with Warden's NATO token pool during detokenization.
     print("Seeding Expert Scenario Patients...")
     
-    # 1. Diabetic Dave (High Glucose)
+    # 1. David Martinez (High Glucose — Diabetes)
     cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
-                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-DIABETIC", "Diabetic", "Dave", "1970-01-01", "M", "{}"))
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-DIABETIC", "David", "Martinez", "1970-01-01", "M", "{}"))
     msg_id = cursor.lastrowid
     cursor.execute("INSERT INTO diagnoses (patient_id, diagnosis_code, diagnosis_name, diagnosis_date, status) VALUES ('P-DIABETIC', 'E11.9', 'Type 2 diabetes mellitus', '2025-01-01', 'Active')")
     cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '2339-0', 'Glucose', 250, 'mg/dL', ?, 'F', 'H', 'WARNING')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
-    # 2. Feverish Fiona (High Temp)
+    # 2. Fiona Reynolds (High Temp — Fever)
     cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
-                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-FEVER", "Feverish", "Fiona", "1990-02-14", "F", "{}"))
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-FEVER", "Fiona", "Reynolds", "1990-02-14", "F", "{}"))
     msg_id = cursor.lastrowid
     cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '8310-5', 'Body Temperature', 103.5, 'F', ?, 'F', 'H', 'WARNING')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
-    # 3. Normal Nancy (All Normal)
+    # 3. Nancy Park (All Normal)
     cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
-                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-NORMAL", "Normal", "Nancy", "1985-11-20", "F", "{}"))
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-NORMAL", "Nancy", "Park", "1985-11-20", "F", "{}"))
     msg_id = cursor.lastrowid
     cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '8867-4', 'Heart Rate', 72, 'bpm', ?, 'F', 'N', NULL)", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '8480-6', 'Systolic BP', 115, 'mmHg', ?, 'F', 'N', NULL)", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     
-    # 4. Hypertensive Harry (High BP)
+    # 4. Harold Bennett (High BP — Hypertension)
     cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
-                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-HTN", "Hypertensive", "Harry", "1960-04-10", "M", "{}"))
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-HTN", "Harold", "Bennett", "1960-04-10", "M", "{}"))
     msg_id = cursor.lastrowid
     cursor.execute("INSERT INTO diagnoses (patient_id, diagnosis_code, diagnosis_name, diagnosis_date, status) VALUES ('P-HTN', 'I10', 'Essential (primary) hypertension', '2020-01-01', 'Active')")
     cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '8480-6', 'Systolic BP', 185, 'mmHg', ?, 'F', 'H', 'CRITICAL')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     
-    # 5. Tachycardic Tom (High HR Warning)
+    # 5. Thomas Grant (High HR — Tachycardia)
     cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
-                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-TACHY", "Tachycardic", "Tom", "1975-09-30", "M", "{}"))
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-TACHY", "Thomas", "Grant", "1975-09-30", "M", "{}"))
     msg_id = cursor.lastrowid
     cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '8867-4', 'Heart Rate', 115, 'bpm', ?, 'F', 'H', 'WARNING')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
-    # 6. Hypoglycemic Hannah (Low Glucose)
+    # 6. Hannah Ortiz (Low Glucose — Hypoglycemia)
     cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
-                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-HYPO", "Hypoglycemic", "Hannah", "1988-06-15", "F", "{}"))
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-HYPO", "Hannah", "Ortiz", "1988-06-15", "F", "{}"))
     msg_id = cursor.lastrowid
     cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '2339-0', 'Glucose', 55, 'mg/dL', ?, 'F', 'L', 'CRITICAL')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
-    # 4. CKD Charlie (Low eGFR)
+    # 7. Charles Wilson (Low eGFR — CKD)
     cursor.execute("INSERT INTO hl7_messages (received_at, raw_hl7, patient_id, patient_first_name, patient_last_name, patient_dob, patient_sex, fhir_bundle_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
-                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-CKD", "CKD", "Charlie", "1955-08-20", "M", "{}"))
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Expert Data", "P-CKD", "Charles", "Wilson", "1955-08-20", "M", "{}"))
     msg_id = cursor.lastrowid
     cursor.execute("INSERT INTO diagnoses (patient_id, diagnosis_code, diagnosis_name, diagnosis_date, status) VALUES ('P-CKD', 'N18.3', 'Chronic kidney disease, stage 3', '2024-06-01', 'Active')")
     cursor.execute("INSERT INTO observations (message_id, code, display, value_num, unit, observation_datetime, status, flag, alert_level) VALUES (?, '33914-3', 'eGFR', 45, 'mL/min/1.73m2', ?, 'F', 'L', 'WARNING')", (msg_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
@@ -175,6 +177,8 @@ def seed_database(verbose=True, use_llm=False):
                 patient_conditions.append("Diabetes")
             if random.random() < 0.25: # 25% chance of High Cholesterol
                 patient_conditions.append("Hyperlipidemia")
+            if random.random() < 0.1: # 10% chance of CKD
+                patient_conditions.append("CKD")
             
         dob = generate_dob(age)
             
@@ -231,6 +235,10 @@ def seed_database(verbose=True, use_llm=False):
                     val *= random.uniform(1.1, 1.4)
                 if "Hyperlipidemia" in patient_conditions and lab_name == "LDL":
                     val = random.uniform(110, 190)
+                if "CKD" in patient_conditions:
+                    if lab_name == "Serum Creatinine": val = random.uniform(1.5, 3.0)
+                    if lab_name == "eGFR": val = random.uniform(30, 59)
+                    if lab_name == "BUN": val = random.uniform(25, 50)
                 
                 # Round appropriately
                 if "BP" in lab_name or "Rate" in lab_name:

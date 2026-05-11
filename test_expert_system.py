@@ -5,6 +5,10 @@ import time
 import random
 import sys
 import io
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Force utf-8 output
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -73,7 +77,8 @@ def chaos_reset():
     time.sleep(2)
     log("!!! TRIGGERING CHAOS RESET !!!")
     try:
-        r = requests.post(f"{API_URL}/admin/reset", timeout=15)
+        password = os.environ.get("ADMIN_PASSWORD")
+        r = requests.post(f"{API_URL}/admin/reset", json={"password": password}, timeout=15)
         log(f"Reset Result: {r.status_code}")
     except Exception as e:
         log(f"Reset Failed: {e}")

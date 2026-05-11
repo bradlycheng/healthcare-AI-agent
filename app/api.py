@@ -18,6 +18,10 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 import os
 from fastapi import FastAPI, HTTPException, Query, Request
+from dotenv import load_dotenv
+
+# Load environment variables from .env file (if present)
+load_dotenv()
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 print("DEBUG: API MODULE LOADED", flush=True)

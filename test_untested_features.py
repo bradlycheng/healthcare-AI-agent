@@ -5,6 +5,10 @@ Tests: Patient Timeline, ORU Pipeline, Reset Demo, FHIR Builder, Frontend
 import sys
 import io
 import json
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 RESULTS = {"passed": 0, "failed": 0}
@@ -210,7 +214,8 @@ def test_api_integration():
                     test("Timeline endpoint works", r3.status_code == 200)
             
             # Test reset endpoint exists
-            r4 = requests.post("http://127.0.0.1:8080/admin/reset", timeout=15)
+            password = os.environ.get("ADMIN_PASSWORD")
+            r4 = requests.post("http://127.0.0.1:8080/admin/reset", json={"password": password}, timeout=15)
             test("Reset endpoint works", r4.status_code in [200, 201], f"status={r4.status_code}")
         else:
             test("Server is running", False, f"status={r.status_code}")

@@ -44,23 +44,6 @@ WARDEN_CONFIG = {
 # Format-Preserving Token Pools
 # ---------------------------------------------------------------------------
 
-# NATO phonetic for patient names — LLM sees natural "first last" patterns
-_PATIENT_NAMES = [
-    "Alpha", "Bravo", "Charlie", "Delta",
-    "Echo", "Foxtrot", "Golf", "Hotel",
-    "India", "Juliet", "Kilo", "Lima",
-    "Mike", "November", "Oscar", "Papa",
-    "Quebec", "Romeo", "Sierra", "Tango",
-    "Uniform", "Victor", "Whiskey", "Xray",
-    "Yankee", "Zulu",
-]
-
-# Synthetic provider names — preserves "Dr." prefix
-_PROVIDER_NAMES = [
-    "Dr. Morgan", "Dr. Ellis", "Dr. Reed", "Dr. Blake", "Dr. Quinn",
-    "NP Casey", "NP Jordan", "Dr. Hayes", "Dr. Avery", "Dr. Lane",
-]
-
 # Synthetic DOBs — offset preserves approximate age reasoning
 _SYNTHETIC_DOBS = [
     "1990-06-15", "1985-03-22", "1978-11-08", "1992-01-30", "1988-07-14",
@@ -132,7 +115,12 @@ class PHITokenMap:
         return result
 
     def detokenize(self, text: str) -> str:
-        """Replace all tokens with their real values."""
+        """Replace all tokens with their real values.
+        
+        Since we use deterministic inline markers (<<PAT_1>>), there is
+        no risk of substring collisions or truncation. A simple exact
+        replacement is sufficient and safe.
+        """
         result = text
         for token, real in sorted(
             self._token_to_real.items(), key=lambda x: len(x[0]), reverse=True
@@ -223,19 +211,16 @@ class WardenAnalyzer:
                 full_name = f"{first} {last}".strip()
 
                 # Assign format-preserving tokens
-                if patient_idx < len(_PATIENT_NAMES):
-                    name_token = _PATIENT_NAMES[patient_idx]
-                else:
-                    name_token = f"Patient P{patient_idx + 1:03d}"
+                name_token = f"<<PAT_{patient_idx + 1}>>"
 
-                # Map full name "First Last" -> "Patient Alpha"
+                # Map full name "First Last" -> "<<PAT_1>>"
                 if full_name:
                     token_map.add_mapping(full_name, name_token)
                     token_map._increment_category("patient_name")
 
                 # Map patient ID
                 if pid:
-                    pid_token = f"P{pid_counter:05d}"
+                    pid_token = f"<<PID_{pid_counter}>>"
                     token_map.add_mapping(pid, pid_token)
                     token_map._increment_category("patient_id")
                     pid_counter += 1
@@ -262,10 +247,7 @@ class WardenAnalyzer:
             for row in providers:
                 provider = row["provider_name"] or ""
                 if provider:
-                    if provider_idx < len(_PROVIDER_NAMES):
-                        prov_token = _PROVIDER_NAMES[provider_idx]
-                    else:
-                        prov_token = f"Dr. Temp{provider_idx}"
+                    prov_token = f"<<PROV_{provider_idx + 1}>>"
                     token_map.add_mapping(provider, prov_token)
                     token_map._increment_category("provider_name")
                     provider_idx += 1

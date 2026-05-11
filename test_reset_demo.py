@@ -1,6 +1,10 @@
 import requests
 import sqlite3
 import time
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Wait for server to start
 print("Waiting for server...")
@@ -13,7 +17,8 @@ print("="*80)
 
 try:
     print("\nCalling /admin/reset endpoint...")
-    resp = requests.post("http://localhost:8080/admin/reset")
+    password = os.environ.get("ADMIN_PASSWORD")
+    resp = requests.post("http://localhost:8080/admin/reset", json={"password": password})
     print(f"Status: {resp.status_code}")
     print(f"Response: {resp.json()}")
 except Exception as e:

@@ -1,6 +1,9 @@
-
 import requests
 import sys
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_URL = "http://localhost:8080"
 
@@ -61,7 +64,8 @@ def test_buttons():
     
     # Path A: The one in dashboard.js (NOW FIXED)
     print("\nTesting Dashboard 'Reset Demo' Path (POST /admin/reset)...")
-    resp_reset = requests.post(f"{BASE_URL}/admin/reset")
+    password = os.environ.get("ADMIN_PASSWORD")
+    resp_reset = requests.post(f"{BASE_URL}/admin/reset", json={"password": password})
     if resp_reset.status_code == 200 or resp_reset.status_code == 409:
         log("Reset Demo (JS Path)", "PASS", "Database reset initiated")
     else:
@@ -69,7 +73,7 @@ def test_buttons():
 
     # Path B: The correct API path
     print("\nTesting Correct Admin Path (POST /admin/reset)...")
-    resp_reset = requests.post(f"{BASE_URL}/admin/reset")
+    resp_reset = requests.post(f"{BASE_URL}/admin/reset", json={"password": password})
     if resp_reset.status_code == 200:
          log("Admin Reset Endpoint", "PASS", "Database successfully reset")
     else:

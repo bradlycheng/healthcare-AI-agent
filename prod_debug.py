@@ -1,6 +1,10 @@
 
 import requests
 import sys
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_URL = "https://healthdataagent.com"
 
@@ -24,7 +28,8 @@ def test_reset():
     print("\n2. Testing 'Reset Demo' Endpoint (POST /admin/reset)...")
     try:
         # Increase timeout to distinguish between 504 (Gateway Timeout) and other errors
-        resp = requests.post(f"{BASE_URL}/admin/reset", timeout=65)
+        password = os.environ.get("ADMIN_PASSWORD")
+        resp = requests.post(f"{BASE_URL}/admin/reset", json={"password": password}, timeout=65)
         
         print(f"   Status Code: {resp.status_code}")
         print(f"   Response Text: {resp.text[:500]}") # Print first 500 chars

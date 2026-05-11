@@ -2,6 +2,10 @@
 import requests
 import time
 import sys
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_URL = "http://localhost:8080"
 
@@ -22,7 +26,8 @@ def wait_for_service():
 def trigger_reset():
     print("Resetting database to Day 1 state...")
     try:
-        resp = requests.post(f"{BASE_URL}/admin/reset", timeout=60)
+        password = os.environ.get("ADMIN_PASSWORD")
+        resp = requests.post(f"{BASE_URL}/admin/reset", json={"password": password}, timeout=60)
         print(f"Reset Response: {resp.status_code}")
         if resp.status_code == 200:
             print("Reset Success!")

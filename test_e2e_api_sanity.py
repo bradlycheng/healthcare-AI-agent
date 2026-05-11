@@ -1,6 +1,10 @@
 import requests
 import json
 import time
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_URL = "http://localhost:8080/"
 
@@ -32,7 +36,8 @@ def test_query_deep():
 
 def test_reset():
     print("\n[Testing POST /admin/reset]")
-    payload = {"password": "d3m0th1s"}
+    password = os.environ.get("ADMIN_PASSWORD")
+    payload = {"password": password}
     res = requests.post(BASE_URL + "admin/reset", json=payload)
     print(f"Status: {res.status_code}")
     if res.status_code == 200:
