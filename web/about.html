@@ -12,7 +12,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=9">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
@@ -39,7 +39,7 @@
         .section-block h1 {
             font-size: 3rem;
             margin-bottom: 1.5rem;
-            background: var(--gradient-primary);
+            background: var(--gradient-main);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -49,7 +49,7 @@
         .section-block h2 {
             font-size: 2rem;
             margin-bottom: 1rem;
-            color: var(--text-heading);
+            color: var(--text-main);
         }
 
         .text-content {
@@ -147,20 +147,21 @@
             <h1>Health Data Agent</h1>
             <div class="text-content">
                 <p>
-                    The <strong>Health Data Agent</strong> is an autonomous AI partner designed to handle
-                    <strong>sensitive healthcare data</strong>.
-                    It <strong>answers your complex clinical and data questions</strong>, providing instant insights.
+                    The <strong>Health Data Agent</strong> is a healthcare AI project focused on clinical intelligence,
+                    interoperability, and AI governance for <strong>sensitive healthcare data</strong>. It combines
+                    practical AI engineering with PHI-safe controls that make clinical workflows easier to review,
+                    audit, and trust.
                 </p>
 
-                <div style="margin-top: 2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                <div style="margin-top: 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem;">
                     <div class="feature-card"
                         style="background: rgba(255, 255, 255, 0.03); padding: 1.2rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
                         <strong style="color: var(--primary); font-size: 1.1rem; display:block; margin-bottom: 0.5rem;">
-                            <i class="fa-solid fa-chart-line"></i> Dashboard & Chat
+                            <i class="fa-solid fa-user-shield"></i> The Warden
                         </strong>
                         <p style="font-size: 0.9em; margin: 0; color: var(--text-muted);">
-                            Your central command hub. Ask the <strong>AI Agent</strong> questions and uncover patient
-                            insights in real-time.
+                            AI governance and security controls for PHI-safe workflows, request guardrails, and
+                            audit-aware clinical AI access.
                         </p>
                     </div>
 
@@ -174,15 +175,25 @@
                                 clinical notes</strong> and extract key insights.
                         </p>
                     </div>
+
+                    <div class="feature-card"
+                        style="background: rgba(255, 255, 255, 0.03); padding: 1.2rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                        <strong style="color: var(--primary); font-size: 1.1rem; display:block; margin-bottom: 0.5rem;">
+                            <i class="fa-solid fa-chart-line"></i> Dashboard & Chat
+                        </strong>
+                        <p style="font-size: 0.9em; margin: 0; color: var(--text-muted);">
+                            A practical AI interface for asking patient-data questions, reviewing insights, and
+                            exploring clinical risk signals.
+                        </p>
+                    </div>
                 </div>
                 <div class="highlight-box">
-                    <h3><i class="fa-solid fa-layer-group"></i> The Tech Behind It</h3>
+                    <h3><i class="fa-solid fa-shield-halved"></i> Governance & Security Focus</h3>
                     <p style="margin-bottom: 0;">
-                        Built on a robust <strong>Python/FastAPI</strong> backend, the system orchestrates <strong>AWS
-                            Bedrock</strong>
-                        LLMs for clinical reasoning and <strong>ChromaDB</strong> for long-term semantic memory. It
-                        features
-                        strict strictly-typed Pydantic validation and secure MLLP ingestion pipelines.
+                        The Warden is the core security and governance layer: it keeps PHI out of model exposure,
+                        applies request-level guardrails, and records audit-aware governance events. The broader system
+                        is built with <strong>Python/FastAPI</strong>, <strong>AWS Bedrock</strong>, typed Pydantic
+                        validation, HL7/FHIR workflows, and <strong>ChromaDB</strong> for semantic memory.
                     </p>
                 </div>
             </div>
@@ -193,11 +204,19 @@
             <h2>About the Creator</h2>
             <div class="text-content">
                 <p>
-                    Hi, I'm Bradly Cheng. I am a Software Developer and AI Engineer specializing in healthcare data.
+                    Hi, I'm Bradly Cheng, a software developer and AI engineer focused on AI governance, healthcare data
+                    security, interoperability, and practical clinical AI systems.
                 </p>
                 <p style="margin-top: 1rem;">
-                    I built the Health Data Agent to demonstrate how Agentic AI can safely handle complex
-                    clinical data. I want to show off the potential of AI in healthcare data.
+                    I built Health Data Agent to show that useful AI is only half the problem in healthcare. The harder
+                    question is how to make AI access controlled, PHI-safe, auditable, and aligned with real clinical
+                    data workflows.
+                </p>
+                <p style="margin-top: 1rem;">
+                    My strongest interest is the Warden side of the project: AI security, request guardrails, HIPAA-aware
+                    governance, and systems that let organizations use LLMs without treating sensitive data casually. I
+                    still build the AI applications themselves, but I am especially interested in making them safe enough
+                    to operate in regulated environments.
                 </p>
                 <div class="social-links-large">
                     <a href="https://www.linkedin.com/in/bradly-cheng/" target="_blank" class="social-btn">
@@ -227,6 +246,17 @@
                 </p>
                 <a href="https://bcdawgs.com" target="_blank" class="btn-primary large">
                     <i class="fa-solid fa-globe"></i> Visit Website
+                </a>
+            </div>
+
+            <div class="game-card">
+                <h3 style="font-size: 1.8rem; margin-bottom: 1rem;">What's That Human Thing?</h3>
+                <p style="color: var(--text-muted); margin-bottom: 2rem;">
+                    AI-assisted video editing and storytelling experiments exploring how human ideas can be shaped with
+                    modern creative tools.
+                </p>
+                <a href="https://www.youtube.com/@WhatsThatHumanThing" target="_blank" class="btn-primary large">
+                    <i class="fa-brands fa-youtube"></i> Watch Channel
                 </a>
             </div>
         </section>

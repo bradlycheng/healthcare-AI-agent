@@ -12,7 +12,7 @@
         rel="stylesheet">
     <meta name="description"
         content="Clinical Intelligence for healthcare data. Process HL7 streams, convert to FHIR R4, and unlock patient insights with AI.">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=9">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
@@ -56,12 +56,13 @@
             </div>
             <h1>Health Data <br><span class="gradient-text">Agent</span></h1>
             <p class="hero-sub">
-                Clinical Intelligence. Process HL7 data streams, convert to FHIR R4, and unlock patient insights with
-                AI.
+                Clinical intelligence for HL7, FHIR, and patient-data chat, with PHI-safe guardrails built in through
+                The Warden.
             </p>
             <div class="hero-actions">
-                <a href="/dashboard.html" class="btn-primary large">Launch Dashboard</a>
-                <a href="/process-data.html" class="btn-secondary large">Process HL7 Message</a>
+                <a href="/dashboard.html" class="btn-primary">Launch Dashboard</a>
+                <a href="/process-data.html" class="btn-secondary">Process Data</a>
+                <a href="/warden.html" class="btn-warden">View Warden</a>
             </div>
         </div>
         <div class="hero-visual">
@@ -121,6 +122,13 @@
                 </div>
                 <h3>Chat with Data</h3>
                 <p>Ask the dashboard: "What patients should I be worried about?"</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon-box">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <h3>PHI-Safe Guardrails</h3>
+                <p>The Warden helps keep patient-identifying data out of the model while supporting HIPAA-aware AI workflows.</p>
             </div>
         </div>
     </section>
