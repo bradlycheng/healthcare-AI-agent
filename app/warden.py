@@ -255,7 +255,7 @@ class WardenAnalyzer:
             conn.close()
 
         except Exception as e:
-            print(f"[WARDEN] Analyzer error building token map: {e}")
+            print(f"[WARDEN] analyzer_error error_type={type(e).__name__}")
 
         return token_map
 
@@ -615,7 +615,7 @@ class WardenAuditLog:
             with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry) + "\n")
         except Exception as e:
-            print(f"[WARDEN] Audit log write error: {e}")
+            print(f"[WARDEN] audit_log_write_error error_type={type(e).__name__}")
 
     def get_recent(self, n: int = 20) -> List[Dict]:
         """Read the most recent n audit entries."""

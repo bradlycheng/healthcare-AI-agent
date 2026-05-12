@@ -16,11 +16,12 @@ import asyncio
 import json
 import re
 import time
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Callable
 
-from .llm_client import call_llm_for_json, call_llm, LLMError
+from .llm_client import call_llm_for_json, call_llm, LLMError, BEDROCK_MODEL_ID
 from .security import sanitize_text, detect_injection_patterns
 
 
@@ -272,7 +273,13 @@ class HealthcareAgent:
             ToolName.ASK_CLARIFICATION.value: self._tool_ask_clarification,
         }
     
-    def run(self, question: str, history: List[Dict[str, str]] = None, depth: str = "standard") -> AgentResponse:
+    def run(
+        self,
+        question: str,
+        history: List[Dict[str, str]] = None,
+        depth: str = "standard",
+        request_id: str = None,
+    ) -> AgentResponse:
         """
         Main agent entry point with Reasoning Router.
         
@@ -283,19 +290,44 @@ class HealthcareAgent:
         """
         if history is None:
             history = []
+        if request_id is None:
+            request_id = str(uuid.uuid4())
             
         # Router
         if depth == ReasoningDepth.DEEP.value:
-            return self._run_deep(question, history)
+            return self._run_deep(question, history, request_id)
         else:
-            return self._run_standard(question, history)
+            return self._run_standard(question, history, request_id)
 
-    def _run_standard(self, question: str, history: List[Dict[str, str]] = None) -> AgentResponse:
+    def _run_standard(
+        self,
+        question: str,
+        history: List[Dict[str, str]] = None,
+        request_id: str = None,
+    ) -> AgentResponse:
         """
         Standard ReAct Loop (Legacy 'run' method).
         """
         if history is None:
             history = []
+        if request_id is None:
+            request_id = str(uuid.uuid4())
+
+        from .db import insert_governance_event, upsert_ai_interaction
+        event_sequence = 0
+
+        def emit_event(event_type: str, component: str, **kwargs):
+            nonlocal event_sequence
+            event_sequence += 1
+            insert_governance_event(
+                request_id=request_id,
+                event_type=event_type,
+                component=component,
+                sequence=event_sequence,
+                model_id=BEDROCK_MODEL_ID,
+                policy_version="warden-v1",
+                **kwargs,
+            )
         
         # Security: Check for injection attempts
         injection_warnings = detect_injection_patterns(question)
@@ -335,9 +367,30 @@ class HealthcareAgent:
                     if "content" in safe_msg:
                         safe_msg["content"] = warden_ctx.anonymize(safe_msg["content"])
                     safe_history.append(safe_msg)
+
+                upsert_ai_interaction(
+                    request_id,
+                    raw_question=question,
+                    safe_question=safe_question,
+                    raw_history=history,
+                    safe_history=safe_history,
+                    model_id=BEDROCK_MODEL_ID,
+                    status="started",
+                )
+                emit_event(
+                    "llm_plan_prepared",
+                    "agent",
+                    payload={
+                        "history_messages": len(safe_history),
+                        "phi_fields_anonymized": warden_ctx.token_map.field_count,
+                        "field_types": warden_ctx.token_map.field_types_anonymized,
+                    },
+                )
                 
                 plan = self._plan(safe_question, safe_history)
-                print(f"DEBUG: Plan result: {plan}")
+                tool_count = len(plan.get("tool_calls", [])) if isinstance(plan, dict) else 0
+                print(f"agent_plan_completed request_id={request_id} tool_count={tool_count}")
+                upsert_ai_interaction(request_id, plan=plan, status="planned")
             
                 if plan.get("error"):
                     return AgentResponse(
@@ -351,8 +404,24 @@ class HealthcareAgent:
                     # Still retrieve RAG context so sources appear for knowledge questions
                     from .query_assistant import retrieve_context
                     _, direct_sources = retrieve_context(question)
+                    answer = warden_ctx.deanonymize(plan["direct_answer"])
+                    upsert_ai_interaction(
+                        request_id,
+                        final_answer=answer,
+                        tools_used=[],
+                        row_count=0,
+                        status="completed",
+                    )
+                    emit_event(
+                        "final_answer_generated",
+                        "agent",
+                        success=True,
+                        row_count=0,
+                        payload={"tools_used": []},
+                    )
+                    emit_event("request_completed", "api", success=True, row_count=0)
                     return AgentResponse(
-                        answer=plan["direct_answer"],
+                        answer=answer,
                         success=True,
                         sources=direct_sources,
                         reasoning_trace=[AgentStep(
@@ -364,15 +433,32 @@ class HealthcareAgent:
                 
                 # Check for clarification needed
                 tool_calls = plan.get("tool_calls", [])
+                upsert_ai_interaction(request_id, tool_calls=tool_calls)
                 for tc in tool_calls:
                     if tc.get("tool") == ToolName.ASK_CLARIFICATION.value:
                         inp = tc.get("input", {})
+                        clarification = warden_ctx.deanonymize(inp.get("question", "Could you please clarify your question?"))
+                        options = [warden_ctx.deanonymize(o) for o in inp.get("options", [])]
+                        upsert_ai_interaction(
+                            request_id,
+                            final_answer=clarification,
+                            tools_used=["ask_clarification"],
+                            row_count=0,
+                            status="needs_clarification",
+                        )
+                        emit_event(
+                            "request_completed",
+                            "agent",
+                            success=True,
+                            row_count=0,
+                            payload={"needs_clarification": True},
+                        )
                         return AgentResponse(
-                            answer=inp.get("question", "Could you please clarify your question?"),
+                            answer=clarification,
                             success=True,
                             needs_clarification=True,
-                            clarification_question=inp.get("question"),
-                            clarification_options=inp.get("options", []),
+                            clarification_question=clarification,
+                            clarification_options=options,
                             reasoning_trace=[AgentStep(
                                 thought=plan.get("thought", "Need clarification"),
                                 tool_calls=[ToolCall(tool=tc["tool"], input=inp)],
@@ -393,6 +479,19 @@ class HealthcareAgent:
                     
                     # === POLICY GATE: Validate tool call before execution ===
                     decision = warden_ctx.intercept(tool_name, tool_input)
+                    emit_event(
+                        "warden_decision",
+                        "warden",
+                        tool_name=tool_name,
+                        decision=decision.action,
+                        reason=decision.reason,
+                        success=decision.action != "DENY",
+                        payload={
+                            "evidence": decision.evidence,
+                            "phi_fields_anonymized": decision.phi_fields_anonymized,
+                            "field_types": decision.field_types,
+                        },
+                    )
                     if decision.action == "DENY":
                         step.tool_results.append(ToolResult(
                             tool=tool_name,
@@ -426,6 +525,12 @@ class HealthcareAgent:
                     
                     start_time = time.time()
                     try:
+                        emit_event(
+                            "tool_execution_started",
+                            "agent",
+                            tool_name=tool_name,
+                            payload={"input_keys": sorted(real_tool_input.keys())},
+                        )
                         # Pass history for context-aware tools
                         if tool_name == ToolName.QUERY_DATABASE.value:
                             result = self._tools[tool_name](real_tool_input, history)
@@ -442,6 +547,17 @@ class HealthcareAgent:
                         ))
                         
                         tools_used.append(tool_name)
+                        emit_event(
+                            "tool_execution_completed",
+                            "agent",
+                            tool_name=tool_name,
+                            success=True,
+                            row_count=result.get("row_count") if isinstance(result, dict) else None,
+                            payload={
+                                "execution_time_ms": execution_time,
+                                "result_keys": sorted(result.keys()) if isinstance(result, dict) else [],
+                            },
+                        )
                         
                         # Collect metadata
                         if tool_name == ToolName.QUERY_DATABASE.value:
@@ -458,6 +574,13 @@ class HealthcareAgent:
                             result={},
                             error=str(e)
                         ))
+                        emit_event(
+                            "tool_execution_completed",
+                            "agent",
+                            tool_name=tool_name,
+                            success=False,
+                            reason=type(e).__name__,
+                        )
                 
                 trace.append(step)
                 
@@ -483,12 +606,68 @@ class HealthcareAgent:
                         execution_time_ms=tr.execution_time_ms
                     )
                     safe_tool_results.append(safe_tr)
+
+                raw_tool_results_trace = [
+                    {
+                        "tool": tr.tool,
+                        "success": tr.success,
+                        "result": tr.result,
+                        "error": tr.error,
+                        "execution_time_ms": tr.execution_time_ms,
+                    }
+                    for tr in step.tool_results
+                ]
+                safe_tool_results_trace = [
+                    {
+                        "tool": tr.tool,
+                        "success": tr.success,
+                        "result": tr.result,
+                        "error": tr.error,
+                        "execution_time_ms": tr.execution_time_ms,
+                    }
+                    for tr in safe_tool_results
+                ]
+                upsert_ai_interaction(
+                    request_id,
+                    raw_tool_results=raw_tool_results_trace,
+                    safe_tool_results=safe_tool_results_trace,
+                    tools_used=tools_used,
+                    sql_used=sql_used,
+                    row_count=row_count,
+                    status="tools_completed",
+                )
+                emit_event(
+                    "llm_synthesis_prepared",
+                    "agent",
+                    payload={"tool_result_count": len(safe_tool_results)},
+                )
                 
                 answer, highlights = self._synthesize(safe_question, safe_tool_results)
                 
                 # OUT-GATE: Detokenize LLM response for the user
                 answer = warden_ctx.deanonymize(answer)
                 highlights = [warden_ctx.deanonymize(h) for h in highlights]
+                upsert_ai_interaction(
+                    request_id,
+                    final_answer=answer,
+                    tools_used=tools_used,
+                    sql_used=sql_used,
+                    row_count=row_count,
+                    status="completed",
+                )
+                emit_event(
+                    "final_answer_generated",
+                    "agent",
+                    success=True,
+                    row_count=row_count,
+                    payload={"tools_used": tools_used},
+                )
+                emit_event(
+                    "request_completed",
+                    "api",
+                    success=True,
+                    row_count=row_count,
+                )
                 
                 return AgentResponse(
                     answer=answer,
@@ -502,12 +681,16 @@ class HealthcareAgent:
                 )
             
         except LLMError as e:
+            upsert_ai_interaction(request_id, status="failed", error=f"LLM error: {type(e).__name__}")
+            emit_event("request_failed", "agent", success=False, reason=type(e).__name__)
             return AgentResponse(
                 answer="I encountered an error processing your question. Please try again.",
                 success=False,
                 error=f"LLM error: {str(e)}"
             )
         except Exception as e:
+            upsert_ai_interaction(request_id, status="failed", error=f"Agent error: {type(e).__name__}")
+            emit_event("request_failed", "agent", success=False, reason=type(e).__name__)
             return AgentResponse(
                 answer="Sorry, something went wrong. Please try again.",
                 success=False,
@@ -570,7 +753,7 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         try:
             # Use text generation to avoid JSON parsing issues with Markdown tables
             text_response = call_llm(prompt)
-            print(f"DEBUG: Raw synthesis response:\n{text_response}")
+            print("llm_synthesis_completed")
             
             # Parse the text response
             answer = text_response
@@ -595,7 +778,7 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
             # append a deterministic table from raw data
             row_count = self._count_patient_rows(tool_results)
             if row_count > 3 and '|' not in answer:
-                print(f"DEBUG: LLM failed table format ({row_count} rows, no pipes). Appending fallback table.")
+                print(f"llm_table_fallback_applied row_count={row_count}")
                 fallback_table = self._build_table_from_results(tool_results)
                 if fallback_table:
                     answer = answer + "\n\n" + fallback_table
@@ -812,9 +995,8 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         try:
             timeline = get_patient_timeline(patient_id)
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return {"error": f"Error retrieving timeline: {str(e)}", "patient": None}
+            print(f"patient_timeline_failed error_type={type(e).__name__}")
+            return {"error": "Error retrieving timeline", "patient": None}
 
         if not timeline:
             return {"error": "Patient not found", "patient": None}
@@ -925,7 +1107,12 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
     # Reasoning Modes
     # =========================================================================
 
-    def _run_deep(self, question: str, history: List[Dict[str, str]]) -> AgentResponse:
+    def _run_deep(
+        self,
+        question: str,
+        history: List[Dict[str, str]],
+        request_id: str = None,
+    ) -> AgentResponse:
         """
         Deep Mode: Reflection + Standard ReAct.
         """
@@ -938,9 +1125,12 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
   "modifications": "Ensure to check for synonyms of..."
 }
 """
+        with self.warden.request_scope() as warden_ctx:
+            safe_question = warden_ctx.anonymize(question)
+
         reflection_prompt = f"""
 You are a Senior Clinical AI Supervisor.
-A user has asked: "{question}"
+A user has asked: "{safe_question}"
 
 Analyze the complexity of this request.
 1. Identify if this requires multi-step reasoning (e.g., compare two patients, trend analysis).
@@ -963,7 +1153,7 @@ Output valid JSON only. Do not use code blocks.
             enhanced_question = f"[STRATEGY: {strategy}] {question}"
             
             # Run Standard loop with enhanced context
-            response = self._run_standard(enhanced_question, history)
+            response = self._run_standard(enhanced_question, history, request_id)
             
             # Prepend reflection step to trace
             reflection_step = AgentStep(
@@ -982,7 +1172,7 @@ Output valid JSON only. Do not use code blocks.
             
         except Exception as e:
             # Fallback to standard if reflection fails
-            return self._run_standard(question, history)
+            return self._run_standard(question, history, request_id)
 
 
 
@@ -991,16 +1181,24 @@ Output valid JSON only. Do not use code blocks.
 # =============================================================================
 
 
-def run_agent_query(question: str, history: List[Dict[str, str]] = None, depth: str = "standard") -> Dict[str, Any]:
+def run_agent_query(
+    question: str,
+    history: List[Dict[str, str]] = None,
+    depth: str = "standard",
+    request_id: str = None,
+) -> Dict[str, Any]:
     """
     Run an agent query and return the result as a dict.
     
     This is the main entry point for the API.
     """
     agent = HealthcareAgent()
-    response = agent.run(question, history, depth)
+    if request_id is None:
+        request_id = str(uuid.uuid4())
+    response = agent.run(question, history, depth, request_id)
     
     return {
+        "request_id": request_id,
         "success": response.success,
         "answer": response.answer,
         "highlights": response.highlights,

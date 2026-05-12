@@ -450,7 +450,7 @@ def retrieve_context(question: str) -> tuple[str, List[Dict[str, Any]]]:
         return context_text, sources
         
     except Exception as e:
-        print(f"RAG retrieval error: {e}")
+        print(f"rag_retrieval_failed error_type={type(e).__name__}")
         return "", []
 
 

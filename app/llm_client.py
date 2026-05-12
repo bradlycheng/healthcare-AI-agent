@@ -21,7 +21,7 @@ try:
         region_name=AWS_REGION
     )
 except Exception as e:
-    print(f"Warning: Failed to initialize Bedrock client: {e}")
+    print(f"bedrock_client_init_failed error_type={type(e).__name__}")
     bedrock_runtime = None
 
 

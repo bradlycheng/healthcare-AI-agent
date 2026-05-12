@@ -188,7 +188,7 @@ def index_directory(dir_path: str, extensions: List[str] = ['.pdf', '.txt', '.md
             results[filename] = count
             print(f"Indexed {filename}: {count} chunks")
         except Exception as e:
-            print(f"Error indexing {filename}: {e}")
+            print(f"document_index_failed filename={filename} error_type={type(e).__name__}")
             results[filename] = 0
     
     return results

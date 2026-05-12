@@ -277,8 +277,7 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
             structured_observations = _normalize_loinc_codes(structured_observations)
             structured_observations = [o for o in structured_observations if o.get("value") is not None and o.get("value") != ""]
         except Exception as e:
-            print(f"CRITICAL: AI Pipeline Failure: {e}", file=sys.stderr, flush=True)
-            traceback.print_exc(file=sys.stderr)
+            print(f"oru_ai_pipeline_failed error_type={type(e).__name__}", file=sys.stderr, flush=True)
             pass
     
 

@@ -139,6 +139,53 @@ def init_db(db_path: str = DB_PATH) -> None:
             );
             """
         )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS governance_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id TEXT UNIQUE NOT NULL,
+                request_id TEXT NOT NULL,
+                sequence INTEGER,
+                event_type TEXT NOT NULL,
+                component TEXT NOT NULL,
+                tool_name TEXT,
+                decision TEXT,
+                reason TEXT,
+                model_id TEXT,
+                policy_version TEXT,
+                success INTEGER,
+                row_count INTEGER,
+                payload_json TEXT,
+                created_at TEXT NOT NULL
+            );
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_interactions (
+                request_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                raw_question TEXT,
+                safe_question TEXT,
+                raw_history_json TEXT,
+                safe_history_json TEXT,
+                plan_json TEXT,
+                tool_calls_json TEXT,
+                raw_tool_results_json TEXT,
+                safe_tool_results_json TEXT,
+                final_answer TEXT,
+                model_id TEXT,
+                tools_used_json TEXT,
+                sql_used TEXT,
+                row_count INTEGER,
+                status TEXT,
+                error TEXT
+            );
+            """
+        )
         
         # Migration for existing tables
         try:
@@ -166,6 +213,199 @@ def init_db(db_path: str = DB_PATH) -> None:
         conn.close()
 
 
+def insert_governance_event(
+    request_id: str,
+    event_type: str,
+    component: str,
+    *,
+    sequence: int = None,
+    tool_name: str = None,
+    decision: str = None,
+    reason: str = None,
+    model_id: str = None,
+    policy_version: str = None,
+    success: bool = None,
+    row_count: int = None,
+    payload: Dict[str, Any] = None,
+    db_path: str = DB_PATH,
+) -> None:
+    """Insert a PHI-minimized governance event."""
+    import uuid
+
+    conn = get_connection(db_path)
+    try:
+        conn.execute(
+            """
+            INSERT INTO governance_events (
+                event_id, request_id, sequence, event_type, component,
+                tool_name, decision, reason, model_id, policy_version,
+                success, row_count, payload_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid.uuid4()),
+                request_id,
+                sequence,
+                event_type,
+                component,
+                tool_name,
+                decision,
+                reason,
+                model_id,
+                policy_version,
+                None if success is None else int(bool(success)),
+                row_count,
+                json.dumps(payload or {}, default=str),
+                datetime.utcnow().isoformat(),
+            ),
+        )
+        conn.commit()
+    except Exception as e:
+        print(f"governance_event_write_failed error_type={type(e).__name__}")
+    finally:
+        conn.close()
+
+
+def upsert_ai_interaction(
+    request_id: str,
+    *,
+    raw_question: str = None,
+    safe_question: str = None,
+    raw_history: List[Dict[str, str]] = None,
+    safe_history: List[Dict[str, str]] = None,
+    plan: Dict[str, Any] = None,
+    tool_calls: List[Dict[str, Any]] = None,
+    raw_tool_results: List[Dict[str, Any]] = None,
+    safe_tool_results: List[Dict[str, Any]] = None,
+    final_answer: str = None,
+    model_id: str = None,
+    tools_used: List[str] = None,
+    sql_used: str = None,
+    row_count: int = None,
+    status: str = None,
+    error: str = None,
+    db_path: str = DB_PATH,
+) -> None:
+    """Upsert the protected AI interaction trace for a request.
+
+    This table may contain PHI and should be treated as protected clinical data.
+    """
+    conn = get_connection(db_path)
+    now = datetime.utcnow().isoformat()
+    fields = {
+        "raw_question": raw_question,
+        "safe_question": safe_question,
+        "raw_history_json": None if raw_history is None else json.dumps(raw_history, default=str),
+        "safe_history_json": None if safe_history is None else json.dumps(safe_history, default=str),
+        "plan_json": None if plan is None else json.dumps(plan, default=str),
+        "tool_calls_json": None if tool_calls is None else json.dumps(tool_calls, default=str),
+        "raw_tool_results_json": None if raw_tool_results is None else json.dumps(raw_tool_results, default=str),
+        "safe_tool_results_json": None if safe_tool_results is None else json.dumps(safe_tool_results, default=str),
+        "final_answer": final_answer,
+        "model_id": model_id,
+        "tools_used_json": None if tools_used is None else json.dumps(tools_used, default=str),
+        "sql_used": sql_used,
+        "row_count": row_count,
+        "status": status,
+        "error": error,
+    }
+    active = {k: v for k, v in fields.items() if v is not None}
+
+    try:
+        conn.execute(
+            """
+            INSERT INTO ai_interactions (request_id, created_at, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(request_id) DO NOTHING
+            """,
+            (request_id, now, now),
+        )
+        if active:
+            assignments = ", ".join([f"{key} = ?" for key in active] + ["updated_at = ?"])
+            values = list(active.values()) + [now, request_id]
+            conn.execute(
+                f"UPDATE ai_interactions SET {assignments} WHERE request_id = ?",
+                values,
+            )
+        conn.commit()
+    except Exception as e:
+        print(f"ai_interaction_write_failed error_type={type(e).__name__}")
+    finally:
+        conn.close()
+
+
+def reconcile_interrupted_ai_interactions(
+    older_than_minutes: int = 30,
+    db_path: str = DB_PATH,
+) -> int:
+    """Mark stale non-terminal AI interactions as interrupted.
+
+    This is crash recovery for requests that started but never reached a final
+    lifecycle status because the process/container stopped mid-request.
+    """
+    terminal_statuses = {
+        "completed",
+        "failed",
+        "blocked",
+        "completed_legacy",
+        "interrupted",
+    }
+    cutoff = (datetime.utcnow() - timedelta(minutes=older_than_minutes)).isoformat()
+    conn = get_connection(db_path)
+    reconciled = 0
+    event_payloads = []
+
+    try:
+        cur = conn.cursor()
+        rows = cur.execute(
+            """
+            SELECT request_id, status
+            FROM ai_interactions
+            WHERE updated_at < ?
+            """,
+            (cutoff,),
+        ).fetchall()
+
+        for row in rows:
+            request_id = row["request_id"]
+            status = row["status"] or ""
+            if status in terminal_statuses:
+                continue
+
+            now = datetime.utcnow().isoformat()
+            cur.execute(
+                """
+                UPDATE ai_interactions
+                SET status = ?, error = ?, updated_at = ?
+                WHERE request_id = ?
+                """,
+                ("interrupted", f"stale_non_terminal_status:{status or 'unknown'}", now, request_id),
+            )
+            event_payloads.append(
+                (request_id, {"previous_status": status or "unknown"})
+            )
+            reconciled += 1
+
+        conn.commit()
+    except Exception as e:
+        print(f"ai_interaction_reconcile_failed error_type={type(e).__name__}")
+    finally:
+        conn.close()
+
+    for request_id, payload in event_payloads:
+        insert_governance_event(
+            request_id=request_id,
+            event_type="request_interrupted_reconciled",
+            component="api",
+            success=False,
+            reason="stale_non_terminal_interaction",
+            payload=payload,
+            db_path=db_path,
+        )
+
+    return reconciled
+
+
 def save_contact_request(email: str, ip_address: str, db_path: str = DB_PATH) -> bool:
     """
     Save a contact request to the database.
@@ -190,7 +430,7 @@ def save_contact_request(email: str, ip_address: str, db_path: str = DB_PATH) ->
         conn.commit()
         return True
     except Exception as e:
-        print(f"Error saving contact: {e}")
+        print(f"contact_request_save_failed error_type={type(e).__name__}")
         return False
     finally:
         conn.close()
@@ -233,25 +473,25 @@ def delete_all_messages(db_path: str = DB_PATH) -> None:
     Clear all data from the database.
     """
     conn = get_connection(db_path)
-    print(f"DEBUG: Attempting to delete all messages from {db_path}...", flush=True)
+    print("delete_all_messages_started", flush=True)
     try:
         cur = conn.cursor()
         cur.execute("DELETE FROM observations")
-        print(f"DEBUG: Deleted {cur.rowcount} observations", flush=True)
+        print(f"delete_all_messages_observations count={cur.rowcount}", flush=True)
         cur.execute("DELETE FROM hl7_messages")
-        print(f"DEBUG: Deleted {cur.rowcount} messages", flush=True)
+        print(f"delete_all_messages_hl7 count={cur.rowcount}", flush=True)
         cur.execute("DELETE FROM visits")
-        print(f"DEBUG: Deleted {cur.rowcount} visits", flush=True)
+        print(f"delete_all_messages_visits count={cur.rowcount}", flush=True)
         cur.execute("DELETE FROM medications")
-        print(f"DEBUG: Deleted {cur.rowcount} medications", flush=True)
+        print(f"delete_all_messages_medications count={cur.rowcount}", flush=True)
         cur.execute("DELETE FROM diagnoses")
-        print(f"DEBUG: Deleted {cur.rowcount} diagnoses", flush=True)
+        print(f"delete_all_messages_diagnoses count={cur.rowcount}", flush=True)
         
         try:
             cur.execute("DELETE FROM contacts")
-            print(f"DEBUG: Deleted {cur.rowcount} contacts", flush=True)
+            print(f"delete_all_messages_contacts count={cur.rowcount}", flush=True)
         except sqlite3.OperationalError:
-            print("DEBUG: contacts table not found, skipping delete", flush=True)
+            print("delete_all_messages_contacts_missing", flush=True)
         
         # Reset sequences for auto-increment IDs
         cur.execute("DELETE FROM sqlite_sequence WHERE name='hl7_messages'")
@@ -351,7 +591,7 @@ def insert_message_and_observations(
         except ValueError:
             raise
         except Exception as e:
-            print(f"Error checking storage limit: {e}")
+            print(f"storage_limit_check_failed error_type={type(e).__name__}")
         # --------------------------------
 
         cur.execute(

@@ -6,6 +6,7 @@ import json
 import os
 import sqlite3
 import time
+import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -24,7 +25,7 @@ from dotenv import load_dotenv
 load_dotenv()
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-print("DEBUG: API MODULE LOADED", flush=True)
+print("api_module_loaded", flush=True)
 
 DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
 # AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
@@ -57,9 +58,12 @@ async def add_process_time_header(request: Request, call_next):
     
 @app.on_event("startup")
 def on_startup():
-    from .db import init_db
+    from .db import init_db, reconcile_interrupted_ai_interactions
     init_db()
-    print("DEBUG: Database initialized", flush=True)
+    print("database_initialized", flush=True)
+    reconciled = reconcile_interrupted_ai_interactions(older_than_minutes=30)
+    if reconciled:
+        print(f"ai_interactions_reconciled count={reconciled}", flush=True)
 
 # ---------- Pydantic Models ----------
 
@@ -146,6 +150,7 @@ class QueryRequest(BaseModel):
 
 
 class QueryResponse(BaseModel):
+    request_id: str = ""
     success: bool
     answer: str
     highlights: List[str] = []
@@ -256,7 +261,7 @@ async def startup_event():
         if deleted > 0:
             print(f"Pruned {deleted} old messages on startup.")
     except Exception as e:
-        print(f"Startup pruning failed: {e}")
+        print(f"startup_pruning_failed error_type={type(e).__name__}")
 
 
 @app.get("/health")
@@ -312,6 +317,7 @@ def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryRespon
     Falls back to legacy system on error.
     """
     # Rate limit check
+    request_id = str(uuid.uuid4())
     client_ip = request.client.host if request.client else "unknown"
     now_ts = __import__("time").time()
     last_ts = _RATE_LIMIT_STORE.get(client_ip, 0.0)
@@ -320,57 +326,130 @@ def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryRespon
         raise HTTPException(status_code=429, detail="Too many requests. Please wait a few seconds.")
     
     _RATE_LIMIT_STORE[client_ip] = now_ts
-    
-    # Security: Block prompt injection at API layer
-    from .security import detect_injection_patterns
-    injection_warnings = detect_injection_patterns(req.question)
-    if injection_warnings:
-        print(f"SECURITY API BLOCK: {injection_warnings}")
-        return QueryResponse(
-            success=False,
-            answer="Your query was blocked due to potentially unsafe content. Please ask a normal question about patient data.",
-            error="Query blocked by input sanitization"
-        )
-    
-    # Use new Agent system
+
+    from .db import insert_governance_event, upsert_ai_interaction
+    final_status = "failed"
+    final_success = False
+    final_reason = None
+    final_row_count = 0
+
+    insert_governance_event(
+        request_id=request_id,
+        event_type="request_received",
+        component="api",
+        sequence=0,
+        payload={
+            "history_messages": len(req.history or []),
+            "reasoning_depth": req.reasoning_depth,
+            "client_ip_present": client_ip != "unknown",
+        },
+    )
+    upsert_ai_interaction(
+        request_id,
+        raw_question=req.question,
+        raw_history=req.history,
+        status="received",
+    )
+
     try:
-        from .healthcare_agent import run_agent_query
-        result = run_agent_query(req.question, req.history, depth=req.reasoning_depth)
-        
-        # If agent failed with an error, try legacy fallback
-        if not result.get("success", False) and result.get("error"):
-            print(f"Agent returned error, trying legacy: {result.get('error')}")
-            raise Exception(result.get("error"))
-        
-        return QueryResponse(
-            success=result.get("success", False),
-            answer=result.get("answer", "Sorry, I couldn't process that."),
-            highlights=result.get("highlights", []),
-            sql_used=result.get("sql_used", ""),
-            row_count=result.get("row_count", 0),
-            sources=result.get("sources", []),
-            error=result.get("error"),
-            reasoning_trace=result.get("reasoning_trace", []),
-            tools_used=result.get("tools_used", []),
-            needs_clarification=result.get("needs_clarification", False),
-            clarification_question=result.get("clarification_question"),
-            clarification_options=result.get("clarification_options", [])
-        )
+        # Security: Block prompt injection at API layer
+        from .security import detect_injection_patterns
+        injection_warnings = detect_injection_patterns(req.question)
+        if injection_warnings:
+            print(f"security_api_block request_id={request_id} warning_count={len(injection_warnings)}")
+            final_status = "blocked"
+            final_success = False
+            final_reason = "input_sanitization_block"
+            final_row_count = 0
+            upsert_ai_interaction(request_id, status=final_status, error=final_reason)
+            return QueryResponse(
+                request_id=request_id,
+                success=False,
+                answer="Your query was blocked due to potentially unsafe content. Please ask a normal question about patient data.",
+                error="Query blocked by input sanitization"
+            )
+
+        # Use new Agent system
+        try:
+            from .healthcare_agent import run_agent_query
+            result = run_agent_query(req.question, req.history, depth=req.reasoning_depth, request_id=request_id)
+            
+            # If agent failed with an error, try legacy fallback
+            if not result.get("success", False) and result.get("error"):
+                print(f"agent_returned_error request_id={request_id} error_type=AgentError")
+                raise Exception("agent_error")
+            
+            final_status = "completed"
+            final_success = bool(result.get("success", False))
+            final_reason = result.get("error")
+            final_row_count = result.get("row_count", 0)
+            return QueryResponse(
+                request_id=request_id,
+                success=result.get("success", False),
+                answer=result.get("answer", "Sorry, I couldn't process that."),
+                highlights=result.get("highlights", []),
+                sql_used=result.get("sql_used", ""),
+                row_count=result.get("row_count", 0),
+                sources=result.get("sources", []),
+                error=result.get("error"),
+                reasoning_trace=result.get("reasoning_trace", []),
+                tools_used=result.get("tools_used", []),
+                needs_clarification=result.get("needs_clarification", False),
+                clarification_question=result.get("clarification_question"),
+                clarification_options=result.get("clarification_options", [])
+            )
+        except Exception as e:
+            # Fallback to legacy system
+            print(f"agent_fallback_to_legacy request_id={request_id} error_type={type(e).__name__}")
+            from .query_assistant import process_query
+            sanitized_q = sanitize_text(req.question)
+            result = process_query(sanitized_q, req.history)
+            final_status = "completed_legacy"
+            final_success = bool(result.get("success", False))
+            final_reason = result.get("error") or "agent_fallback_to_legacy"
+            final_row_count = result.get("row_count", 0)
+            upsert_ai_interaction(
+                request_id,
+                final_answer=result.get("answer"),
+                tools_used=["legacy_query_assistant"],
+                sql_used=result.get("sql_used", ""),
+                row_count=result.get("row_count", 0),
+                status=final_status,
+                error=result.get("error"),
+            )
+            
+            return QueryResponse(
+                request_id=request_id,
+                success=result.get("success", False),
+                answer=result.get("answer", "Sorry, I couldn't process that."),
+                highlights=result.get("highlights", []),
+                sql_used=result.get("sql_used", ""),
+                row_count=result.get("row_count", 0),
+                sources=result.get("sources", []),
+                error=result.get("error")
+            )
     except Exception as e:
-        # Fallback to legacy system
-        print(f"Agent error, falling back to legacy: {e}")
-        from .query_assistant import process_query
-        sanitized_q = sanitize_text(req.question)
-        result = process_query(sanitized_q, req.history)
-        
-        return QueryResponse(
-            success=result.get("success", False),
-            answer=result.get("answer", "Sorry, I couldn't process that."),
-            highlights=result.get("highlights", []),
-            sql_used=result.get("sql_used", ""),
-            row_count=result.get("row_count", 0),
-            sources=result.get("sources", []),
-            error=result.get("error")
+        final_status = "failed"
+        final_success = False
+        final_reason = type(e).__name__
+        upsert_ai_interaction(request_id, status=final_status, error=final_reason)
+        raise
+    finally:
+        upsert_ai_interaction(
+            request_id,
+            status=final_status,
+            error=final_reason,
+            row_count=final_row_count,
+        )
+        insert_governance_event(
+            request_id=request_id,
+            event_type="request_finalized",
+            component="api",
+            sequence=10000,
+            success=final_success,
+            reason=final_reason,
+            row_count=final_row_count,
+            payload={"final_status": final_status},
         )
     
 
@@ -426,7 +505,7 @@ def get_document_content(filename: str, request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error reading doc {filename}: {e}")
+        print(f"doc_read_failed filename={filename} error_type={type(e).__name__}")
         raise HTTPException(status_code=500, detail="Error reading document")
     
 
@@ -633,7 +712,7 @@ async def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParse
     try:
         # Rate limit check if requesting LLM
         if req.use_llm:
-            print(f"DEBUG: API /oru/parse called. persist={req.persist}, use_llm={req.use_llm}", flush=True)
+            print(f"oru_parse_requested persist={req.persist} use_llm={req.use_llm}", flush=True)
             client_ip = request.client.host if request.client else "unknown"
             now_ts = __import__("time").time()
             last_ts = _RATE_LIMIT_STORE.get(client_ip, 0.0)
@@ -974,10 +1053,10 @@ async def handle_contact(req: ContactRequest, request: Request):
             (req.email, client_ip, datetime.now().isoformat())
         )
         conn.commit()
-        print(f"New contact saved: {req.email}")
+        print("contact_saved")
         return {"status": "saved"}
     except Exception as e:
-        print(f"Error saving contact: {e}")
+        print(f"contact_save_failed error_type={type(e).__name__}")
         raise HTTPException(status_code=500, detail="Failed to save contact information.")
     finally:
         conn.close()

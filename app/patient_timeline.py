@@ -187,5 +187,5 @@ Return ONLY the summary text, no JSON."""
         summary = call_llm(prompt)
         return summary.strip() if summary else "Unable to generate summary."
     except Exception as e:
-        print(f"Journey summary error: {e}")
+        print(f"journey_summary_failed error_type={type(e).__name__}")
         return "AI summary temporarily unavailable."
