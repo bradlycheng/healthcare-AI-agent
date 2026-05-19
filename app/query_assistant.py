@@ -13,7 +13,7 @@ import re
 import sqlite3
 from typing import Any, Dict, List, Optional
 
-from .llm_client import call_llm_for_json, LLMError
+from .llm_gateway import LLMError, sql_generation, call_llm_json
 from .security import sanitize_text
 
 DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
@@ -476,7 +476,7 @@ Generate the SQL query now. Output JSON only.
 """
     
     try:
-        result = call_llm_for_json(prompt)
+        result = sql_generation(prompt)
         sql = result.get("sql", "").strip()
         explanation = result.get("explanation", "")
         
@@ -536,7 +536,7 @@ Output JSON only.
 """
     
     try:
-        result = call_llm_for_json(prompt)
+        result = call_llm_json("legacy_response_formatting", prompt)
         answer = result.get("answer", "Here are the results I found.")
         highlights = result.get("highlights", [])
         

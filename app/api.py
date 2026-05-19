@@ -17,13 +17,22 @@ import sys
 sys.stdout.reconfigure(encoding='utf-8')
 
 import os
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from dotenv import load_dotenv
 
 # Load environment variables from .env file (if present)
 load_dotenv()
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from .security_validation import (
+    SECURITY_CONFIG,
+    emit_governance_event,
+    get_or_create_demo_session,
+    hash_text,
+    iso_after,
+    new_parse_id,
+    new_request_id,
+)
 print("DEBUG: API MODULE LOADED", flush=True)
 
 DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
@@ -66,7 +75,7 @@ def on_startup():
 class ORUParseRequest(BaseModel):
     hl7_text: str
     use_llm: bool = True
-    persist: bool = True
+    persist: bool = False
 
 
 class PatientOut(BaseModel):
@@ -99,14 +108,16 @@ class ORUParseResponse(BaseModel):
     fhir_bundle: Dict[str, Any]
     hl7_ack: str = ""
     ai_analysis: Optional[Dict[str, Any]] = None
+    parse_id: Optional[str] = None
 
 
 class SaveMessageRequest(BaseModel):
-    patient: PatientOut
-    clinical_summary: str
-    structured_observations: List[ObservationOut]
-    fhir_bundle: Dict[str, Any]
-    raw_hl7: str
+    parse_id: Optional[str] = None
+    patient: Optional[PatientOut] = None
+    clinical_summary: Optional[str] = None
+    structured_observations: List[ObservationOut] = []
+    fhir_bundle: Dict[str, Any] = {}
+    raw_hl7: str = ""
 
 
 class MessageListItem(BaseModel):
@@ -242,6 +253,27 @@ def _obs_value(row: sqlite3.Row) -> Any:
     return vraw if vraw is not None else ""
 
 
+def _audit_read_endpoint(
+    request: Request,
+    response: Response,
+    *,
+    component: str,
+    reason_code: str,
+    payload: Optional[Dict[str, Any]] = None,
+) -> str:
+    request_id = new_request_id()
+    session_id = get_or_create_demo_session(request, response)
+    emit_governance_event(
+        request_id=request_id,
+        session_id=session_id,
+        component=component,
+        action="ALLOW",
+        reason_code=reason_code,
+        payload=payload or {},
+    )
+    return request_id
+
+
 # ---------- Routes ----------
 
 from fastapi import Request
@@ -305,12 +337,23 @@ def contact_endpoint(req: ContactRequest, request: Request):
 
 
 @app.post("/api/query", response_model=QueryResponse)
-def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryResponse:
+def query_assistant_endpoint(req: QueryRequest, request: Request, response: Response) -> QueryResponse:
     """
     Natural language query endpoint using AI Agent.
     Agent decides which tools to use (database, guidelines, calculators, etc.)
     Falls back to legacy system on error.
     """
+    request_id = new_request_id()
+    session_id = get_or_create_demo_session(request, response)
+    emit_governance_event(
+        request_id=request_id,
+        session_id=session_id,
+        component="api.query",
+        action="START",
+        reason_code="query_received",
+        payload={"reasoning_depth": req.reasoning_depth, "history_count": len(req.history or [])},
+    )
+
     # Rate limit check
     client_ip = request.client.host if request.client else "unknown"
     now_ts = __import__("time").time()
@@ -326,22 +369,51 @@ def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryRespon
     injection_warnings = detect_injection_patterns(req.question)
     if injection_warnings:
         print(f"SECURITY API BLOCK: {injection_warnings}")
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.query",
+            action="DENY",
+            reason_code="input_sanitization_block",
+            payload={"warnings": injection_warnings},
+        )
         return QueryResponse(
             success=False,
             answer="Your query was blocked due to potentially unsafe content. Please ask a normal question about patient data.",
             error="Query blocked by input sanitization"
         )
     
-    # Use new Agent system
     try:
         from .healthcare_agent import run_agent_query
         result = run_agent_query(req.question, req.history, depth=req.reasoning_depth)
         
-        # If agent failed with an error, try legacy fallback
         if not result.get("success", False) and result.get("error"):
-            print(f"Agent returned error, trying legacy: {result.get('error')}")
-            raise Exception(result.get("error"))
+            emit_governance_event(
+                request_id=request_id,
+                session_id=session_id,
+                component="api.query",
+                action="DENY",
+                reason_code="agent_failed_no_legacy_fallback",
+                payload={"tools_used": result.get("tools_used", [])},
+            )
+            return QueryResponse(
+                success=False,
+                answer="I could not process that request safely.",
+                error="Agent failed; legacy fallback is disabled by governance.",
+            )
         
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.query",
+            action="ALLOW",
+            reason_code="query_completed",
+            payload={
+                "tools_used": result.get("tools_used", []),
+                "row_count": result.get("row_count", 0),
+                "source_count": len(result.get("sources", []) or []),
+            },
+        )
         return QueryResponse(
             success=result.get("success", False),
             answer=result.get("answer", "Sorry, I couldn't process that."),
@@ -357,20 +429,19 @@ def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryRespon
             clarification_options=result.get("clarification_options", [])
         )
     except Exception as e:
-        # Fallback to legacy system
-        print(f"Agent error, falling back to legacy: {e}")
-        from .query_assistant import process_query
-        sanitized_q = sanitize_text(req.question)
-        result = process_query(sanitized_q, req.history)
-        
+        print(f"Agent error, legacy fallback disabled: {e}")
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.query",
+            action="DENY",
+            reason_code="agent_exception_no_legacy_fallback",
+            payload={"error_type": type(e).__name__},
+        )
         return QueryResponse(
-            success=result.get("success", False),
-            answer=result.get("answer", "Sorry, I couldn't process that."),
-            highlights=result.get("highlights", []),
-            sql_used=result.get("sql_used", ""),
-            row_count=result.get("row_count", 0),
-            sources=result.get("sources", []),
-            error=result.get("error")
+            success=False,
+            answer="I could not process that request safely.",
+            error="Agent error; legacy fallback is disabled by governance.",
         )
     
 
@@ -435,13 +506,20 @@ def get_document_content(filename: str, request: Request):
 # ---------- Patient Timeline Routes ----------
 
 @app.get("/patients", response_model=PatientListResponse)
-def list_patients() -> PatientListResponse:
+def list_patients(request: Request, response: Response) -> PatientListResponse:
     """
     Get list of unique patients with visit counts.
     """
     from .patient_timeline import get_unique_patients
     
     patients = get_unique_patients()
+    _audit_read_endpoint(
+        request,
+        response,
+        component="api.patients",
+        reason_code="patient_list_read",
+        payload={"count": len(patients)},
+    )
     items = [
         PatientListItem(
             patient_id=p["patient_id"],
@@ -459,7 +537,7 @@ def list_patients() -> PatientListResponse:
 
 
 @app.get("/patients/{patient_id}/timeline", response_model=PatientTimelineResponse)
-def get_patient_timeline_endpoint(patient_id: str) -> PatientTimelineResponse:
+def get_patient_timeline_endpoint(patient_id: str, request: Request, response: Response) -> PatientTimelineResponse:
     """
     Get full timeline for a patient including all visits and observations.
     """
@@ -469,6 +547,13 @@ def get_patient_timeline_endpoint(patient_id: str) -> PatientTimelineResponse:
     
     if not timeline:
         raise HTTPException(status_code=404, detail="Patient not found")
+    _audit_read_endpoint(
+        request,
+        response,
+        component="api.patients.timeline",
+        reason_code="patient_timeline_read",
+        payload={"patient_id": patient_id, "visit_count": timeline["visit_count"]},
+    )
     
     patient = PatientOut(
         id=timeline["patient"]["patient_id"],
@@ -510,7 +595,7 @@ def get_patient_timeline_endpoint(patient_id: str) -> PatientTimelineResponse:
 
 
 @app.get("/patients/{patient_id}/summary", response_model=PatientSummaryResponse)
-def get_patient_summary_endpoint(patient_id: str, request: Request) -> PatientSummaryResponse:
+def get_patient_summary_endpoint(patient_id: str, request: Request, response: Response) -> PatientSummaryResponse:
     """
     Get AI-generated journey summary for a patient.
     """
@@ -530,6 +615,13 @@ def get_patient_summary_endpoint(patient_id: str, request: Request) -> PatientSu
     
     if not timeline:
         raise HTTPException(status_code=404, detail="Patient not found")
+    _audit_read_endpoint(
+        request,
+        response,
+        component="api.patients.summary",
+        reason_code="patient_summary_requested",
+        payload={"patient_id": patient_id, "visit_count": timeline["visit_count"]},
+    )
     
     summary = generate_journey_summary(timeline)
     
@@ -573,44 +665,160 @@ def clear_all_messages_endpoint(req: ResetRequest):
 
 
 @app.post("/messages", status_code=201)
-def save_message_endpoint(req: SaveMessageRequest):
+def save_message_endpoint(req: SaveMessageRequest, request: Request, response: Response):
     """
     Save a fully verified message (patient + obs) to the DB.
     """
-    from .db import insert_message_and_observations, init_db
+    from .db import (
+        claim_hl7_parse_session,
+        insert_message_and_observations,
+        init_db,
+        mark_hl7_parse_session_persisted,
+    )
     from .hl7_msh import parse_msh
 
+    request_id = new_request_id()
+    session_id = get_or_create_demo_session(request, response)
     try:
         init_db()
-        msh_obj = parse_msh(req.raw_hl7)
+        if not req.parse_id:
+            emit_governance_event(
+                request_id=request_id,
+                session_id=session_id,
+                component="api.messages",
+                action="DENY",
+                reason_code="missing_parse_id",
+                payload={"legacy_compatibility": SECURITY_CONFIG["compatibility"]["allow_legacy_messages"]},
+            )
+            if not SECURITY_CONFIG["compatibility"]["allow_legacy_messages"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Saving requires a server-issued parse_id. Re-parse the HL7 message before saving.",
+                )
+            if req.patient is None:
+                raise HTTPException(status_code=400, detail="Legacy save requires patient data.")
+            msh_obj = parse_msh(req.raw_hl7)
+            msh_dict = msh_obj.__dict__ if msh_obj else {}
+            message_id = insert_message_and_observations(
+                received_at=str(datetime.utcnow()),
+                raw_hl7=req.raw_hl7,
+                patient=req.patient.dict(),
+                observations=[o.dict() for o in req.structured_observations],
+                fhir_bundle=req.fhir_bundle,
+                msh=msh_dict,
+            )
+            emit_governance_event(
+                request_id=request_id,
+                session_id=session_id,
+                component="api.messages",
+                action="ALLOW",
+                reason_code="legacy_message_saved_compatibility_mode",
+                payload={"message_id": message_id, "observation_count": len(req.structured_observations)},
+            )
+            return {"status": "saved", "message_id": message_id}
+
+        parse_row = claim_hl7_parse_session(req.parse_id, session_id)
+        if parse_row is None:
+            emit_governance_event(
+                request_id=request_id,
+                session_id=session_id,
+                component="api.messages",
+                action="DENY",
+                reason_code="invalid_or_expired_parse_id",
+                payload={"parse_id": req.parse_id},
+            )
+            raise HTTPException(status_code=400, detail="Invalid or expired parse_id.")
+
+        parse_result = json.loads(parse_row["parse_result_json"])
+        raw_hl7 = parse_result.get("raw_hl7", "")
+        patient_data = parse_result.get("patient", {}) or {}
+        observations_data = parse_result.get("structured_observations", []) or []
+        fhir_bundle = parse_result.get("fhir_bundle", {}) or {}
+
+        msh_obj = parse_msh(raw_hl7)
         msh_dict = msh_obj.__dict__ if msh_obj else {}
 
-        insert_message_and_observations(
+        message_id = insert_message_and_observations(
             received_at=str(datetime.utcnow()),
-            raw_hl7=req.raw_hl7,
-            patient=req.patient.dict(),
-            observations=[o.dict() for o in req.structured_observations],
-            fhir_bundle=req.fhir_bundle,
+            raw_hl7=raw_hl7,
+            patient=patient_data,
+            observations=observations_data,
+            fhir_bundle=fhir_bundle,
             msh=msh_dict,
         )
-        return {"status": "saved"}
+        mark_hl7_parse_session_persisted(req.parse_id, session_id, message_id)
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.messages",
+            action="ALLOW",
+            reason_code="parse_session_persisted",
+            payload={
+                "parse_id": req.parse_id,
+                "message_id": message_id,
+                "observation_count": len(observations_data),
+            },
+        )
+        return {"status": "saved", "message_id": message_id}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save message: {e}")
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.messages",
+            action="DENY",
+            reason_code="message_save_exception",
+            payload={"error_type": type(e).__name__},
+        )
+        raise HTTPException(status_code=500, detail="Failed to save message.")
 
 
 @app.post("/oru/parse", response_model=ORUParseResponse)
-async def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParseResponse:
+async def parse_oru_endpoint(req: ORUParseRequest, request: Request, response: Response) -> ORUParseResponse:
     """
     Run the ORU pipeline and return the result.
     If persist=False, it's a dry-run (preview).
     """
+    request_id = new_request_id()
+    session_id = get_or_create_demo_session(request, response)
+    emit_governance_event(
+        request_id=request_id,
+        session_id=session_id,
+        component="api.oru_parse",
+        action="START",
+        reason_code="hl7_parse_received",
+        payload={"persist": req.persist, "use_llm": req.use_llm, "raw_length": len(req.hl7_text or "")},
+    )
+
+    direct_persist_allowed = SECURITY_CONFIG["compatibility"]["allow_oru_direct_persist"]
+    if req.persist and not direct_persist_allowed:
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.oru_parse",
+            action="DENY",
+            reason_code="direct_oru_persist_disabled",
+            payload={"legacy_compatibility": direct_persist_allowed},
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Direct ORU persistence is disabled. Parse with persist=false, then save using the server-issued parse_id.",
+        )
+
     # 0. Sanitize input (Strip emojis, non-standard unicode, injection tags)
     req.hl7_text = sanitize_text(req.hl7_text, strict_ascii=True)
 
     # 1. Basic Validation
     if not req.hl7_text or "MSH" not in req.hl7_text:
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.oru_parse",
+            action="DENY",
+            reason_code="missing_msh",
+            payload={},
+        )
         raise HTTPException(status_code=400, detail="Invalid HL7 message. Must start with MSH segment.")
 
     # 1. Message Type Validation
@@ -624,6 +832,14 @@ async def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParse
         
         # Check MSH-9 (Message Type). Should contain ORU (e.g. ORU^R01)
         if "ORU" not in (msh.message_type or "").upper():
+            emit_governance_event(
+                request_id=request_id,
+                session_id=session_id,
+                component="api.oru_parse",
+                action="DENY",
+                reason_code="non_oru_message_type",
+                payload={"message_type": msh.message_type},
+            )
             raise HTTPException(
                 status_code=400, 
                 detail=f"Invalid Message Type: Expected ORU (Observation Result), received '{msh.message_type}'."
@@ -644,14 +860,43 @@ async def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParse
             _RATE_LIMIT_STORE[client_ip] = now_ts
     
         # Run in separate thread to avoid blocking the event loop during Bedrock call
-        result: Dict[str, Any] = await asyncio.to_thread(run_oru_pipeline, req.hl7_text, req.use_llm, req.persist)
+        result: Dict[str, Any] = await asyncio.wait_for(
+            asyncio.to_thread(run_oru_pipeline, req.hl7_text, req.use_llm, req.persist),
+            timeout=SECURITY_CONFIG["timeouts"]["hl7_parse_seconds"],
+        )
+    except asyncio.TimeoutError:
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.oru_parse",
+            action="DENY",
+            reason_code="hl7_parse_timeout",
+            payload={"timeout_seconds": SECURITY_CONFIG["timeouts"]["hl7_parse_seconds"]},
+        )
+        raise HTTPException(status_code=504, detail="HL7 parse timed out.")
     except HTTPException:
         raise
     except Exception as e:
         # Catch any parser errors (like hl7apy failures) and return 400 if it's a data issue
         if "Msh missing" in str(e) or "Invalid" in str(e):
-             raise HTTPException(status_code=400, detail=f"Failed to parse HL7: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal Processing Error: {str(e)}")
+            emit_governance_event(
+                request_id=request_id,
+                session_id=session_id,
+                component="api.oru_parse",
+                action="DENY",
+                reason_code="hl7_parse_invalid",
+                payload={"error_type": type(e).__name__},
+            )
+            raise HTTPException(status_code=400, detail="Failed to parse HL7.")
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.oru_parse",
+            action="DENY",
+            reason_code="hl7_parse_exception",
+            payload={"error_type": type(e).__name__},
+        )
+        raise HTTPException(status_code=500, detail="Internal processing error.")
 
     patient_dict = result.get("patient", {}) or {}
     clinical_summary = result.get("clinical_summary", "") or ""
@@ -689,18 +934,60 @@ async def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParse
     if not isinstance(fhir_bundle, dict):
         fhir_bundle = {"resourceType": "Bundle", "type": "collection", "entry": [], "_raw": fhir_bundle}
 
+    parse_id: Optional[str] = None
+    if not req.persist:
+        from .db import create_hl7_parse_session
+
+        parse_id = new_parse_id()
+        parse_result = {
+            "raw_hl7": req.hl7_text,
+            "patient": patient.dict(),
+            "clinical_summary": clinical_summary,
+            "structured_observations": [o.dict() for o in observations],
+            "fhir_bundle": fhir_bundle,
+            "ai_analysis": ai_analysis,
+        }
+        create_hl7_parse_session(
+            parse_id=parse_id,
+            session_id=session_id,
+            raw_hl7_hash=hash_text(req.hl7_text),
+            parse_result=parse_result,
+            note_policy_result={"status": "not_evaluated_phase_1"},
+            expires_at=iso_after(minutes=SECURITY_CONFIG["ttl"]["hl7_parse_minutes"]),
+        )
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.oru_parse",
+            action="ALLOW",
+            reason_code="parse_session_created",
+            payload={"parse_id": parse_id, "observation_count": len(observations)},
+        )
+    else:
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.oru_parse",
+            action="ALLOW",
+            reason_code="hl7_persisted_directly",
+            payload={"message_id": result.get("id"), "observation_count": len(observations)},
+        )
+
     return ORUParseResponse(
         patient=patient,
         clinical_summary=clinical_summary,
         structured_observations=observations,
         fhir_bundle=fhir_bundle,
         hl7_ack=ack_message,
-        ai_analysis=ai_analysis
+        ai_analysis=ai_analysis,
+        parse_id=parse_id,
     )
 
 
 @app.get("/messages", response_model=MessageListResponse)
 def list_messages(
+    request: Request,
+    response: Response,
     limit: int = Query(50, ge=1, le=2000),
     offset: int = Query(0, ge=0),
 ) -> MessageListResponse:
@@ -710,6 +997,13 @@ def list_messages(
     conn = _conn()
     try:
         total = conn.execute("SELECT COUNT(*) AS c FROM hl7_messages").fetchone()["c"]
+        _audit_read_endpoint(
+            request,
+            response,
+            component="api.messages",
+            reason_code="message_list_read",
+            payload={"limit": limit, "offset": offset, "total": int(total)},
+        )
 
         rows = conn.execute(
             """
@@ -748,7 +1042,7 @@ def list_messages(
 
 
 @app.get("/messages/{message_id}", response_model=MessageDetailResponse)
-def get_message(message_id: int) -> MessageDetailResponse:
+def get_message(message_id: int, request: Request, response: Response) -> MessageDetailResponse:
     """
     Get a single message + patient + fhir bundle.
     """
@@ -774,6 +1068,13 @@ def get_message(message_id: int) -> MessageDetailResponse:
 
         if not r:
             raise HTTPException(status_code=404, detail="Message not found")
+        _audit_read_endpoint(
+            request,
+            response,
+            component="api.messages",
+            reason_code="message_detail_read",
+            payload={"message_id": message_id},
+        )
 
         patient = PatientOut(
             id=str(r["patient_id"] or "patient-1"),
@@ -797,7 +1098,7 @@ def get_message(message_id: int) -> MessageDetailResponse:
 
 
 @app.get("/messages/{message_id}/observations", response_model=ObservationListResponse)
-def list_message_observations(message_id: int) -> ObservationListResponse:
+def list_message_observations(message_id: int, request: Request, response: Response) -> ObservationListResponse:
     """
     Get observations for a message.
     """
@@ -806,6 +1107,13 @@ def list_message_observations(message_id: int) -> ObservationListResponse:
         exists = conn.execute("SELECT 1 FROM hl7_messages WHERE id = ?", (message_id,)).fetchone()
         if not exists:
             raise HTTPException(status_code=404, detail="Message not found")
+        _audit_read_endpoint(
+            request,
+            response,
+            component="api.messages.observations",
+            reason_code="message_observations_read",
+            payload={"message_id": message_id},
+        )
 
         rows = conn.execute(
             """

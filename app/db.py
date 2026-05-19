@@ -139,6 +139,88 @@ def init_db(db_path: str = DB_PATH) -> None:
             );
             """
         )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS demo_sessions (
+                session_id TEXT PRIMARY KEY,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                last_seen_at TEXT,
+                expires_at TEXT,
+                actor_id TEXT
+            );
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS hl7_parse_sessions (
+                parse_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                raw_hl7_hash TEXT NOT NULL,
+                status TEXT NOT NULL,
+                parse_result_json TEXT NOT NULL,
+                note_policy_result_json TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                expires_at TEXT NOT NULL,
+                persisted_message_id INTEGER,
+                FOREIGN KEY(persisted_message_id) REFERENCES hl7_messages(id)
+            );
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversation_states (
+                conversation_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                state_json TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT,
+                expires_at TEXT NOT NULL
+            );
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversation_result_refs (
+                result_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                result_json TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                expires_at TEXT NOT NULL
+            );
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_interactions (
+                request_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                trace_json TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT
+            );
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS governance_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                component TEXT NOT NULL,
+                action TEXT NOT NULL,
+                reason_code TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            """
+        )
         
         # Migration for existing tables
         try:
@@ -160,7 +242,190 @@ def init_db(db_path: str = DB_PATH) -> None:
             conn.execute("ALTER TABLE observations ADD COLUMN source VARCHAR")
         except sqlite3.OperationalError:
             pass # Column likely exists
-            
+
+        indexes = [
+            "CREATE INDEX IF NOT EXISTS idx_hl7_messages_patient_id ON hl7_messages(patient_id)",
+            "CREATE INDEX IF NOT EXISTS idx_hl7_messages_received_at ON hl7_messages(received_at)",
+            "CREATE INDEX IF NOT EXISTS idx_observations_message_id ON observations(message_id)",
+            "CREATE INDEX IF NOT EXISTS idx_visits_patient_id ON visits(patient_id)",
+            "CREATE INDEX IF NOT EXISTS idx_medications_patient_id ON medications(patient_id)",
+            "CREATE INDEX IF NOT EXISTS idx_diagnoses_patient_id ON diagnoses(patient_id)",
+            "CREATE INDEX IF NOT EXISTS idx_demo_sessions_expires_at ON demo_sessions(expires_at)",
+            "CREATE INDEX IF NOT EXISTS idx_hl7_parse_sessions_session_expiry ON hl7_parse_sessions(session_id, expires_at)",
+            "CREATE INDEX IF NOT EXISTS idx_hl7_parse_sessions_status_expiry ON hl7_parse_sessions(status, expires_at)",
+            "CREATE INDEX IF NOT EXISTS idx_conversation_states_session ON conversation_states(conversation_id, session_id)",
+            "CREATE INDEX IF NOT EXISTS idx_conversation_states_expires_at ON conversation_states(expires_at)",
+            "CREATE INDEX IF NOT EXISTS idx_conversation_result_refs_session ON conversation_result_refs(result_id, session_id)",
+            "CREATE INDEX IF NOT EXISTS idx_conversation_result_refs_expires_at ON conversation_result_refs(expires_at)",
+            "CREATE INDEX IF NOT EXISTS idx_governance_events_request_id ON governance_events(request_id)",
+            "CREATE INDEX IF NOT EXISTS idx_governance_events_created_at ON governance_events(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_interactions_status_updated ON ai_interactions(status, updated_at)",
+        ]
+        for statement in indexes:
+            conn.execute(statement)
+
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_demo_session(session_id: str, db_path: str = DB_PATH) -> Optional[sqlite3.Row]:
+    conn = get_connection(db_path)
+    try:
+        return conn.execute(
+            "SELECT * FROM demo_sessions WHERE session_id = ? AND expires_at > ?",
+            (session_id, datetime.utcnow().isoformat()),
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def upsert_demo_session(
+    session_id: str,
+    expires_at: str,
+    last_seen_at: str,
+    db_path: str = DB_PATH,
+) -> None:
+    init_db(db_path)
+    conn = get_connection(db_path)
+    try:
+        conn.execute(
+            """
+            INSERT INTO demo_sessions (session_id, last_seen_at, expires_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(session_id) DO UPDATE SET
+                last_seen_at = excluded.last_seen_at,
+                expires_at = excluded.expires_at
+            """,
+            (session_id, last_seen_at, expires_at),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def insert_governance_event(
+    request_id: str,
+    session_id: str,
+    component: str,
+    action: str,
+    reason_code: str,
+    payload_json: str,
+    created_at: str,
+    db_path: str = DB_PATH,
+) -> None:
+    init_db(db_path)
+    conn = get_connection(db_path)
+    try:
+        conn.execute(
+            """
+            INSERT INTO governance_events (
+                request_id, session_id, component, action, reason_code, payload_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (request_id, session_id, component, action, reason_code, payload_json, created_at),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def create_hl7_parse_session(
+    parse_id: str,
+    session_id: str,
+    raw_hl7_hash: str,
+    parse_result: Dict[str, Any],
+    note_policy_result: Dict[str, Any],
+    expires_at: str,
+    db_path: str = DB_PATH,
+) -> None:
+    init_db(db_path)
+    conn = get_connection(db_path)
+    try:
+        conn.execute(
+            """
+            INSERT INTO hl7_parse_sessions (
+                parse_id, session_id, raw_hl7_hash, status, parse_result_json,
+                note_policy_result_json, expires_at
+            ) VALUES (?, ?, ?, 'validated', ?, ?, ?)
+            """,
+            (
+                parse_id,
+                session_id,
+                raw_hl7_hash,
+                json.dumps(parse_result),
+                json.dumps(note_policy_result),
+                expires_at,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_hl7_parse_session(parse_id: str, session_id: str, db_path: str = DB_PATH) -> Optional[sqlite3.Row]:
+    conn = get_connection(db_path)
+    try:
+        return conn.execute(
+            """
+            SELECT * FROM hl7_parse_sessions
+            WHERE parse_id = ? AND session_id = ? AND status = 'validated' AND expires_at > ?
+            """,
+            (parse_id, session_id, datetime.utcnow().isoformat()),
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def claim_hl7_parse_session(parse_id: str, session_id: str, db_path: str = DB_PATH) -> Optional[sqlite3.Row]:
+    """Atomically claim a validated parse session for one persistence attempt."""
+    conn = get_connection(db_path)
+    now = datetime.utcnow().isoformat()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cur = conn.execute(
+            """
+            UPDATE hl7_parse_sessions
+            SET status = 'persisting'
+            WHERE parse_id = ? AND session_id = ? AND status = 'validated' AND expires_at > ?
+            """,
+            (parse_id, session_id, now),
+        )
+        if cur.rowcount != 1:
+            conn.rollback()
+            return None
+        row = conn.execute(
+            """
+            SELECT * FROM hl7_parse_sessions
+            WHERE parse_id = ? AND session_id = ? AND status = 'persisting'
+            """,
+            (parse_id, session_id),
+        ).fetchone()
+        conn.commit()
+        return row
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def mark_hl7_parse_session_persisted(
+    parse_id: str,
+    session_id: str,
+    message_id: int,
+    db_path: str = DB_PATH,
+) -> None:
+    conn = get_connection(db_path)
+    try:
+        conn.execute(
+            """
+            UPDATE hl7_parse_sessions
+            SET status = 'persisted', persisted_message_id = ?
+            WHERE parse_id = ? AND session_id = ? AND status = 'persisting'
+            """,
+            (message_id, parse_id, session_id),
+        )
         conn.commit()
     finally:
         conn.close()

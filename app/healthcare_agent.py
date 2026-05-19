@@ -20,8 +20,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Callable
 
-from .llm_client import call_llm_for_json, call_llm, LLMError
+from .llm_gateway import LLMError, agent_planning, agent_synthesis, deep_reflection
 from .security import sanitize_text, detect_injection_patterns
+from .security_validation import IntentGrant, iso_after, new_request_id
 
 
 # =============================================================================
@@ -322,9 +323,21 @@ class HealthcareAgent:
         row_count = 0
         
         try:
+            grant = IntentGrant(
+                intent="clinical_query",
+                risk="medium",
+                session_id="agent_internal",
+                request_id=new_request_id(),
+                scope="demo",
+                allowed_tools=[tool.value for tool in ToolName],
+                allowed_tables=["hl7_messages", "observations", "visits", "medications", "diagnoses"],
+                output_fields=["answer", "highlights", "sources"],
+                max_rows=50,
+                expires_at=iso_after(minutes=5),
+            )
             # === MCP WARDEN: Create request-scoped security context ===
             # PHITokenMap is session-pinned, ephemeral (RAM-only)
-            with self.warden.request_scope() as warden_ctx:
+            with self.warden.request_scope(grant=grant) as warden_ctx:
             
                 # Step 1: Planning - decide which tools to use
                 # IN-GATE: Tokenize question + history before LLM sees it
@@ -428,7 +441,7 @@ class HealthcareAgent:
                     try:
                         # Pass history for context-aware tools
                         if tool_name == ToolName.QUERY_DATABASE.value:
-                            result = self._tools[tool_name](real_tool_input, history)
+                            result = self._tools[tool_name](real_tool_input, safe_history)
                         else:
                             result = self._tools[tool_name](real_tool_input)
                         
@@ -547,7 +560,7 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
 """
         
         try:
-            result = call_llm_for_json(prompt)
+            result = agent_planning(prompt)
             return result
         except Exception as e:
             return {"error": str(e)}
@@ -569,7 +582,7 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         
         try:
             # Use text generation to avoid JSON parsing issues with Markdown tables
-            text_response = call_llm(prompt)
+            text_response = agent_synthesis(prompt)
             print(f"DEBUG: Raw synthesis response:\n{text_response}")
             
             # Parse the text response
@@ -929,6 +942,20 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         """
         Deep Mode: Reflection + Standard ReAct.
         """
+        reflection_grant = IntentGrant(
+            intent="deep_reflection",
+            risk="medium",
+            session_id="agent_internal",
+            request_id=new_request_id(),
+            scope="advisory",
+            allowed_tools=[],
+            output_fields=["analysis", "strategy", "modifications"],
+            max_rows=0,
+            expires_at=iso_after(minutes=5),
+        )
+        with self.warden.request_scope(grant=reflection_grant) as reflection_ctx:
+            safe_question = reflection_ctx.anonymize(question)
+
         # 1. Reflection / Planning Step
         # JSON template in separate string to avoid f-string escaping issues
         json_template = """
@@ -940,7 +967,7 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
 """
         reflection_prompt = f"""
 You are a Senior Clinical AI Supervisor.
-A user has asked: "{question}"
+A user has asked: "{safe_question}"
 
 Analyze the complexity of this request.
 1. Identify if this requires multi-step reasoning (e.g., compare two patients, trend analysis).
@@ -955,15 +982,12 @@ Output JSON:
 Output valid JSON only. Do not use code blocks.
 """
         try:
-            reflection = call_llm_for_json(reflection_prompt)
+            reflection = deep_reflection(reflection_prompt)
             strategy = reflection.get("strategy", "Proceed with standard analysis.")
-            
-            # Inject strategy into history or prompt to guide _run_standard?
-            # For now, we prepend the strategy to the question to guide the ReAct agent
-            enhanced_question = f"[STRATEGY: {strategy}] {question}"
-            
-            # Run Standard loop with enhanced context
-            response = self._run_standard(enhanced_question, history)
+
+            # Reflection is advisory only. Do not prepend LLM-generated strategy
+            # into user text, because strategy text is not authority.
+            response = self._run_standard(question, history)
             
             # Prepend reflection step to trace
             reflection_step = AgentStep(

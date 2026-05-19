@@ -23,10 +23,12 @@ import re
 import sqlite3
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Dict, List, Set, Tuple, Optional, Any
 from contextlib import contextmanager
+
+from .security_validation import IntentGrant
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -75,7 +77,7 @@ TOOL_SCHEMAS = {
     "query_database": {"query": str},
     "search_guidelines": {"query": str},
     "get_patient_context": {"patient_id": (str, type(None)), "patient_name": (str, type(None))},
-    "clinical_calculator": {"calculation": str, "params": dict},
+    "clinical_calculator": {"calculation": str, "values": dict},
     "ask_clarification": {"question": str},
 }
 
@@ -347,11 +349,55 @@ class WardenPolicy:
         tool_name: str,
         tool_input: Dict[str, Any],
         token_map: PHITokenMap = None,
+        grant: Optional[IntentGrant] = None,
     ) -> WardenDecision:
         """Main entry point — every tool call passes through here.
 
         Returns ALLOW/DENY/MODIFY with reasoning.
         """
+        if grant is None:
+            decision = WardenDecision(
+                action="DENY",
+                tool_name=tool_name,
+                reason="Missing server-owned grant",
+                evidence="Tool execution requires IntentGrant",
+            )
+            self.audit_log.log(decision)
+            return decision
+
+        try:
+            expires_at = datetime.fromisoformat(grant.expires_at)
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            if expires_at <= datetime.now(timezone.utc):
+                decision = WardenDecision(
+                    action="DENY",
+                    tool_name=tool_name,
+                    reason="Expired server-owned grant",
+                    evidence=f"Grant expired at {grant.expires_at}",
+                )
+                self.audit_log.log(decision)
+                return decision
+        except Exception:
+            decision = WardenDecision(
+                action="DENY",
+                tool_name=tool_name,
+                reason="Invalid grant expiry",
+                evidence="Grant expires_at must be an ISO timestamp",
+            )
+            self.audit_log.log(decision)
+            return decision
+
+        if tool_name not in grant.allowed_tools:
+            decision = WardenDecision(
+                action="DENY",
+                tool_name=tool_name,
+                reason="Tool not allowed by grant",
+                evidence=f"Grant intent '{grant.intent}' does not allow tool '{tool_name}'",
+            )
+            self.audit_log.log(decision)
+            return decision
+
         # Check 1: Strict Type-Checking
         decision = self._check_schema(tool_name, tool_input)
         if decision.action == "DENY":
@@ -386,16 +432,38 @@ class WardenPolicy:
                 evidence=f"Tool '{tool_name}' not registered",
             )
 
+        expected_keys = set(schema.keys())
+        actual_keys = set(tool_input.keys())
+        optional_keys = {
+            key for key, expected_type in schema.items()
+            if isinstance(expected_type, tuple) and type(None) in expected_type
+        }
+        missing = expected_keys - actual_keys - optional_keys
+        extra = actual_keys - expected_keys
+        if missing:
+            return WardenDecision(
+                action="DENY",
+                tool_name=tool_name,
+                reason=f"Missing required fields: {', '.join(sorted(missing))}",
+                evidence="Exact schema validation failed",
+            )
+        if extra:
+            return WardenDecision(
+                action="DENY",
+                tool_name=tool_name,
+                reason=f"Unexpected fields: {', '.join(sorted(extra))}",
+                evidence="Exact schema validation failed",
+            )
+
         for param_name, expected_type in schema.items():
-            if param_name in tool_input:
-                value = tool_input[param_name]
-                if value is not None and not isinstance(value, expected_type):
-                    return WardenDecision(
-                        action="DENY",
-                        tool_name=tool_name,
-                        reason=f"Type mismatch: '{param_name}' expected {expected_type.__name__}, got {type(value).__name__}",
-                        evidence=f"Schema validation failed for parameter '{param_name}'",
-                    )
+            value = tool_input.get(param_name)
+            if value is not None and not isinstance(value, expected_type):
+                return WardenDecision(
+                    action="DENY",
+                    tool_name=tool_name,
+                    reason=f"Type mismatch: '{param_name}' expected {expected_type}, got {type(value).__name__}",
+                    evidence=f"Schema validation failed for parameter '{param_name}'",
+                )
 
         return WardenDecision(action="ALLOW", tool_name=tool_name, reason="Schema valid")
 
@@ -664,7 +732,7 @@ class Warden:
         self.surrogator = ClinicalSurrogator()
 
     @contextmanager
-    def request_scope(self):
+    def request_scope(self, grant: Optional[IntentGrant] = None):
         """Create a request-scoped security context.
 
         The PHITokenMap is created fresh and destroyed when the
@@ -676,6 +744,7 @@ class Warden:
             anonymizer=self.anonymizer,
             policy=self.policy,
             surrogator=self.surrogator,
+            grant=grant,
         )
         try:
             yield ctx
@@ -701,11 +770,13 @@ class WardenContext:
         anonymizer: WardenAnonymizer,
         policy: WardenPolicy,
         surrogator: ClinicalSurrogator,
+        grant: Optional[IntentGrant] = None,
     ):
         self.token_map = token_map
         self._anonymizer = anonymizer
         self._policy = policy
         self._surrogator = surrogator
+        self._grant = grant
 
     # --- IN-GATE ---
 
@@ -721,7 +792,7 @@ class WardenContext:
 
     def intercept(self, tool_name: str, tool_input: Dict[str, Any]) -> WardenDecision:
         """POLICY GATE: Validate a tool call. Returns ALLOW/DENY/MODIFY."""
-        return self._policy.intercept(tool_name, tool_input, self.token_map)
+        return self._policy.intercept(tool_name, tool_input, self.token_map, self._grant)
 
     # --- DOUBLE-BLIND SQL ---
 

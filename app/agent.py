@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from .db import init_db, insert_message_and_observations
 from .hl7_msh import parse_msh
 from .hl7_parser import parse_oru
-from .llm_client import LLMError, call_llm_for_json
+from .llm_gateway import LLMError, hl7_note_extraction
 from .alerts import check_alert
 from .security import sanitize_text
 
@@ -265,7 +265,7 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
     if USE_LLM and use_llm and _needs_ai_analysis(structured_observations):
         try:
             prompt = _build_llm_prompt(patient, structured_observations)
-            llm_raw = call_llm_for_json(prompt)
+            llm_raw = hl7_note_extraction(prompt)
 
             patient, clinical_summary, structured_observations, fhir_bundle = _merge_llm_output(
                 patient, clinical_summary, structured_observations, fhir_bundle, llm_raw

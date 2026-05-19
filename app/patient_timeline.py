@@ -11,7 +11,7 @@ import sqlite3
 import os
 from typing import Any, Dict, List, Optional
 
-from .llm_client import call_llm_for_json, LLMError
+from .llm_gateway import LLMError, patient_summary
 
 DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
 
@@ -169,7 +169,9 @@ def generate_journey_summary(timeline_data: Dict[str, Any]) -> str:
     
     prompt = f"""You are a clinical assistant. Summarize this patient's healthcare journey.
 
-PATIENT: {patient['first_name']} {patient['last_name']} (DOB: {patient['dob']}, Sex: {patient['sex']})
+PATIENT CONTEXT:
+Sex: {patient['sex'] or 'unknown'}
+Direct identifiers are withheld by governance policy.
 
 VISIT HISTORY:
 {chr(10).join(visit_summaries)}
@@ -183,8 +185,7 @@ Return ONLY the summary text, no JSON."""
 
     try:
         # Use a simpler call that returns text
-        from .llm_client import call_llm
-        summary = call_llm(prompt)
+        summary = patient_summary(prompt)
         return summary.strip() if summary else "Unable to generate summary."
     except Exception as e:
         print(f"Journey summary error: {e}")
