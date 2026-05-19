@@ -345,13 +345,20 @@ def query_assistant_endpoint(req: QueryRequest, request: Request, response: Resp
     """
     request_id = new_request_id()
     session_id = get_or_create_demo_session(request, response)
+    from .safe_memory import conversation_id_for_session, load_state
+    conversation_id = conversation_id_for_session(session_id)
+    prior_state = load_state(conversation_id, session_id)
     emit_governance_event(
         request_id=request_id,
         session_id=session_id,
         component="api.query",
         action="START",
         reason_code="query_received",
-        payload={"reasoning_depth": req.reasoning_depth, "history_count": len(req.history or [])},
+        payload={
+            "reasoning_depth": req.reasoning_depth,
+            "history_count": len(req.history or []),
+            "safe_state_present": prior_state is not None,
+        },
     )
 
     # Rate limit check
@@ -413,6 +420,20 @@ def query_assistant_endpoint(req: QueryRequest, request: Request, response: Resp
                 "row_count": result.get("row_count", 0),
                 "source_count": len(result.get("sources", []) or []),
             },
+        )
+        from .safe_memory import commit_successful_turn
+        memory_committed = commit_successful_turn(
+            conversation_id=conversation_id,
+            session_id=session_id,
+            agent_result=result,
+        )
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.query.memory",
+            action="ALLOW" if memory_committed else "SKIP",
+            reason_code="safe_memory_commit" if memory_committed else "safe_memory_not_committed",
+            payload={"committed": memory_committed},
         )
         return QueryResponse(
             success=result.get("success", False),

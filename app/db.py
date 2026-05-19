@@ -431,6 +431,54 @@ def mark_hl7_parse_session_persisted(
         conn.close()
 
 
+def upsert_conversation_state(
+    conversation_id: str,
+    session_id: str,
+    state: Dict[str, Any],
+    expires_at: str,
+    db_path: str = DB_PATH,
+) -> None:
+    init_db(db_path)
+    conn = get_connection(db_path)
+    try:
+        now = datetime.utcnow().isoformat()
+        conn.execute(
+            """
+            INSERT INTO conversation_states (
+                conversation_id, session_id, state_json, status, updated_at, expires_at
+            ) VALUES (?, ?, ?, 'active', ?, ?)
+            ON CONFLICT(conversation_id) DO UPDATE SET
+                session_id = excluded.session_id,
+                state_json = excluded.state_json,
+                status = 'active',
+                updated_at = excluded.updated_at,
+                expires_at = excluded.expires_at
+            """,
+            (conversation_id, session_id, json.dumps(state, sort_keys=True), now, expires_at),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_conversation_state(
+    conversation_id: str,
+    session_id: str,
+    db_path: str = DB_PATH,
+) -> Optional[sqlite3.Row]:
+    conn = get_connection(db_path)
+    try:
+        return conn.execute(
+            """
+            SELECT * FROM conversation_states
+            WHERE conversation_id = ? AND session_id = ? AND status = 'active' AND expires_at > ?
+            """,
+            (conversation_id, session_id, datetime.utcnow().isoformat()),
+        ).fetchone()
+    finally:
+        conn.close()
+
+
 def save_contact_request(email: str, ip_address: str, db_path: str = DB_PATH) -> bool:
     """
     Save a contact request to the database.

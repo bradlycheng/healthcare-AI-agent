@@ -85,6 +85,7 @@ class AgentResponse:
     clarification_question: Optional[str] = None
     clarification_options: List[str] = field(default_factory=list)
     error: Optional[str] = None
+    safe_metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -511,7 +512,8 @@ class HealthcareAgent:
                     tools_used=tools_used,
                     sources=all_sources,
                     sql_used=sql_used,
-                    row_count=row_count
+                    row_count=row_count,
+                    safe_metadata=self._safe_metadata_from_results(step.tool_results),
                 )
             
         except LLMError as e:
@@ -670,6 +672,11 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
             return header + "\n" + separator + "\n" + "\n".join(rows)
         
         return ""
+
+    def _safe_metadata_from_results(self, tool_results: List[ToolResult]) -> Dict[str, Any]:
+        from .safe_memory import extract_safe_metadata_from_tool_results
+
+        return extract_safe_metadata_from_tool_results(tool_results)
     
     def _fallback_synthesis(self, tool_results: List[ToolResult]) -> str:
         """Create a fallback answer when LLM synthesis fails.
@@ -1067,5 +1074,6 @@ def run_agent_query(question: str, history: List[Dict[str, str]] = None, depth: 
         "needs_clarification": response.needs_clarification,
         "clarification_question": response.clarification_question,
         "clarification_options": response.clarification_options,
-        "error": response.error
+        "error": response.error,
+        "safe_metadata": response.safe_metadata,
     }
