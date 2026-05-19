@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Security Kernel Execution With Agents And Sandbox</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --ink: #17202a;
+    --muted: #5b6773;
+    --line: #b9c2cc;
+    --kernel: #dff3ea;
+    --agent: #e7eefc;
+    --sandbox: #fff0d9;
+    --risk: #fde4e4;
+    --test: #ece7fb;
+    --card: #ffffff;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  main {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 32px;
+  }
+
+  h1 {
+    margin: 0 0 8px;
+    font-size: clamp(24px, 3vw, 34px);
+    letter-spacing: 0;
+  }
+
+  h2 {
+    margin: 0 0 12px;
+    font-size: 17px;
+    letter-spacing: 0;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    margin-bottom: 28px;
+    max-width: 900px;
+    line-height: 1.45;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1.05fr 1.3fr 1.05fr;
+    gap: 18px;
+    align-items: start;
+  }
+
+  .lane,
+  .phase {
+    background: var(--card);
+    border: 1px solid #d8dde3;
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+  }
+
+  .box {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 10px 0;
+    background: white;
+    min-height: 76px;
+  }
+
+  .agent {
+    background: var(--agent);
+  }
+
+  .kernel {
+    background: var(--kernel);
+  }
+
+  .sandbox {
+    background: var(--sandbox);
+  }
+
+  .risk {
+    background: var(--risk);
+  }
+
+  .test {
+    background: var(--test);
+  }
+
+  .box strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .box span {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .arrow {
+    text-align: center;
+    color: var(--muted);
+    font-weight: 700;
+    margin: 6px 0;
+  }
+
+  .phase {
+    margin-top: 22px;
+  }
+
+  .phase-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 22px 0;
+  }
+
+  .pill {
+    border: 1px solid #ccd3db;
+    border-radius: 999px;
+    padding: 7px 10px;
+    background: white;
+    font-size: 13px;
+  }
+
+  @media (max-width: 980px) {
+    .grid,
+    .phase-grid {
+      grid-template-columns: 1fr;
+    }
+
+    main {
+      padding: 20px;
+    }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Security Kernel Execution With Multiple Agents And Sandbox</h1>
+  <div class="subtitle">
+    Lead Codex owns the kernel architecture and integration. Sub-agents help with bounded discovery,
+    implementation slices, and review. The sandbox applies to every agent.
+  </div>
+
+  <div class="legend">
+    <div class="pill">Blue = agent work</div>
+    <div class="pill">Green = kernel enforcement</div>
+    <div class="pill">Yellow = sandbox/approval</div>
+    <div class="pill">Purple = validation</div>
+    <div class="pill">Red = risks to block</div>
+  </div>
+
+  <section class="phase">
+    <h2>Current Sandbox Setup</h2>
+    <div class="phase-grid">
+      <div class="box sandbox">
+        <strong>Sandbox is active</strong>
+        <span>Current mode is workspace-write. No extra sandbox setup is needed before Phase 0.</span>
+      </div>
+
+      <div class="box sandbox">
+        <strong>Writable roots</strong>
+        <span>Edits are limited to the healthcare_ai_agent workspace and C:\tmp unless you approve more access.</span>
+      </div>
+
+      <div class="box sandbox">
+        <strong>Network restricted</strong>
+        <span>External fetches, installs, or internet-dependent actions need approval and a clear reason.</span>
+      </div>
+
+      <div class="box sandbox">
+        <strong>Escalation still applies</strong>
+        <span>GUI/browser launch, destructive commands, reset/delete operations, and outside-workspace changes need approval.</span>
+      </div>
+
+      <div class="box test">
+        <strong>Project policy add-on</strong>
+        <span>Sandbox controls permissions. Project policy says Phase 0 agents stay read-only and worker edits wait for mapping review.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="lane">
+      <h2>1. Sandbox Rules</h2>
+
+      <div class="box sandbox">
+        <strong>Read-only exploration</strong>
+        <span>Agents may inspect files, search code, map flows, and run non-mutating checks.</span>
+      </div>
+
+      <div class="arrow">down</div>
+
+      <div class="box sandbox">
+        <strong>Approval before mutation</strong>
+        <span>Code edits, patches, migrations, generated files, and destructive commands require approval.</span>
+      </div>
+
+      <div class="arrow">down</div>
+
+      <div class="box sandbox">
+        <strong>No permission bypass</strong>
+        <span>Sub-agents inherit sandbox limits. More agents does not mean more authority.</span>
+      </div>
+
+      <div class="box risk">
+        <strong>Blocked behavior</strong>
+        <span>No unapproved writes, no broad destructive commands, no hidden network dependency, no silent implementation.</span>
+      </div>
+    </div>
+
+    <div class="lane">
+      <h2>2. Lead + Agent Model</h2>
+
+      <div class="box kernel">
+        <strong>Lead Codex</strong>
+        <span>Owns final architecture, integration, acceptance criteria, and security invariants.</span>
+      </div>
+
+      <div class="arrow">assigns bounded work</div>
+
+      <div class="box agent">
+        <strong>Explorer A: Query Flow</strong>
+        <span>Maps /api/query, process_query, agent tools, SQL generation, RAG, fallback paths.</span>
+      </div>
+
+      <div class="box agent">
+        <strong>Explorer B: HL7 + Messages</strong>
+        <span>Maps /oru/parse, /messages, FHIR generation, observations, client-trusted fields.</span>
+      </div>
+
+      <div class="box agent">
+        <strong>Explorer C: Warden + Guards</strong>
+        <span>Maps Warden v1, tool schemas, SQL validation, tokenization, calculator rules, audit JSONL.</span>
+      </div>
+
+      <div class="box agent">
+        <strong>Explorer D: Storage + Audit</strong>
+        <span>Maps DB setup, reset/admin, trace storage, ownership gaps, TTL/index needs.</span>
+      </div>
+
+      <div class="arrow">after mapping</div>
+
+      <div class="box agent">
+        <strong>Workers</strong>
+        <span>Implement isolated slices only: contracts, LLM gateway, Warden v2, HL7/messages governance.</span>
+      </div>
+
+      <div class="arrow">then</div>
+
+      <div class="box test">
+        <strong>Reviewer Agent</strong>
+        <span>Looks for bypasses, PHI leaks, unsafe fallback, metadata injection, stale state, missing tests.</span>
+      </div>
+    </div>
+
+    <div class="lane">
+      <h2>3. Kernel Spine</h2>
+
+      <div class="box kernel">
+        <strong>Endpoint intake</strong>
+        <span>/api/query, /oru/parse, /messages, read endpoints, admin/reset.</span>
+      </div>
+
+      <div class="arrow">down</div>
+
+      <div class="box kernel">
+        <strong>Canonicalize + session bind</strong>
+        <span>Normalize input, create request_id, attach server-issued session_id, record warnings.</span>
+      </div>
+
+      <div class="arrow">down</div>
+
+      <div class="box kernel">
+        <strong>Grant + Warden v2</strong>
+        <span>Server builds IntentGrant. Warden validates tool, exact schema, grant, scope, policy.</span>
+      </div>
+
+      <div class="arrow">down</div>
+
+      <div class="box kernel">
+        <strong>Specialized guards</strong>
+        <span>SQLGuard, Hl7Guard, TokenGuard, RAGGuard, CalculatorGuard, MemoryGuard.</span>
+      </div>
+
+      <div class="arrow">down</div>
+
+      <div class="box kernel">
+        <strong>Output + commit gates</strong>
+        <span>Token restore/redact, safe rendering, PHI-free audit, safe memory commit only after success.</span>
+      </div>
+
+      <div class="box risk">
+        <strong>Never allowed</strong>
+        <span>LLM-created authority, client-created clinical truth, ungated fallback, PHI in governance_events.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="phase">
+    <h2>Execution Phases</h2>
+    <div class="phase-grid">
+      <div class="box agent">
+        <strong>Phase 0</strong>
+        <span>Read-only multi-agent mapping. No edits. Produce bypass list and implementation checklist.</span>
+      </div>
+
+      <div class="box kernel">
+        <strong>Phase 1</strong>
+        <span>Build broad kernel spine. Route high-risk endpoints through session, grant, audit, and fail-closed gates.</span>
+      </div>
+
+      <div class="box kernel">
+        <strong>Phase 2</strong>
+        <span>Deepen SQL, HL7, token, RAG, calculator, note, and admin guards.</span>
+      </div>
+
+      <div class="box kernel">
+        <strong>Phase 3</strong>
+        <span>Add safe memory, result refs, TTLs, reference resolution, and no-commit-on-failure behavior.</span>
+      </div>
+
+      <div class="box kernel">
+        <strong>Phase 4+</strong>
+        <span>Add bounded dynamic context, then operational hardening, retention, production auth, and legacy cleanup.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="phase">
+    <h2>Validation Gates</h2>
+    <div class="phase-grid">
+      <div class="box test">
+        <strong>Boundary tests</strong>
+        <span>No direct LLM imports outside gateway. No ungated /api/query fallback.</span>
+      </div>
+
+      <div class="box test">
+        <strong>Authority tests</strong>
+        <span>No client JSON creates clinical truth. No LLM output creates grants, trust, or permissions.</span>
+      </div>
+
+      <div class="box test">
+        <strong>Guard tests</strong>
+        <span>SQL, HL7, token, RAG, calculator, memory, and output policies fail closed.</span>
+      </div>
+
+      <div class="box test">
+        <strong>Audit tests</strong>
+        <span>governance_events contains reason metadata but no raw PHI, HL7, FHIR, token maps, or stack traces.</span>
+      </div>
+
+      <div class="box test">
+        <strong>Regression tests</strong>
+        <span>Valid query, ORU preview, parse_id persistence, and normal clinical note instructions still work.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="phase">
+    <h2>Recommended Agent Sequence</h2>
+    <div class="box">
+      <strong>1. Start with explorers only</strong>
+      <span>Use agents for mapping first because security work needs truth before edits.</span>
+    </div>
+    <div class="box">
+      <strong>2. Lead builds or integrates the Phase 1 spine</strong>
+      <span>One owner keeps the kernel model consistent.</span>
+    </div>
+    <div class="box">
+      <strong>3. Workers deepen isolated guards</strong>
+      <span>Give each worker a narrow write scope and exact test expectations.</span>
+    </div>
+    <div class="box">
+      <strong>4. Reviewer agent checks bypasses</strong>
+      <span>Review every phase for bypass, PHI leakage, unsafe fallback, metadata injection, and stale authority.</span>
+    </div>
+  </section>
+</main>
+</body>
+</html>

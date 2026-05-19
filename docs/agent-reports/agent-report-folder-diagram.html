@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Agent Report Folder Diagram</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --ink: #18212c;
+    --muted: #607080;
+    --line: #cbd4dd;
+    --doc: #fff;
+    --folder: #fff4d6;
+    --agent: #e8f0ff;
+    --lead: #e1f5ea;
+    --verify: #efe9fb;
+    --risk: #fde8e8;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif;
+  }
+
+  main {
+    max-width: 1380px;
+    margin: 0 auto;
+    padding: 32px;
+  }
+
+  h1 {
+    margin: 0 0 8px;
+    font-size: clamp(24px, 3vw, 34px);
+    letter-spacing: 0;
+  }
+
+  h2 {
+    margin: 0 0 14px;
+    font-size: 18px;
+    letter-spacing: 0;
+  }
+
+  .intro {
+    max-width: 900px;
+    color: var(--muted);
+    line-height: 1.45;
+    margin-bottom: 24px;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+
+  .pill {
+    border: 1px solid var(--line);
+    background: white;
+    border-radius: 999px;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+
+  section {
+    background: white;
+    border: 1px solid #d9e0e7;
+    border-radius: 12px;
+    padding: 18px;
+    margin: 18px 0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+  }
+
+  .pathbar {
+    background: #17202a;
+    color: white;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-family: Consolas, Monaco, "Courier New", monospace;
+    font-size: 13px;
+    overflow-x: auto;
+    margin: 12px 0 4px;
+  }
+
+  .concept-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .tree {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 1.35fr;
+    gap: 14px;
+  }
+
+  .node,
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    background: var(--doc);
+    min-height: 76px;
+  }
+
+  .folder {
+    background: var(--folder);
+  }
+
+  .agent {
+    background: var(--agent);
+  }
+
+  .lead {
+    background: var(--lead);
+  }
+
+  .verify {
+    background: var(--verify);
+  }
+
+  .risk {
+    background: var(--risk);
+  }
+
+  .node strong,
+  .card strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .node span,
+  .card span {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .stack {
+    display: grid;
+    gap: 10px;
+  }
+
+  .flow-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .worker-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .verify-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+
+  .arrow {
+    color: var(--muted);
+    font-weight: 700;
+    text-align: center;
+    margin: 8px 0;
+  }
+
+  .wide {
+    grid-column: 1 / -1;
+  }
+
+  .mono {
+    font-family: Consolas, Monaco, "Courier New", monospace;
+    font-size: 12px;
+  }
+
+  .tag {
+    display: inline-block;
+    margin-top: 8px;
+    border-radius: 999px;
+    padding: 4px 8px;
+    border: 1px solid rgba(0, 0, 0, .12);
+    color: #394654;
+    background: rgba(255, 255, 255, .65);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  @media (max-width: 980px) {
+    main {
+      padding: 20px;
+    }
+
+    .tree,
+    .concept-grid,
+    .flow-grid,
+    .worker-grid,
+    .verify-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Agent Report Folder Diagram</h1>
+  <p class="intro">
+    Agents run inside Codex. They do not sit in the repository as files. The repository stores their reports,
+    summaries, handoff notes, and verification results.
+  </p>
+
+  <div class="legend">
+    <div class="pill">Yellow = folders</div>
+    <div class="pill">White = report files</div>
+    <div class="pill">Blue = agent work</div>
+    <div class="pill">Green = lead Codex</div>
+    <div class="pill">Purple = verification</div>
+  </div>
+
+  <section>
+    <h2>Read This First</h2>
+    <div class="concept-grid">
+      <div class="card agent">
+        <strong>Agents run in Codex</strong>
+        <span>Explorer, worker, and reviewer agents are temporary helpers. They are not folders and they are not stored in Git.</span>
+      </div>
+
+      <div class="card">
+        <strong>Reports are files</strong>
+        <span>Each agent writes findings or handoff notes into a Markdown report under the report folder.</span>
+      </div>
+
+      <div class="card lead">
+        <strong>Lead Codex decides</strong>
+        <span>The lead reads reports, combines them into a summary, then decides what becomes implementation work.</span>
+      </div>
+    </div>
+    <div class="pathbar">docs/agent-reports/ = report storage, not where agents live</div>
+  </section>
+
+  <section>
+    <h2>Folder Placement For Reports</h2>
+    <div class="tree">
+      <div class="stack">
+        <div class="node folder">
+          <strong>healthcare_ai_agent/</strong>
+          <span>Project root.</span>
+        </div>
+        <div class="arrow">contains</div>
+        <div class="node folder">
+          <strong>docs/</strong>
+          <span>Planning docs, diagrams, and agent reports.</span>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="node">
+          <strong>security-kernel-plan.md</strong>
+          <span>Final V2 target architecture.</span>
+        </div>
+        <div class="node">
+          <strong>security-kernel-execution-plan.md</strong>
+          <span>Main rollout plan and phase gates.</span>
+        </div>
+        <div class="node">
+          <strong>security-kernel-agent-sandbox-diagram.html</strong>
+          <span>Visual sandbox and multi-agent execution diagram.</span>
+        </div>
+        <div class="node folder">
+          <strong>agent-reports/</strong>
+          <span>Where agent findings and handoff notes are saved.</span>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="node folder">
+          <strong>phase-0-mapping/</strong>
+          <span>Read-only explorer reports and lead mapping summary.</span>
+          <span class="tag">created as agents run</span>
+        </div>
+        <div class="node folder">
+          <strong>phase-1-kernel-spine/</strong>
+          <span>Worker notes for contracts, gateway, Warden v2, and HL7/messages governance.</span>
+          <span class="tag">later phase</span>
+        </div>
+        <div class="node folder">
+          <strong>phase-2-guard-depth/</strong>
+          <span>Worker notes for SQLGuard, Hl7Guard, TokenGuard, RAG, and calculators.</span>
+          <span class="tag">later phase</span>
+        </div>
+        <div class="node folder">
+          <strong>review/</strong>
+          <span>Independent security review reports.</span>
+          <span class="tag">after each phase</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Phase 0 Mapping Flow</h2>
+    <div class="card lead wide">
+      <strong>Lead Codex</strong>
+      <span>Assigns read-only mapping tasks. The explorers can run at the same time, but they only inspect and report.</span>
+    </div>
+    <div class="arrow">parallel explorer work</div>
+    <div class="flow-grid">
+      <div class="card agent">
+        <strong>Explorer A</strong>
+        <span>Maps query flow, /api/query, SQL generation, RAG, fallback paths, and LLM calls.</span>
+      </div>
+      <div class="card agent">
+        <strong>Explorer B</strong>
+        <span>Maps /oru/parse, /messages, FHIR generation, observations, and client-trusted fields.</span>
+      </div>
+      <div class="card agent">
+        <strong>Explorer C</strong>
+        <span>Maps Warden v1, schemas, tokenization, SQL validation, calculators, and JSONL audit.</span>
+      </div>
+      <div class="card agent">
+        <strong>Explorer D</strong>
+        <span>Maps DB setup, sessions, TTL, reset/admin, trace storage, and audit risks.</span>
+      </div>
+    </div>
+    <div class="arrow">writes reports</div>
+    <div class="flow-grid">
+      <div class="card mono">
+        <strong>01-explorer-query-flow.md</strong>
+        <span>Report file saved under docs/agent-reports/phase-0-mapping/.</span>
+      </div>
+      <div class="card mono">
+        <strong>02-explorer-hl7-messages.md</strong>
+        <span>Report file saved under docs/agent-reports/phase-0-mapping/.</span>
+      </div>
+      <div class="card mono">
+        <strong>03-explorer-warden-guards.md</strong>
+        <span>Report file saved under docs/agent-reports/phase-0-mapping/.</span>
+      </div>
+      <div class="card mono">
+        <strong>04-explorer-storage-audit-admin.md</strong>
+        <span>Report file saved under docs/agent-reports/phase-0-mapping/.</span>
+      </div>
+    </div>
+    <div class="arrow">lead combines</div>
+    <div class="card lead wide mono">
+      <strong>00-lead-mapping-summary.md</strong>
+      <span>Lead-owned gate file. Implementation does not start until this summary exists and is reviewed.</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Phase 1 Worker Flow</h2>
+    <div class="card lead wide">
+      <strong>Phase 0 summary approved</strong>
+      <span>Worker edits begin only after mapping is reviewed and the Phase 1 plan is stable.</span>
+    </div>
+    <div class="arrow">narrow worker slices</div>
+    <div class="worker-grid">
+      <div class="card agent">
+        <strong>Worker 1</strong>
+        <span>Kernel contracts, central config, sessions, decisions, and audit helper.</span>
+      </div>
+      <div class="card agent">
+        <strong>Worker 2</strong>
+        <span>LLM Gateway migration and direct-import boundary tests.</span>
+      </div>
+      <div class="card agent">
+        <strong>Worker 3</strong>
+        <span>Warden v2 grant-aware exact-schema tool validation.</span>
+      </div>
+      <div class="card agent">
+        <strong>Worker 4</strong>
+        <span>HL7 parse sessions, /messages authority, TTL, status, and idempotency.</span>
+      </div>
+    </div>
+    <div class="arrow">writes handoff reports</div>
+    <div class="worker-grid">
+      <div class="card mono">
+        <strong>10-worker-kernel-contracts.md</strong>
+        <span>Contracts slice.</span>
+      </div>
+      <div class="card mono">
+        <strong>11-worker-llm-gateway.md</strong>
+        <span>Gateway slice.</span>
+      </div>
+      <div class="card mono">
+        <strong>12-worker-warden-v2.md</strong>
+        <span>Warden slice.</span>
+      </div>
+      <div class="card mono">
+        <strong>13-worker-hl7-messages-governance.md</strong>
+        <span>HL7/messages slice.</span>
+      </div>
+    </div>
+    <div class="arrow">lead integrates</div>
+    <div class="card lead wide mono">
+      <strong>19-lead-phase-1-integration.md</strong>
+      <span>Integration notes, acceptance checklist, and unresolved issues.</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where Verification Sits</h2>
+    <div class="card verify wide">
+      <strong>Verification is not a separate folder-first step.</strong>
+      <span>It happens after an agent report, after the lead summary, after each implementation phase, and during reviewer security pass.</span>
+    </div>
+    <div class="arrow">verification timeline</div>
+    <div class="verify-grid">
+      <div class="card agent">
+        <strong>Agent report</strong>
+        <span>Focused findings or worker handoff.</span>
+      </div>
+      <div class="card lead">
+        <strong>Lead review</strong>
+        <span>Checks fit against the kernel architecture.</span>
+      </div>
+      <div class="card lead">
+        <strong>Phase summary</strong>
+        <span>Combines reports into one decision point.</span>
+      </div>
+      <div class="card verify">
+        <strong>Validation gate</strong>
+        <span>Runs required tests and invariant checks.</span>
+      </div>
+      <div class="card verify">
+        <strong>Reviewer pass</strong>
+        <span>Searches for bypasses, PHI leaks, stale authority, and missing tests.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Important Rule</h2>
+    <div class="card risk">
+      <strong>Agents are not stored in the repo.</strong>
+      <span>Only reports are stored. Lead Codex decides what reports become implementation.</span>
+    </div>
+  </section>
+</main>
+</body>
+</html>

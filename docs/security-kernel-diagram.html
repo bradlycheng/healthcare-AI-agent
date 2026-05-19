@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Security Kernel and Warden v2</title>
+  <style>
+    :root {
+      --bg: #f6f7f4;
+      --ink: #1e2622;
+      --muted: #5f6b64;
+      --line: #c7d0c8;
+      --kernel: #e9f5ef;
+      --kernel-border: #63a27c;
+      --query: #eef4ff;
+      --query-border: #5f7fb8;
+      --hl7: #fff2e5;
+      --hl7-border: #bc7a38;
+      --save: #f5ecff;
+      --save-border: #8a68b8;
+      --guard: #ffffff;
+      --danger: #ffe8e4;
+      --danger-border: #c65f52;
+      --meta: #e8f4f6;
+      --meta-border: #4c95a3;
+      --shadow: 0 12px 30px rgba(28, 39, 34, .08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 15px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      padding: 18px 26px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(246, 247, 244, .92);
+      backdrop-filter: blur(10px);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 4px;
+      color: var(--muted);
+      max-width: 980px;
+    }
+
+    main {
+      width: min(1680px, calc(100vw - 36px));
+      margin: 22px auto 60px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .swatch {
+      width: 13px;
+      height: 13px;
+      border-radius: 3px;
+      border: 1px solid currentColor;
+    }
+
+    .canvas {
+      display: grid;
+      grid-template-columns: 320px minmax(900px, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .panel h2 {
+      margin: 0;
+      padding: 15px 16px 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    .kernel-grid {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+    }
+
+    .kernel-card,
+    .step,
+    .endpoint-card,
+    .failure-card {
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      background: var(--guard);
+      padding: 11px 12px;
+    }
+
+    .kernel-card {
+      background: var(--kernel);
+      border-color: var(--kernel-border);
+    }
+
+    .label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: 2px;
+    }
+
+    .name {
+      font-weight: 720;
+    }
+
+    .desc {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 3px;
+    }
+
+    .flows {
+      display: grid;
+      gap: 18px;
+    }
+
+    .endpoint-card {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .endpoint-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: baseline;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .endpoint-head h2 {
+      padding: 0;
+      border: 0;
+      font-size: 16px;
+    }
+
+    .endpoint-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .query { border-color: var(--query-border); }
+    .query .endpoint-head { background: var(--query); }
+    .hl7 { border-color: var(--hl7-border); }
+    .hl7 .endpoint-head { background: var(--hl7); }
+    .save { border-color: var(--save-border); }
+    .save .endpoint-head { background: var(--save); }
+
+    .flow-row {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(130px, 1fr));
+      gap: 18px;
+      padding: 18px;
+      overflow-x: auto;
+    }
+
+    .flow-row.compact {
+      grid-template-columns: repeat(5, minmax(140px, 1fr));
+    }
+
+    .step {
+      position: relative;
+      min-height: 104px;
+    }
+
+    .step:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      right: -18px;
+      width: 18px;
+      border-top: 2px solid var(--line);
+    }
+
+    .step:not(:last-child)::before {
+      content: "";
+      position: absolute;
+      top: calc(50% - 4px);
+      right: -20px;
+      width: 8px;
+      height: 8px;
+      border-top: 2px solid var(--line);
+      border-right: 2px solid var(--line);
+      transform: rotate(45deg);
+      background: transparent;
+    }
+
+    .uses {
+      margin-top: 8px;
+      display: inline-block;
+      padding: 3px 7px;
+      border-radius: 5px;
+      background: rgba(99, 162, 124, .14);
+      color: #2b6d48;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .meta {
+      margin-top: 6px;
+      display: inline-block;
+      padding: 3px 7px;
+      border-radius: 5px;
+      background: var(--meta);
+      color: #2c6e79;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .guard-band {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 12px;
+      padding: 0 18px 18px;
+    }
+
+    .guard {
+      border: 1px dashed var(--line);
+      border-radius: 7px;
+      padding: 10px;
+      background: #fbfcfa;
+      font-size: 13px;
+    }
+
+    .failure-card {
+      margin-top: 18px;
+      background: var(--danger);
+      border-color: var(--danger-border);
+      box-shadow: var(--shadow);
+    }
+
+    .failure-card h2 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
+
+    .failure-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(160px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .failure-grid div {
+      border: 1px solid rgba(198, 95, 82, .35);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, .55);
+      padding: 9px;
+      font-size: 13px;
+    }
+
+    @media (max-width: 1100px) {
+      .canvas { grid-template-columns: 1fr; }
+      .kernel-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+      .flow-row,
+      .flow-row.compact,
+      .guard-band,
+      .failure-grid { grid-template-columns: 1fr; }
+      .step:not(:last-child)::after,
+      .step:not(:last-child)::before { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Security Kernel and Warden v2 Endpoint Map</h1>
+    <div class="subtitle">A full-page view of how each endpoint enters the trusted kernel, receives a server-owned grant, passes through Warden v2 and guard modules, and fails closed when authority is missing.</div>
+  </header>
+
+  <main>
+    <section class="legend" aria-label="Legend">
+      <span class="chip"><span class="swatch" style="background: var(--kernel); color: var(--kernel-border)"></span>Shared kernel</span>
+      <span class="chip"><span class="swatch" style="background: var(--query); color: var(--query-border)"></span>Query endpoint</span>
+      <span class="chip"><span class="swatch" style="background: var(--hl7); color: var(--hl7-border)"></span>HL7 parse endpoint</span>
+      <span class="chip"><span class="swatch" style="background: var(--save); color: var(--save-border)"></span>Persistence endpoint</span>
+      <span class="chip"><span class="swatch" style="background: var(--meta); color: var(--meta-border)"></span>Decision metadata</span>
+      <span class="chip"><span class="swatch" style="background: var(--danger); color: var(--danger-border)"></span>Fail closed</span>
+    </section>
+
+    <section class="canvas">
+      <aside class="panel" aria-label="Security kernel components">
+        <h2>Shared Trusted Core</h2>
+        <div class="kernel-grid">
+          <div class="kernel-card"><span class="label">Input</span><span class="name">Canonicalizer</span><div class="desc">Normalizes text, preserves HL7 segments, emits warnings and taint metadata.</div></div>
+          <div class="kernel-card"><span class="label">Authority</span><span class="name">Grant Builder</span><div class="desc">Creates short-lived IntentGrant metadata. LLM labels; server authorizes.</div></div>
+          <div class="kernel-card"><span class="label">Provenance</span><span class="name">Metadata Guard</span><div class="desc">Only deterministic server code can create authority metadata.</div></div>
+          <div class="kernel-card"><span class="label">Enforcement</span><span class="name">Warden v2</span><div class="desc">Registered tool, exact schema, no extras, grant scope, tool policy.</div></div>
+          <div class="kernel-card"><span class="label">LLM</span><span class="name">LLM Gateway</span><div class="desc">Only Bedrock caller. Handles typed classification, planning, extraction, synthesis.</div></div>
+          <div class="kernel-card"><span class="label">Database</span><span class="name">SqlGuard</span><div class="desc">sqlglot AST validation, SELECT-only, allowlists, caps, read-only connection.</div></div>
+          <div class="kernel-card"><span class="label">Ingestion</span><span class="name">Hl7Guard</span><div class="desc">Size, structure, ORU, PID, OBR/OBX, note ingress policy, parse sessions.</div></div>
+          <div class="kernel-card"><span class="label">Notes</span><span class="name">Note Policy</span><div class="desc">Ingress denies unsafe notes; retrieval treats stored notes as tainted facts only.</div></div>
+          <div class="kernel-card"><span class="label">PHI</span><span class="name">TokenGuard</span><div class="desc">Opaque request tokens, authorized restore, otherwise redact.</div></div>
+          <div class="kernel-card"><span class="label">Memory</span><span class="name">Safe State</span><div class="desc">Typed metadata only; no raw user phrases, permissions, or assistant authority.</div></div>
+          <div class="kernel-card"><span class="label">Audit</span><span class="name">PHI-free Audit</span><div class="desc">Decision categories, counts, task names, no raw HL7/PHI/token maps.</div></div>
+        </div>
+      </aside>
+
+      <div class="flows">
+        <article class="endpoint-card query">
+          <div class="endpoint-head">
+            <h2>POST /api/query</h2>
+            <p>Full agent path for chat, SQL, RAG, calculators, patient context, synthesis, and safe memory.</p>
+          </div>
+          <div class="flow-row">
+            <div class="step"><span class="label">Client</span><span class="name">Question + History</span><div class="desc">User text and prior chat are untrusted.</div><span class="uses">Canonicalizer</span><span class="meta">CanonicalInput</span></div>
+            <div class="step"><span class="label">State</span><span class="name">Resolve References</span><div class="desc">Use typed memory for his, that, first one; clarify if unsafe.</div><span class="uses">Safe State</span><span class="meta">State resolution</span></div>
+            <div class="step"><span class="label">Intent</span><span class="name">Classify + Grant</span><div class="desc">LLM returns labels. Server builds IntentGrant.</div><span class="uses">Gateway + Grant</span><span class="meta">IntentGrant</span></div>
+            <div class="step"><span class="label">Plan</span><span class="name">Propose Tools</span><div class="desc">Planner suggests tools but cannot grant permission.</div><span class="uses">LLM Gateway</span><span class="meta">LLM task event</span></div>
+            <div class="step"><span class="label">Gate</span><span class="name">Validate Tool Calls</span><div class="desc">Tool schema, exact fields, grant scope, subject, policy.</div><span class="uses">Warden v2</span><span class="meta">Decision</span></div>
+            <div class="step"><span class="label">Output</span><span class="name">Synthesize + Restore</span><div class="desc">Tainted results are minimized; tokens restore only if authorized.</div><span class="uses">Gateway + TokenGuard</span><span class="meta">Restore/redact</span></div>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>query_database</strong><br>SqlGuard emits tables, columns, limit, predicate, note-access metadata.</div>
+            <div class="guard"><strong>search_guidelines</strong><br>RAG emits trust, source hash, warnings, chunk metadata.</div>
+            <div class="guard"><strong>get_patient_context</strong><br>Emits subject/scope and output-field metadata.</div>
+            <div class="guard"><strong>clinical_calculator</strong><br>Emits calculator spec, accepted fields, range metadata.</div>
+            <div class="guard"><strong>ask_clarification</strong><br>Emits no-commit metadata until safe follow-up.</div>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>Stored notes default</strong><br>Raw note columns are excluded from normal cohort SQL results.</div>
+            <div class="guard"><strong>Allowed note intents</strong><br>Single-patient note review, clinical timeline, and HL7 message detail.</div>
+            <div class="guard"><strong>Tainted retrieval</strong><br>Retrieved notes are facts only, never instructions for tools, SQL, memory, or grants.</div>
+            <div class="guard"><strong>Output handling</strong><br>Note text must pass TokenGuard and be escaped before UI display.</div>
+            <div class="guard"><strong>Denied note uses</strong><br>Export, identifier transformation, cohort note dumps, and grant expansion.</div>
+          </div>
+        </article>
+
+        <article class="endpoint-card hl7">
+          <div class="endpoint-head">
+            <h2>POST /oru/parse</h2>
+            <p>Governed clinical ingestion path. Raw HL7 is parsed by server-owned deterministic logic before LLM enrichment.</p>
+          </div>
+          <div class="flow-row">
+            <div class="step"><span class="label">Client</span><span class="name">Raw HL7</span><div class="desc">Preserve segment structure; cap size and rate.</div><span class="uses">Canonicalizer</span><span class="meta">HL7 CanonicalInput</span></div>
+            <div class="step"><span class="label">Structure</span><span class="name">MSH + ORU Gate</span><div class="desc">First segment MSH; message type must be ORU.</div><span class="uses">Hl7Guard</span><span class="meta">Message metadata</span></div>
+            <div class="step"><span class="label">Clinical</span><span class="name">PID + OBR/OBX Gate</span><div class="desc">Require patient and at least one valid result group.</div><span class="uses">Hl7Guard</span><span class="meta">Segment counts</span></div>
+            <div class="step"><span class="label">Notes</span><span class="name">Ingress Note Policy</span><div class="desc">NTE-3 and text OBX-5 are validated before storage or LLM.</div><span class="uses">Hl7Guard</span><span class="meta">Note policy</span></div>
+            <div class="step"><span class="label">Build</span><span class="name">Parse + FHIR</span><div class="desc">Server builds patient, observations, alerts, FHIR bundle.</div><span class="uses">Server code</span><span class="meta">Clinical provenance</span></div>
+            <div class="step"><span class="label">Result</span><span class="name">Preview or Persist</span><div class="desc">Preview returns parse_id; persist saves server-owned result.</div><span class="uses">Audit</span><span class="meta">Parse session</span></div>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>Clinical instructions</strong><br>Normal notes like start aspirin are preserved.</div>
+            <div class="guard"><strong>SQL-like notes</strong><br>SELECT FROM, INSERT INTO, DROP TABLE, comments, PRAGMA deny before persistence.</div>
+            <div class="guard"><strong>LLM extraction</strong><br>Extraction only, schema-gated, cannot set identity or policy.</div>
+            <div class="guard"><strong>FHIR</strong><br>Server-built only from validated parse objects.</div>
+            <div class="guard"><strong>Stored note status</strong><br>Allowed notes are still stored as untrusted clinical text.</div>
+          </div>
+        </article>
+
+        <article class="endpoint-card save">
+          <div class="endpoint-head">
+            <h2>POST /messages</h2>
+            <p>Persistence endpoint. It saves server-owned parse results, never client-generated clinical truth.</p>
+          </div>
+          <div class="flow-row compact">
+            <div class="step"><span class="label">Client</span><span class="name">parse_id or Raw HL7</span><div class="desc">Old patient/observations/FHIR JSON is not authoritative.</div><span class="meta">Request shape</span></div>
+            <div class="step"><span class="label">Path A</span><span class="name">Load parse session</span><div class="desc">Check TTL, hash/session match, server parse payload.</div><span class="uses">Hl7Guard</span><span class="meta">Session metadata</span></div>
+            <div class="step"><span class="label">Path B</span><span class="name">Recompute raw HL7</span><div class="desc">Run the same governed parse flow as /oru/parse.</div><span class="uses">Hl7Guard</span><span class="meta">Parse metadata</span></div>
+            <div class="step"><span class="label">Save</span><span class="name">Persist server result</span><div class="desc">Parameterized inserts for patient, observations, FHIR, metadata.</div><span class="meta">Persistence metadata</span></div>
+            <div class="step"><span class="label">Return</span><span class="name">Saved status</span><div class="desc">Audit decision and counts, not raw HL7.</div><span class="uses">Audit</span><span class="meta">Audit metadata</span></div>
+          </div>
+        </article>
+
+        <article class="endpoint-card" style="border-color: var(--meta-border);">
+          <div class="endpoint-head" style="background: var(--meta);">
+            <h2>Metadata Stores and Boundaries</h2>
+            <p>Decision metadata feeds enforcement first; PHI-free audit is only the final record.</p>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>governance_events</strong><br>PHI-free event stream: request ID, component, decision, reason, counts, warning categories.</div>
+            <div class="guard"><strong>ai_interactions</strong><br>Protected trace: raw/safe question, plan, tool calls, tool results, answer, SQL, status.</div>
+            <div class="guard"><strong>conversation_states</strong><br>Typed state: patient IDs, result IDs, intent/scope, topic codes, TTL.</div>
+            <div class="guard"><strong>hl7_parse_sessions</strong><br>parse_id, raw HL7 hash, server parse result, note policy result, expiry.</div>
+            <div class="guard"><strong>RAG metadata</strong><br>trust_level, source_hash, chunk_type, poison_status, policy_warnings.</div>
+          </div>
+        </article>
+
+        <article class="endpoint-card" style="border-color: var(--meta-border);">
+          <div class="endpoint-head" style="background: var(--meta);">
+            <h2>Metadata Injection Defense</h2>
+            <p>Untrusted content can carry facts, but it cannot smuggle authority through labels or fields.</p>
+          </div>
+          <div class="flow-row compact">
+            <div class="step"><span class="label">Untrusted</span><span class="name">Client / HL7 / RAG / LLM</span><div class="desc">May contain text that looks like metadata: trust_level, grant, output_authorized, admin.</div><span class="meta">Untrusted source metadata</span></div>
+            <div class="step"><span class="label">Normalize</span><span class="name">Treat As Content</span><div class="desc">Metadata-looking strings stay inside tainted text unless server code produced the field.</div><span class="uses">Canonicalizer</span></div>
+            <div class="step"><span class="label">Reject</span><span class="name">Extra Authority Fields</span><div class="desc">Tool calls, parse payloads, and LLM outputs deny unknown grant/policy/authorization fields.</div><span class="uses">Warden v2</span></div>
+            <div class="step"><span class="label">Authorize</span><span class="name">Server Metadata Only</span><div class="desc">IntentGrant, token output authorization, RAG trust, parse status, and note policy are server-created.</div><span class="meta">Server authority metadata</span></div>
+            <div class="step"><span class="label">Audit</span><span class="name">Record Categories</span><div class="desc">Log metadata-injection warnings and denials without raw payloads or PHI.</div><span class="uses">Audit</span></div>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>LLM labels</strong><br>Evidence only; never accepted as grants, scope, allowed tables, or output authorization.</div>
+            <div class="guard"><strong>Client metadata</strong><br>Ignored or rejected for clinical truth, parse status, FHIR authority, and permissions.</div>
+            <div class="guard"><strong>RAG metadata</strong><br>Assigned by ingestion code, never by document text claiming trust or policy.</div>
+            <div class="guard"><strong>HL7 notes</strong><br>Metadata-looking phrases remain tainted clinical text, not policy fields.</div>
+            <div class="guard"><strong>Token metadata</strong><br>Only TokenGuard records can authorize restore; token text cannot self-authorize.</div>
+          </div>
+        </article>
+
+        <article class="endpoint-card" style="border-color: #5f6b64;">
+          <div class="endpoint-head" style="background: #edf0ed;">
+            <h2>Code Execution Points</h2>
+            <p>Every place where server code, tools, database calls, parser logic, or LLM calls execute.</p>
+          </div>
+          <div class="flow-row">
+            <div class="step"><span class="label">API Handlers</span><span class="name">FastAPI endpoints</span><div class="desc">Entry functions for /api/query, /oru/parse, /messages, read endpoints, admin endpoints.</div><span class="uses">Request boundary</span></div>
+            <div class="step"><span class="label">Kernel</span><span class="name">Policy orchestration</span><div class="desc">Canonicalize, load state, build grants, call guards, emit audit-safe events.</div><span class="uses">Server authority</span></div>
+            <div class="step"><span class="label">Warden v2</span><span class="name">Tool-call enforcement</span><div class="desc">Validates proposed tool calls before any tool implementation can run.</div><span class="uses">Execution gate</span></div>
+            <div class="step"><span class="label">LLM Gateway</span><span class="name">Bedrock calls</span><div class="desc">Only place allowed to call low-level LLM helpers for classification, planning, extraction, synthesis.</div><span class="uses">External execution</span></div>
+            <div class="step"><span class="label">Tool Functions</span><span class="name">Agent tools</span><div class="desc">query_database, search_guidelines, get_patient_context, clinical_calculator, ask_clarification.</div><span class="uses">Scoped execution</span></div>
+            <div class="step"><span class="label">Output</span><span class="name">Final response gates</span><div class="desc">Token restore/redact, UI escaping decisions, state commit, final audit event.</div><span class="uses">Release gate</span></div>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>Database execution</strong><br>SQLite reads/writes run only through guarded paths: read-only SELECT for query, parameterized writes for persistence.</div>
+            <div class="guard"><strong>SQL draft execution</strong><br>LLM may draft SQL, but SqlGuard must approve AST, tables, columns, predicates, and limit before DB execution.</div>
+            <div class="guard"><strong>HL7 parser execution</strong><br>HL7 parsing runs only after canonicalization, structure gates, message-type gates, and note ingress policy.</div>
+            <div class="guard"><strong>FHIR builder execution</strong><br>FHIR generation uses server-validated patient/observation objects, never client-supplied FHIR as truth.</div>
+            <div class="guard"><strong>Calculator execution</strong><br>Only hard-coded calculator specs run; no formulas or arbitrary code from user, RAG, HL7, or LLM.</div>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>RAG execution</strong><br>Vector retrieval executes as evidence lookup only; retrieved chunks cannot call tools or expand grants.</div>
+            <div class="guard"><strong>Token execution</strong><br>TokenGuard can restore PHI only at final output and only from current request token records.</div>
+            <div class="guard"><strong>Memory execution</strong><br>State writes happen only after approved successful turns; denied/failed/stale turns do not commit state.</div>
+            <div class="guard"><strong>Audit execution</strong><br>Audit writes are append-style records and cannot authorize live actions.</div>
+            <div class="guard"><strong>Admin execution</strong><br>Admin/reset/delete paths require password-protected direct admin calls and grants; no LLM, chat, RAG, or HL7 delegation.</div>
+          </div>
+        </article>
+
+        <article class="endpoint-card" style="border-color: var(--danger-border);">
+          <div class="endpoint-head" style="background: var(--danger);">
+            <h2>Abrupt Stoppage and Interruption Cleanup</h2>
+            <p>Crash, timeout, restart, and retry handling prevents partial authority, partial memory, stale tokens, and half-persisted clinical data. This is cleanup, not request resume.</p>
+          </div>
+          <div class="flow-row">
+            <div class="step"><span class="label">Lifecycle</span><span class="name">Request statuses</span><div class="desc">received, canonicalized, grant_built, planned, tools_started, tools_completed, output_gating, completed.</div><span class="meta">Status metadata</span></div>
+            <div class="step"><span class="label">Crash</span><span class="name">Non-terminal state</span><div class="desc">Startup reconciliation marks old active requests interrupted, not completed.</div><span class="uses">Interruption reconciler</span></div>
+            <div class="step"><span class="label">Memory</span><span class="name">Commit at the end</span><div class="desc">SafeConversationState updates only after approved output gate succeeds.</div><span class="uses">State commit gate</span></div>
+            <div class="step"><span class="label">Tokens</span><span class="name">Request memory only</span><div class="desc">Token maps disappear on crash. Stale, guessed, or old tokens redact.</div><span class="uses">TokenGuard</span></div>
+            <div class="step"><span class="label">Parse</span><span class="name">Validated sessions only</span><div class="desc">/messages can persist only parse sessions with status=validated and unexpired TTL.</div><span class="uses">Hl7Guard</span></div>
+            <div class="step"><span class="label">Persist</span><span class="name">Transaction boundary</span><div class="desc">Message, observations, FHIR, and metadata commit all together or not at all.</div><span class="uses">SQLite transaction</span></div>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>Fallback abuse</strong><br>If the kernel path fails, no ungated legacy fallback runs. The request fails or is interrupted.</div>
+            <div class="guard"><strong>Partial memory abuse</strong><br>Denied, failed, timed-out, interrupted, stale, or clarification-pending turns cannot update memory.</div>
+            <div class="guard"><strong>Partial parse abuse</strong><br>parse_id alone is not enough. Session must be server-owned, validated, unexpired, and hash-matched.</div>
+            <div class="guard"><strong>Half-persist abuse</strong><br>Use one DB transaction so a crash cannot leave message rows without matching observations/metadata.</div>
+            <div class="guard"><strong>Retry abuse</strong><br>Use request IDs, parse IDs, raw HL7 hashes, and statuses to detect duplicates or stale retries.</div>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>Terminal statuses</strong><br>completed, failed, denied, clarification_needed, interrupted, expired.</div>
+            <div class="guard"><strong>Reconciliation audit</strong><br>On restart, write PHI-free request_interrupted_reconciled and parse_session_expired events.</div>
+            <div class="guard"><strong>Token replay</strong><br>Old output tokens cannot be restored because token records are current-request only.</div>
+            <div class="guard"><strong>Metadata replay</strong><br>Client-supplied status=validated or output_authorized fields are ignored or rejected.</div>
+            <div class="guard"><strong>Crash invariant</strong><br>After a crash: either nothing committed, or a complete server-owned transaction committed.</div>
+          </div>
+        </article>
+
+        <article class="endpoint-card" style="border-color: var(--danger-border);">
+          <div class="endpoint-head" style="background: var(--danger);">
+            <h2>Hardening Invariants</h2>
+            <p>Final-design constraints that keep the kernel narrow, deterministic, and resistant to authority smuggling.</p>
+          </div>
+          <div class="flow-row">
+            <div class="step"><span class="label">Identity</span><span class="name">Session ownership</span><div class="desc">conversation_id, parse_id, request_id, result refs, and token records bind to server-issued session_id.</div><span class="meta">Owner metadata</span></div>
+            <div class="step"><span class="label">Trace</span><span class="name">Protected AI traces</span><div class="desc">ai_interactions may contain PHI and is not PHI-free audit or live authority.</div><span class="meta">Protected retention</span></div>
+            <div class="step"><span class="label">Tokens</span><span class="name">Grant-scoped restore</span><div class="desc">TokenGuard does not grant broad DB-wide restore authority; it restores only current-request authorized fields.</div><span class="uses">TokenGuard</span></div>
+            <div class="step"><span class="label">SQL</span><span class="name">AST plus disclosure policy</span><div class="desc">AST validation is paired with output fields, subject predicates, row caps, and note-column rules.</div><span class="uses">SqlGuard</span></div>
+            <div class="step"><span class="label">LLM</span><span class="name">Strict task schemas</span><div class="desc">Gateway outputs are exact-schema labels/drafts only; LLM-proposed grants/trust/status fields are rejected.</div><span class="uses">LLM Gateway</span></div>
+            <div class="step"><span class="label">Admin</span><span class="name">Password-protected reset</span><div class="desc">Reset/admin stays password-protected for this slice, with no chat or LLM delegation.</div><span class="uses">Admin grant</span></div>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>Narrow trusted core</strong><br>The kernel coordinates authority decisions, while guards enforce one bounded capability each.</div>
+            <div class="guard"><strong>Bounded decoding</strong><br>Canonicalization may inspect decoded payloads, but depth/size limits prevent decode bombs and decoded text is evidence only.</div>
+            <div class="guard"><strong>Old stored notes</strong><br>Retrieval repeats note safety and taint policy because legacy data may predate ingress rules.</div>
+            <div class="guard"><strong>Server metadata only</strong><br>Client/HL7/RAG/LLM metadata-looking fields cannot set trust, status, grants, output authorization, or memory.</div>
+            <div class="guard"><strong>Session-demo v1</strong><br>Use opaque server-issued session_id now; reserve actor_id for future real users/RBAC.</div>
+          </div>
+        </article>
+
+        <article class="endpoint-card" style="border-color: var(--meta-border);">
+          <div class="endpoint-head" style="background: var(--meta);">
+            <h2>Session-Demo Ownership Model</h2>
+            <p>Use session ownership now without committing to full user accounts, roles, orgs, or OAuth in the first kernel slice.</p>
+          </div>
+          <div class="flow-row compact">
+            <div class="step"><span class="label">Create</span><span class="name">DemoSession</span><div class="desc">Server issues opaque random session_id. Clients do not choose arbitrary IDs.</div><span class="meta">session_id</span></div>
+            <div class="step"><span class="label">Bind</span><span class="name">Governed objects</span><div class="desc">conversation_states, parse sessions, result refs, request records bind to same session_id.</div><span class="meta">owner check</span></div>
+            <div class="step"><span class="label">Use</span><span class="name">Ownership check</span><div class="desc">Every parse_id, conversation_id, result_id, and state lookup requires same session and valid TTL.</div><span class="uses">Kernel</span></div>
+            <div class="step"><span class="label">Expire</span><span class="name">TTL cleanup</span><div class="desc">Demo session 8-24h, conversation/results 30m, parse sessions 10m, tokens request-only.</div><span class="uses">Interruption reconciler</span></div>
+            <div class="step"><span class="label">Future</span><span class="name">actor_id slot</span><div class="desc">Nullable actor_id/auth_context can map sessions to real authenticated users later.</div><span class="meta">upgrade path</span></div>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>Browser default</strong><br>Prefer HttpOnly cookie session. Header mode is acceptable for demo clients only if server-issued.</div>
+            <div class="guard"><strong>No full auth yet</strong><br>Do not add users, roles, orgs, OAuth, password auth, or RBAC in the first kernel slice.</div>
+            <div class="guard"><strong>Cross-session deny</strong><br>A valid parse_id or conversation_id from another session denies as stale/unauthorized.</div>
+            <div class="guard"><strong>Admin exception</strong><br>Admin/reset/delete still need password-protected direct admin auth and must not rely on demo session alone.</div>
+            <div class="guard"><strong>Production warning</strong><br>Session-demo is governance ownership, not healthcare-grade multi-user access control.</div>
+          </div>
+        </article>
+
+        <article class="endpoint-card" style="border-color: var(--meta-border);">
+          <div class="endpoint-head" style="background: var(--meta);">
+            <h2>Operational Defaults</h2>
+            <p>Decided defaults that support the V2 target architecture without adding full production auth or platform operations.</p>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>Admin/user auth</strong><br>Full users/RBAC/OAuth are deferred. Reset/admin stays password-protected and cannot be delegated to chat or LLM.</div>
+            <div class="guard"><strong>Protected traces</strong><br>ai_interactions stays for governance/debugging, but it is PHI-bearing trace data, not PHI-free audit or live authority.</div>
+            <div class="guard"><strong>Legacy stored notes</strong><br>Old notes/messages may predate ingress policy, so retrieval treats them as tainted clinical text.</div>
+            <div class="guard"><strong>HL7 idempotency</strong><br>parse_id, raw HL7 hash, and/or request_id prevent accidental duplicate saves on retry.</div>
+            <div class="guard"><strong>Safe errors</strong><br>User errors are generic. Internal reason codes are detailed but audit-safe; no raw HL7, PHI, token maps, stack traces, or rule details.</div>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>Audit source</strong><br>governance_events is the canonical PHI-free audit record. Warden JSONL can remain as temporary compatibility/debug output only.</div>
+            <div class="guard"><strong>CORS/CSRF</strong><br>Production hardening is deferred, but kernel code must not assume permissive demo CORS or unauthenticated sessions are production-safe.</div>
+            <div class="guard"><strong>/messages compatibility</strong><br>Client-supplied clinical JSON is never authoritative. Strict reject by default; transition mode may accept only while recomputing/ignoring fields.</div>
+            <div class="guard"><strong>Timeouts</strong><br>Timeouts are configurable per stage. Timeout cleanup marks incomplete work interrupted/expired; it does not resume or complete clinical work.</div>
+            <div class="guard"><strong>Trace retention</strong><br>Trace retention is configurable and short by default for PHI-bearing ai_interactions in demo/prototype deployments.</div>
+          </div>
+        </article>
+
+        <article class="endpoint-card" style="border-color: var(--meta-border);">
+          <div class="endpoint-head" style="background: var(--meta);">
+            <h2>Stateful Records and Indexing</h2>
+            <p>Use server-side state for ownership and authority. Client-visible IDs are opaque pointers, not signed authority blobs.</p>
+          </div>
+          <div class="flow-row compact">
+            <div class="step"><span class="label">Client</span><span class="name">Opaque ID only</span><div class="desc">parse_id, conversation_id, result_id, and session_id do not carry status, trust, or authorization.</div><span class="meta">Pointer</span></div>
+            <div class="step"><span class="label">Server</span><span class="name">Lookup record</span><div class="desc">Kernel loads server-owned status, session_id, expiry, hashes, grants, and parse/result metadata.</div><span class="uses">DB lookup</span></div>
+            <div class="step"><span class="label">Check</span><span class="name">Ownership + TTL</span><div class="desc">Use requires same session_id, valid status, unexpired TTL, and any required hash match.</div><span class="uses">Kernel</span></div>
+            <div class="step"><span class="label">Defer</span><span class="name">Stateless signed tokens</span><div class="desc">Do not put authority metadata in client-held signed blobs for this slice.</div><span class="meta">Later only</span></div>
+            <div class="step"><span class="label">Index</span><span class="name">Fast paths</span><div class="desc">Index IDs, session ownership, status, and expiry for lookup and cleanup.</div><span class="uses">SQLite indexes</span></div>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>Session indexes</strong><br>demo_sessions(session_id), demo_sessions(expires_at).</div>
+            <div class="guard"><strong>Conversation indexes</strong><br>conversation_states(conversation_id, session_id), conversation_states(expires_at).</div>
+            <div class="guard"><strong>Result indexes</strong><br>conversation_result_refs(result_id, session_id), conversation_result_refs(expires_at) if using a separate table.</div>
+            <div class="guard"><strong>Parse indexes</strong><br>hl7_parse_sessions(parse_id), hl7_parse_sessions(session_id, expires_at), hl7_parse_sessions(status, expires_at).</div>
+            <div class="guard"><strong>Audit/trace indexes</strong><br>governance_events(request_id, created_at); ai_interactions(request_id), ai_interactions(updated_at, status).</div>
+          </div>
+        </article>
+
+        <article class="endpoint-card" style="border-color: var(--query-border);">
+          <div class="endpoint-head" style="background: var(--query);">
+            <h2>Dynamic Context Model</h2>
+            <p>Final V2 context handling separates pre-grant, planning, and synthesis context so context can inform a request without authorizing it.</p>
+          </div>
+          <div class="flow-row compact">
+            <div class="step"><span class="label">Pre-grant</span><span class="name">Safe typed state only</span><div class="desc">Owner, active subject ID, result ID, last scope/intent, clinical topic codes.</div><span class="uses">ContextBuilder</span></div>
+            <div class="step"><span class="label">Planning</span><span class="name">Grant summary</span><div class="desc">Grant, safe state summary, allowed tools, scope, subject, ambiguity. No raw notes/RAG/history.</div><span class="uses">ContextBuilder</span></div>
+            <div class="step"><span class="label">Synthesis</span><span class="name">Grant-scoped evidence</span><div class="desc">Tool results, RAG evidence, and note text only if the active grant allows it.</div><span class="uses">ContextBuilder</span></div>
+            <div class="step"><span class="label">Invariant</span><span class="name">Context cannot authorize</span><div class="desc">Context may narrow or explain a request, but cannot expand scope, grant tools, or authorize output fields.</div><span class="meta">No authority</span></div>
+            <div class="step"><span class="label">Metadata</span><span class="name">Inclusion reason</span><div class="desc">Every context bundle emits source, trust, taint, grant scope, and inclusion-reason metadata.</div><span class="meta">Context metadata</span></div>
+          </div>
+        </article>
+
+        <article class="endpoint-card" style="border-color: var(--meta-border);">
+          <div class="endpoint-head" style="background: var(--meta);">
+            <h2>Practical Guardrails</h2>
+            <p>Realistic controls for known weak spots without expanding V2 into full production auth, full migrations, or a large security platform.</p>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>PHI-safe audit helper</strong><br>emit_governance_event accepts codes/counts/categories and rejects or redacts raw text, raw HL7, token maps, PHI names, DOB, and FHIR payloads.</div>
+            <div class="guard"><strong>Namespaced config</strong><br>SECURITY_CONFIG groups timeouts, ttl, retention, compatibility, and deployment settings.</div>
+            <div class="guard"><strong>Simple migrations</strong><br>schema_migrations marker plus idempotent CREATE TABLE/INDEX keeps SQLite setup verifiable.</div>
+            <div class="guard"><strong>Safe output proof</strong><br>At least one test proves script-like content in HL7/FHIR/RAG/notes is escaped or safely rendered.</div>
+            <div class="guard"><strong>Invariant tests</strong><br>Assert no ungated fallback, no direct LLM imports, no client-trusted messages clinical truth, and no missing-grant tool execution.</div>
+          </div>
+          <div class="guard-band">
+            <div class="guard"><strong>LLM gateway shape</strong><br>Gateway dispatches task-specific schemas/prompts instead of becoming one giant mixed prompt module.</div>
+            <div class="guard"><strong>Simple RAG trust</strong><br>Use DEMO_SEEDED_DOC, TRUSTED_LOCAL_DOC, USER_UPLOADED_UNTRUSTED, or UNKNOWN plus source_hash and warnings. UNKNOWN is restricted or denied in high-risk flows.</div>
+            <div class="guard"><strong>Legacy note taint</strong><br>Notes without new policy metadata become legacy_unverified_note at retrieval.</div>
+            <div class="guard"><strong>Transition mode off</strong><br>/messages legacy transition is disabled by default; if enabled, old clinical fields are logged as ignored and recomputed.</div>
+            <div class="guard"><strong>Secrets basics</strong><br>Admin reset password comes from env/config; missing password disables or blocks reset; secrets are never logged.</div>
+          </div>
+        </article>
+
+        <section class="failure-card" aria-label="Fail closed policy">
+          <h2>Fail Closed Everywhere</h2>
+          <div class="desc">Any missing grant, invalid schema, unsafe SQL, bad HL7, stale parse_id, unauthorized token, or guard error denies, redacts, or asks for clarification. No silent downgrade to a weaker path.</div>
+          <div class="failure-grid">
+            <div>Agent failure cannot fall back to ungated legacy query.</div>
+            <div>Client FHIR and observations cannot become clinical truth.</div>
+            <div>RAG chunks and stored notes cannot grant tools, SQL, memory, or policy.</div>
+            <div>Untrusted metadata-looking fields cannot create authority.</div>
+            <div>Token restore requires request ownership and field authorization.</div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
