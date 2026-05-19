@@ -721,10 +721,11 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         """Execute natural language query against patient database."""
         from .query_assistant import (
             generate_sql_from_question,
-            validate_sql,
             execute_safe_query,
             retrieve_context
         )
+        from .security_validation import IntentGrant, iso_after, new_request_id
+        from .sql_guard import DEFAULT_ALLOWED_COLUMNS, validate_sql_select
         
         query = input_data.get("query", "")
         if not query:
@@ -746,12 +747,26 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
             return {"error": error, "results": [], "row_count": 0, "sql": ""}
         
         # Validate SQL
-        is_valid, validation_error = validate_sql(sql)
-        if not is_valid:
-            return {"error": f"Invalid SQL: {validation_error}", "results": [], "row_count": 0}
+        sql_grant = IntentGrant(
+            intent="clinical_query",
+            risk="medium",
+            session_id="agent_internal",
+            request_id=new_request_id(),
+            scope="clinical_read",
+            allowed_tools=[ToolName.QUERY_DATABASE.value],
+            allowed_tables=sorted(DEFAULT_ALLOWED_COLUMNS.keys()),
+            allowed_columns={table: sorted(columns) for table, columns in DEFAULT_ALLOWED_COLUMNS.items()},
+            output_fields=["clinical_answer", "row_count", "sources"],
+            max_rows=50,
+            expires_at=iso_after(minutes=5),
+        )
+        guard_result = validate_sql_select(sql, sql_grant)
+        if not guard_result.allowed:
+            return {"error": f"Invalid SQL: {guard_result.reason}", "results": [], "row_count": 0}
+        sql = guard_result.sql
         
         # Execute query
-        results, exec_error = execute_safe_query(sql)
+        results, exec_error = execute_safe_query(sql, sql_grant)
         if exec_error:
             return {"error": exec_error, "results": [], "row_count": 0, "sql": sql}
         
@@ -840,8 +855,14 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
     
     def _tool_clinical_calculator(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Perform clinical calculations."""
+        from .calculator_specs import validate_calculator_request
+
+        validation = validate_calculator_request(input_data)
+        if not validation.allowed:
+            return {"error": f"Calculator request denied: {validation.reason}"}
+
         calculation = input_data.get("calculation", "").lower()
-        values = input_data.get("values", {})
+        values = validation.normalized_values
         
         if calculation == "bmi":
             weight = values.get("weight_kg")

@@ -15,6 +15,8 @@ from typing import Any, Dict, List, Optional
 
 from .llm_gateway import LLMError, sql_generation, call_llm_json
 from .security import sanitize_text
+from .security_validation import IntentGrant, iso_after, new_request_id
+from .sql_guard import DEFAULT_ALLOWED_COLUMNS, validate_sql_select
 
 DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
 
@@ -291,60 +293,50 @@ FORBIDDEN_KEYWORDS = [
 ]
 
 
-def validate_sql(sql: str) -> tuple[bool, str]:
+def _default_sql_grant(max_rows: int = 50) -> IntentGrant:
+    return IntentGrant(
+        intent="clinical_query",
+        risk="medium",
+        session_id="legacy_query",
+        request_id=new_request_id(),
+        scope="clinical_read",
+        allowed_tools=["query_database"],
+        allowed_tables=sorted(DEFAULT_ALLOWED_COLUMNS.keys()),
+        allowed_columns={table: sorted(columns) for table, columns in DEFAULT_ALLOWED_COLUMNS.items()},
+        output_fields=["clinical_answer", "row_count", "sources"],
+        max_rows=max_rows,
+        expires_at=iso_after(minutes=5),
+    )
+
+
+def validate_sql(sql: str, grant: Optional[IntentGrant] = None) -> tuple[bool, str]:
     """
     Validate that SQL is safe to execute.
     Returns (is_valid, error_message).
     """
-    if not sql or not sql.strip():
-        return False, "Empty query"
-    
-    normalized = sql.upper().strip()
-    
-    # Must start with SELECT
-    if not normalized.startswith('SELECT'):
-        return False, "Only SELECT queries are allowed"
-    
-    # Check for forbidden keywords
-    for keyword in FORBIDDEN_KEYWORDS:
-        # Use word boundary matching to avoid false positives
-        if re.search(rf'\b{keyword}\b', normalized):
-            return False, f"Forbidden keyword: {keyword}"
-    
-    # Check for multiple statements (;)
-    # Allow ; only at the very end
-    semicolon_count = sql.count(';')
-    if semicolon_count > 1:
-        return False, "Multiple statements not allowed"
-    if semicolon_count == 1 and not sql.strip().endswith(';'):
-        return False, "Semicolon only allowed at end of query"
-    
-    # Check for comments that might hide malicious code
-    if '--' in sql or '/*' in sql:
-        return False, "SQL comments not allowed"
-    
-    return True, ""
+    result = validate_sql_select(sql, grant or _default_sql_grant())
+    return result.allowed, result.reason
 
 
 # ---------------------------------------------------------------------------
 # Query Execution
 # ---------------------------------------------------------------------------
 
-def execute_safe_query(sql: str) -> tuple[List[Dict[str, Any]], Optional[str]]:
+def execute_safe_query(sql: str, grant: Optional[IntentGrant] = None) -> tuple[List[Dict[str, Any]], Optional[str]]:
     """
     Execute a validated SQL query in read-only mode.
     Returns (results, error_message).
     """
-    is_valid, error = validate_sql(sql)
-    if not is_valid:
-        return [], error
+    guard_result = validate_sql_select(sql, grant or _default_sql_grant())
+    if not guard_result.allowed:
+        return [], guard_result.reason
     
     try:
         # Open connection in read-only mode where possible
         conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
         conn.row_factory = sqlite3.Row
         
-        cursor = conn.execute(sql)
+        cursor = conn.execute(guard_result.sql)
         rows = cursor.fetchall()
         
         # Convert to list of dicts
@@ -410,19 +402,24 @@ def retrieve_context(question: str) -> tuple[str, List[Dict[str, Any]]]:
         if not results or not results.get('documents') or not results['documents'][0]:
             return "", []
         
+        from .rag_guard import chunks_from_chroma_results, filter_rag_chunks
+
+        guard_result = filter_rag_chunks(chunks_from_chroma_results(results))
+
         # Build context string and sources list
         context_parts = []
         sources = []
-        
-        documents = results['documents'][0]
-        metadatas = results['metadatas'][0] if results.get('metadatas') else [{}] * len(documents)
-        distances = results['distances'][0] if results.get('distances') else [0.5] * len(documents)
+
+        guarded_chunks = guard_result.accepted
+        distances = [chunk.distance if chunk.distance is not None else 0.5 for chunk in guarded_chunks]
         
         # Debug: log the actual distances from ChromaDB
         print(f"RAG DEBUG - cosine distances: {distances}")
         
-        for i, doc in enumerate(documents):
-            title = metadatas[i].get('title', 'Unknown Source') if i < len(metadatas) else 'Unknown Source'
+        for i, chunk in enumerate(guarded_chunks):
+            doc = chunk.text
+            metadata = chunk.metadata
+            title = metadata.get('title', 'Trusted Reference')
             distance = distances[i] if i < len(distances) else 0.5
             
             # Cosine distance: 0 = identical, 1 = opposite, 2 = completely opposite
@@ -434,16 +431,19 @@ def retrieve_context(question: str) -> tuple[str, List[Dict[str, Any]]]:
             snippet = create_clean_snippet(doc, max_length=180)
             
             # Extract filename from source path for fetching full document
-            source_path = metadatas[i].get('source', '')
+            source_path = metadata.get('source', '')
             filename = os.path.basename(source_path) if source_path else ''
             
-            context_parts.append(f"[Source: {title}]\n{doc}")
+            context_parts.append(f"[Untrusted medical reference evidence: {title}]\n{doc}")
             sources.append({
                 "title": title,
                 "snippet": snippet,
                 "relevance": round(relevance, 2),
                 "filename": filename,
-                "full_snippet": doc
+                "full_snippet": doc,
+                "evidence_only": True,
+                "trust_level": metadata.get("trust_level", "UNKNOWN"),
+                "policy_warnings": metadata.get("policy_warnings", []),
             })
         
         context_text = "\n\n".join(context_parts)
@@ -620,19 +620,21 @@ def process_query(question: str, history: List[Dict[str, str]] = []) -> Dict[str
         }
     
     # Step 2: Validate SQL
-    is_valid, validation_error = validate_sql(sql)
-    if not is_valid:
+    grant = _default_sql_grant()
+    guard_result = validate_sql_select(sql, grant)
+    if not guard_result.allowed:
         return {
             "success": False,
             "answer": "I generated an unsafe query. Please try rephrasing your question.",
             "highlights": [],
             "sql_used": sql,
             "row_count": 0,
-            "error": validation_error
+            "error": guard_result.reason
         }
+    sql = guard_result.sql
     
     # Step 3: Execute query
-    results, exec_error = execute_safe_query(sql)
+    results, exec_error = execute_safe_query(sql, grant)
     if exec_error:
         return {
             "success": False,

@@ -809,6 +809,22 @@ async def parse_oru_endpoint(req: ORUParseRequest, request: Request, response: R
     # 0. Sanitize input (Strip emojis, non-standard unicode, injection tags)
     req.hl7_text = sanitize_text(req.hl7_text, strict_ascii=True)
 
+    from .hl7_guard import validate_hl7_message
+    guard_result = validate_hl7_message(req.hl7_text)
+    if not guard_result.ok:
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.oru_parse",
+            action="DENY",
+            reason_code="hl7_guard_denied",
+            payload={
+                "errors": [issue.code for issue in guard_result.errors],
+                "metadata": guard_result.metadata,
+            },
+        )
+        raise HTTPException(status_code=400, detail="Invalid HL7 message.")
+
     # 1. Basic Validation
     if not req.hl7_text or "MSH" not in req.hl7_text:
         emit_governance_event(
