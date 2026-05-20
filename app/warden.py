@@ -22,13 +22,15 @@ import json
 import re
 import sqlite3
 import os
+import secrets
 import uuid
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Dict, List, Set, Tuple, Optional, Any
 from contextlib import contextmanager
 
-from .security_validation import IntentGrant
+from .security_validation import IntentGrant, TokenRecord
+from .token_guard import TOKEN_PATTERN, TOKEN_REDACTION
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -53,6 +55,20 @@ _SYNTHETIC_DOBS = [
     "1993-10-07", "1977-05-16", "1991-06-21", "1986-09-12", "1983-01-04",
     "1989-11-30", "1976-03-17", "1994-07-09", "1981-04-02", "1987-08-26",
 ]
+
+
+def _new_phi_token(prefix: str) -> str:
+    return f"<<PHI_{prefix}_{secrets.token_hex(10).upper()}>>"
+
+
+def _grant_is_live(grant: IntentGrant) -> bool:
+    try:
+        expires_at = datetime.fromisoformat(grant.expires_at)
+    except Exception:
+        return False
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at > datetime.now(timezone.utc)
 
 
 # ---------------------------------------------------------------------------
@@ -95,15 +111,32 @@ class PHITokenMap:
     Satisfies: NIST AI 100-1 §5.2 (Data Minimization)
     """
 
-    def __init__(self):
+    def __init__(self, request_id: str = ""):
         self._real_to_token: Dict[str, str] = {}
         self._token_to_real: Dict[str, str] = {}
+        self._token_records: Dict[str, TokenRecord] = {}
         self._counter: Dict[str, int] = {}  # per-category counter
+        self._request_id = request_id
 
-    def add_mapping(self, real_value: str, token_value: str) -> None:
+    def add_mapping(
+        self,
+        real_value: str,
+        token_value: str,
+        *,
+        field_type: str = "unknown",
+        source: str = "warden",
+        output_authorized: bool = True,
+    ) -> None:
         """Register a bidirectional mapping."""
         self._real_to_token[real_value] = token_value
         self._token_to_real[token_value] = real_value
+        self._token_records[token_value] = TokenRecord(
+            request_id=self._request_id,
+            token=token_value,
+            field_type=field_type,
+            source=source,
+            output_authorized=output_authorized,
+        )
 
     def tokenize(self, text: str) -> str:
         """Replace all known real values with their tokens."""
@@ -116,19 +149,38 @@ class PHITokenMap:
             result = result.replace(real, token)
         return result
 
-    def detokenize(self, text: str) -> str:
-        """Replace all tokens with their real values.
-        
-        Since we use deterministic inline markers (<<PAT_1>>), there is
-        no risk of substring collisions or truncation. A simple exact
-        replacement is sufficient and safe.
+    def detokenize(self, text: str, grant: Optional[IntentGrant] = None) -> str:
+        """Restore only current-request tokens authorized by the grant.
+
+        Guessed, stale, or out-of-grant PHI-looking tokens are redacted.
         """
-        result = text
-        for token, real in sorted(
-            self._token_to_real.items(), key=lambda x: len(x[0]), reverse=True
-        ):
-            result = result.replace(token, real)
-        return result
+        if not text:
+            return text
+
+        def replace(match: re.Match[str]) -> str:
+            token = match.group(0)
+            record = self._token_records.get(token)
+            if self._can_restore(record, grant):
+                return self._token_to_real[token]
+            return TOKEN_REDACTION
+
+        return TOKEN_PATTERN.sub(replace, text)
+
+    def detokenize_sql(self, text: str) -> str:
+        """Restore only registered request tokens for DB lookup.
+
+        This is intentionally separate from the user-facing OUT-GATE because
+        SQL lookup needs registered tokens restored even when a field is not
+        authorized for final output. Guessed tokens are still redacted.
+        """
+        if not text:
+            return text
+
+        def replace(match: re.Match[str]) -> str:
+            token = match.group(0)
+            return self._token_to_real.get(token, TOKEN_REDACTION)
+
+        return TOKEN_PATTERN.sub(replace, text)
 
     def get_token(self, real_value: str) -> Optional[str]:
         """Get token for a real value, or None if not mapped."""
@@ -157,7 +209,22 @@ class PHITokenMap:
         """Explicitly zero out all mappings."""
         self._real_to_token.clear()
         self._token_to_real.clear()
+        self._token_records.clear()
         self._counter.clear()
+
+    def _can_restore(self, record: Optional[TokenRecord], grant: Optional[IntentGrant]) -> bool:
+        if record is None or record.token not in self._token_to_real:
+            return False
+        if grant is None:
+            return False
+        if record.request_id != grant.request_id:
+            return False
+        if not record.output_authorized:
+            return False
+        if not _grant_is_live(grant):
+            return False
+        allowed = set(grant.output_fields or [])
+        return "*" in allowed or record.field_type in allowed
 
     def __del__(self):
         """Zero out on garbage collection as safety net."""
@@ -181,12 +248,12 @@ class WardenAnalyzer:
             db_path = DB_PATH
         self.db_path = db_path
 
-    def build_token_map(self) -> PHITokenMap:
+    def build_token_map(self, grant: Optional[IntentGrant] = None) -> PHITokenMap:
         """Query DB for known PHI entities, assign format-preserving tokens.
 
         Returns a fresh PHITokenMap for this request.
         """
-        token_map = PHITokenMap()
+        token_map = PHITokenMap(request_id=grant.request_id if grant else "")
         patient_idx = 0
         provider_idx = 0
         dob_idx = 0
@@ -213,27 +280,24 @@ class WardenAnalyzer:
                 full_name = f"{first} {last}".strip()
 
                 # Assign format-preserving tokens
-                name_token = f"<<PAT_{patient_idx + 1}>>"
+                name_token = _new_phi_token("PAT")
 
                 # Map full name "First Last" -> "<<PAT_1>>"
                 if full_name:
-                    token_map.add_mapping(full_name, name_token)
+                    token_map.add_mapping(full_name, name_token, field_type="patient_name")
                     token_map._increment_category("patient_name")
 
                 # Map patient ID
                 if pid:
-                    pid_token = f"<<PID_{pid_counter}>>"
-                    token_map.add_mapping(pid, pid_token)
+                    pid_token = _new_phi_token("PID")
+                    token_map.add_mapping(pid, pid_token, field_type="patient_id")
                     token_map._increment_category("patient_id")
                     pid_counter += 1
 
                 # Map DOB
                 if dob:
-                    if dob_idx < len(_SYNTHETIC_DOBS):
-                        dob_token = _SYNTHETIC_DOBS[dob_idx]
-                    else:
-                        dob_token = f"1950-01-{(dob_idx % 28) + 1:02d}"
-                    token_map.add_mapping(dob, dob_token)
+                    dob_token = _new_phi_token("DOB")
+                    token_map.add_mapping(dob, dob_token, field_type="patient_dob")
                     token_map._increment_category("patient_dob")
                     dob_idx += 1
 
@@ -249,8 +313,8 @@ class WardenAnalyzer:
             for row in providers:
                 provider = row["provider_name"] or ""
                 if provider:
-                    prov_token = f"<<PROV_{provider_idx + 1}>>"
-                    token_map.add_mapping(provider, prov_token)
+                    prov_token = _new_phi_token("PROV")
+                    token_map.add_mapping(provider, prov_token, field_type="provider_name")
                     token_map._increment_category("provider_name")
                     provider_idx += 1
 
@@ -293,14 +357,14 @@ class WardenAnonymizer:
         else:
             return data
 
-    def deanonymize(self, text: str, token_map: PHITokenMap) -> str:
+    def deanonymize(self, text: str, token_map: PHITokenMap, grant: Optional[IntentGrant] = None) -> str:
         """OUT-GATE: Restore real values from tokens.
 
         Call this AFTER receiving response from the LLM.
         """
         if not text or not token_map:
             return text
-        return token_map.detokenize(text)
+        return token_map.detokenize(text, grant)
 
     def deanonymize_sql(self, sql: str, token_map: PHITokenMap) -> str:
         """DOUBLE-BLIND SQL: Detokenize SQL before DB execution.
@@ -310,7 +374,7 @@ class WardenAnonymizer:
         """
         if not sql or not token_map:
             return sql
-        return token_map.detokenize(sql)
+        return token_map.detokenize_sql(sql)
 
 
 # ===========================================================================
@@ -738,7 +802,7 @@ class Warden:
         The PHITokenMap is created fresh and destroyed when the
         context exits — session-pinned, ephemeral, RAM-only.
         """
-        token_map = self.analyzer.build_token_map()
+        token_map = self.analyzer.build_token_map(grant)
         ctx = WardenContext(
             token_map=token_map,
             anonymizer=self.anonymizer,
@@ -804,7 +868,7 @@ class WardenContext:
 
     def deanonymize(self, text: str) -> str:
         """OUT-GATE: Rehydrate tokens in LLM response for the user."""
-        return self._anonymizer.deanonymize(text, self.token_map)
+        return self._anonymizer.deanonymize(text, self.token_map, self._grant)
 
     # --- Clinical Surrogation ---
 

@@ -33,6 +33,7 @@ from app.warden import (
     PHITokenMap, WARDEN_CONFIG, WardenAuditLog,
 )
 from app.security_validation import IntentGrant, iso_after
+from app.token_guard import TOKEN_REDACTION
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -86,6 +87,20 @@ def _test_grant(*tools):
         request_id="req_test",
         scope="test",
         allowed_tools=list(tools),
+        output_fields=["*"],
+        expires_at=iso_after(minutes=5),
+    )
+
+
+def _test_grant_with_output_fields(*output_fields):
+    return IntentGrant(
+        intent="warden_test",
+        risk="low",
+        session_id="sess_test",
+        request_id="req_test",
+        scope="test",
+        allowed_tools=["query_database"],
+        output_fields=list(output_fields),
         expires_at=iso_after(minutes=5),
     )
 
@@ -140,6 +155,41 @@ class TestHappyPath:
                 final_answer = ctx.deanonymize(simulated_llm_answer)
                 assert name in final_answer, \
                     f"OUT-GATE failed to restore '{name}' — got: {final_answer}"
+
+    def test_8a2b_tokens_are_opaque_phi_markers(self):
+        """Warden should use request-scoped opaque PHI token markers."""
+        warden = Warden()
+        phi = _get_all_phi_from_db()
+
+        with warden.request_scope(grant=_test_grant("query_database")) as ctx:
+            for name in phi["names"]:
+                token = ctx.token_map.get_token(name)
+                assert token is not None
+                assert token.startswith("<<PHI_PAT_")
+                assert name not in token
+
+    def test_8a2c_out_gate_redacts_guessed_phi_token(self):
+        """Guessed/user-injected PHI-looking tokens cannot restore data."""
+        warden = Warden()
+        with warden.request_scope(grant=_test_grant("query_database")) as ctx:
+            final_answer = ctx.deanonymize("Patient <<PHI_PAT_GUESSED>> is stable.")
+
+        assert final_answer == f"Patient {TOKEN_REDACTION} is stable."
+
+    def test_8a2d_out_gate_redacts_field_type_not_allowed_by_grant(self):
+        """Grant output_fields controls which PHI token types can restore."""
+        warden = Warden()
+        phi = _get_all_phi_from_db()
+        if not phi["dobs"]:
+            return
+
+        dob = phi["dobs"][0]
+        with warden.request_scope(grant=_test_grant_with_output_fields("patient_name")) as ctx:
+            token = ctx.token_map.get_token(dob)
+            assert token is not None
+            final_answer = ctx.deanonymize(f"DOB {token}")
+
+        assert final_answer == f"DOB {TOKEN_REDACTION}"
 
     def test_8a3_tool_results_tokenized_before_synthesize(self):
         """DB results containing PHI should be tokenized before

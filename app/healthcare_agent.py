@@ -332,7 +332,15 @@ class HealthcareAgent:
                 scope="demo",
                 allowed_tools=[tool.value for tool in ToolName],
                 allowed_tables=["hl7_messages", "observations", "visits", "medications", "diagnoses"],
-                output_fields=["answer", "highlights", "sources"],
+                output_fields=[
+                    "answer",
+                    "highlights",
+                    "sources",
+                    "patient_name",
+                    "patient_id",
+                    "patient_dob",
+                    "provider_name",
+                ],
                 max_rows=50,
                 expires_at=iso_after(minutes=5),
             )
