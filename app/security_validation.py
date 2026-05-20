@@ -24,6 +24,10 @@ SECURITY_CONFIG: Dict[str, Dict[str, Any]] = {
         "rag_seconds": int(os.getenv("SECURITY_RAG_TIMEOUT_SECONDS", "10")),
         "request_seconds": int(os.getenv("SECURITY_REQUEST_TIMEOUT_SECONDS", "90")),
     },
+    "debug": {
+        "show_sql_used": os.getenv("SECURITY_SHOW_SQL_USED", "false").lower() == "true",
+        "show_protected_output": os.getenv("SECURITY_SHOW_PROTECTED_OUTPUT", "false").lower() == "true",
+    },
     "compatibility": {
         "allow_legacy_messages": os.getenv("SECURITY_ALLOW_LEGACY_MESSAGES", "false").lower() == "true",
         "allow_oru_direct_persist": os.getenv("SECURITY_ALLOW_ORU_DIRECT_PERSIST", "false").lower() == "true",

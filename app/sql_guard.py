@@ -66,6 +66,10 @@ DEFAULT_ALLOWED_COLUMNS: Dict[str, Set[str]] = {
     },
 }
 
+NOTE_TEXT_COLUMNS: Dict[str, Set[str]] = {
+    "observations": {"value_raw"},
+}
+
 SAFE_FUNCTIONS: Set[str] = {
     "abs",
     "avg",
@@ -286,6 +290,8 @@ class SqlGuard:
                 policy[table] = static_columns & grant_columns[table]
             else:
                 policy[table] = set(static_columns)
+            if "note_read" not in set(grant.output_fields or []):
+                policy[table] -= NOTE_TEXT_COLUMNS.get(table, set())
         return policy
 
     def _extract_tables(

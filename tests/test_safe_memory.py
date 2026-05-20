@@ -21,10 +21,11 @@ def test_successful_turn_commits_typed_metadata_only(tmp_path):
             "tools_used": ["query_database"],
             "safe_metadata": {"patient_ids": ["P123"], "result_ids": ["message:7"]},
         },
+        db_path=db_path,
     )
 
     assert committed is True
-    row = get_conversation_state("conv_test", "sess_test", db_path="agent.db")
+    row = get_conversation_state("conv_test", "sess_test", db_path=db_path)
     assert row is not None
     state_text = row["state_json"]
     state = json.loads(state_text)

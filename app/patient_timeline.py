@@ -89,7 +89,7 @@ def get_patient_timeline(patient_id: str, db_path: str = DB_PATH) -> Dict[str, A
         
         # Get all visits (messages) for this patient
         message_rows = conn.execute("""
-            SELECT id, received_at, raw_hl7
+            SELECT id, received_at
             FROM hl7_messages
             WHERE patient_id = ?
             ORDER BY received_at ASC
@@ -114,7 +114,7 @@ def get_patient_timeline(patient_id: str, db_path: str = DB_PATH) -> Dict[str, A
             
             observations = []
             for o in obs_rows:
-                value = o["value_num"] if o["value_num"] is not None else o["value_raw"]
+                value = o["value_num"] if o["value_num"] is not None else _safe_text_observation_value(o)
                 obs = {
                     "code": o["code"] or "",
                     "display": o["display"] or o["code"] or "",
@@ -146,6 +146,14 @@ def get_patient_timeline(patient_id: str, db_path: str = DB_PATH) -> Dict[str, A
         }
     finally:
         conn.close()
+
+
+def _safe_text_observation_value(row: sqlite3.Row) -> str:
+    code = str(row["code"] or "").lower()
+    display = str(row["display"] or "").lower()
+    if code == "note" or "note" in display or "clinical text" in display:
+        return "[REDACTED_NOTE_TEXT]"
+    return row["value_raw"] or ""
 
 
 def generate_journey_summary(timeline_data: Dict[str, Any]) -> str:

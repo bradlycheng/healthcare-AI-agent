@@ -130,6 +130,17 @@ def test_rejects_static_sensitive_columns():
     assert_denied("SELECT fhir_bundle_json FROM hl7_messages LIMIT 5", "unknown or non-allowlisted column")
 
 
+def test_note_text_column_requires_note_read_output_grant():
+    assert_denied("SELECT value_raw FROM observations LIMIT 5", "column not allowed")
+
+    result = validate_sql_select(
+        "SELECT value_raw FROM observations LIMIT 5",
+        grant(output_fields=["note_read"]),
+    )
+
+    assert result.allowed is True
+
+
 def test_validates_join_aliases_and_qualified_columns():
     result = validate_sql_select(
         """

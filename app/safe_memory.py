@@ -5,7 +5,7 @@ import re
 from dataclasses import asdict
 from typing import Any, Dict, Iterable, List, Set
 
-from .security_validation import SafeConversationState, iso_after
+from .security_validation import SECURITY_CONFIG, SafeConversationState, iso_after
 
 
 CONTROLLED_TOPIC_BY_TOOL = {
@@ -32,10 +32,13 @@ def conversation_id_for_session(session_id: str) -> str:
     return f"conv_{session_id}"
 
 
-def load_state(conversation_id: str, session_id: str) -> SafeConversationState | None:
+def load_state(conversation_id: str, session_id: str, db_path: str | None = None) -> SafeConversationState | None:
     from .db import get_conversation_state
 
-    row = get_conversation_state(conversation_id, session_id)
+    if db_path is None:
+        row = get_conversation_state(conversation_id, session_id)
+    else:
+        row = get_conversation_state(conversation_id, session_id, db_path=db_path)
     if row is None:
         return None
     data = json.loads(row["state_json"])
@@ -47,6 +50,7 @@ def commit_successful_turn(
     conversation_id: str,
     session_id: str,
     agent_result: Dict[str, Any],
+    db_path: str | None = None,
 ) -> bool:
     """Commit only typed safe metadata after a fully successful turn."""
     if not agent_result.get("success"):
@@ -63,14 +67,17 @@ def commit_successful_turn(
         result_ids=_bounded_sorted_strings(safe_metadata.get("result_ids", []), limit=25),
         scope=_scope_from_tools(agent_result.get("tools_used", [])),
         intent="clinical_query",
-        expires_at=iso_after(minutes=30),
+        expires_at=iso_after(minutes=SECURITY_CONFIG["ttl"]["conversation_minutes"]),
     )
     payload = asdict(state)
     _assert_no_raw_memory(payload)
 
     from .db import upsert_conversation_state
 
-    upsert_conversation_state(conversation_id, session_id, payload, state.expires_at)
+    if db_path is None:
+        upsert_conversation_state(conversation_id, session_id, payload, state.expires_at)
+    else:
+        upsert_conversation_state(conversation_id, session_id, payload, state.expires_at, db_path=db_path)
     return True
 
 

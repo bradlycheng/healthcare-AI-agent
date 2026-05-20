@@ -6,6 +6,7 @@ import json
 import os
 import sqlite3
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -54,6 +55,12 @@ app.add_middleware(
 # We only rate limit the LLM part to prevent expensive calls.
 _RATE_LIMIT_STORE: Dict[str, float] = {}
 RATE_LIMIT_SECONDS = 5.0
+_AGENT_EXECUTOR = ThreadPoolExecutor(max_workers=4)
+
+
+@app.on_event("shutdown")
+def shutdown_agent_executor():
+    _AGENT_EXECUTOR.shutdown(wait=False, cancel_futures=True)
 
 
 @app.middleware("http")
@@ -66,8 +73,9 @@ async def add_process_time_header(request: Request, call_next):
     
 @app.on_event("startup")
 def on_startup():
-    from .db import init_db
+    from .db import cleanup_expired_security_state, init_db
     init_db()
+    cleanup_expired_security_state()
     print("DEBUG: Database initialized", flush=True)
 
 # ---------- Pydantic Models ----------
@@ -250,7 +258,15 @@ def _obs_value(row: sqlite3.Row) -> Any:
     if vnum is not None:
         return float(vnum)
     vraw = row["value_raw"]
+    if vraw is not None and _is_note_like_observation(row) and not _debug_flag("show_protected_output"):
+        return "[REDACTED_NOTE_TEXT]"
     return vraw if vraw is not None else ""
+
+
+def _is_note_like_observation(row: sqlite3.Row) -> bool:
+    code = str(row["code"] or "").lower()
+    display = str(row["display"] or "").lower()
+    return code == "note" or "note" in display or "clinical text" in display
 
 
 def _audit_read_endpoint(
@@ -272,6 +288,15 @@ def _audit_read_endpoint(
         payload=payload or {},
     )
     return request_id
+
+
+def _debug_flag(name: str) -> bool:
+    return bool(SECURITY_CONFIG.get("debug", {}).get(name, False))
+
+
+def _run_agent_with_timeout(func, *args, timeout_seconds: int, **kwargs):
+    future = _AGENT_EXECUTOR.submit(func, *args, **kwargs)
+    return future.result(timeout=max(0.001, float(timeout_seconds)))
 
 
 # ---------- Routes ----------
@@ -394,10 +419,40 @@ def query_assistant_endpoint(req: QueryRequest, request: Request, response: Resp
         from .grant_builder import build_query_grant
         from .healthcare_agent import run_agent_query
         from .intent_classifier import IntentClassificationError, classify_query_intent
+        from .reference_resolver import resolve_safe_references
+
+        resolution = resolve_safe_references(req.question, prior_state)
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.query.references",
+            action="ALLOW" if resolution.allowed else ("CLARIFY" if resolution.needs_clarification else "DENY"),
+            reason_code=resolution.reason_code,
+            payload={
+                "safe_state_present": prior_state is not None,
+                "referenced_patient_count": resolution.referenced_patient_count,
+                "resolved_subject_present": resolution.subject is not None,
+            },
+        )
+        if resolution.action == "deny":
+            return QueryResponse(
+                success=False,
+                answer="I can't use a prior answer to widen scope or expose identifiers. Please ask a bounded clinical question.",
+                error="Reference denied by governance policy.",
+            )
+        if resolution.needs_clarification:
+            return QueryResponse(
+                success=True,
+                answer="I need a little more detail before I can safely use that reference.",
+                needs_clarification=True,
+                clarification_question="Which patient or clinical scope do you mean?",
+                clarification_options=["Specify a patient ID", "Ask a new bounded clinical question"],
+            )
+        governed_question = resolution.question
 
         try:
             classification = classify_query_intent(
-                req.question,
+                governed_question,
                 safe_state_present=prior_state is not None,
             )
         except IntentClassificationError as e:
@@ -420,6 +475,7 @@ def query_assistant_endpoint(req: QueryRequest, request: Request, response: Resp
             request_id=request_id,
             intent=classification.intent,
             scope=classification.scope,
+            subject=resolution.subject,
             max_rows=50,
         )
         emit_governance_event(
@@ -450,7 +506,29 @@ def query_assistant_endpoint(req: QueryRequest, request: Request, response: Resp
                 clarification_options=["Patient data", "Guideline reference", "Calculator"],
             )
 
-        result = run_agent_query(req.question, req.history, depth=req.reasoning_depth, grant=grant)
+        try:
+            result = _run_agent_with_timeout(
+                run_agent_query,
+                governed_question,
+                [],
+                depth=req.reasoning_depth,
+                grant=grant,
+                timeout_seconds=SECURITY_CONFIG["timeouts"]["request_seconds"],
+            )
+        except FutureTimeoutError:
+            emit_governance_event(
+                request_id=request_id,
+                session_id=session_id,
+                component="api.query",
+                action="DENY",
+                reason_code="query_timeout_no_memory_commit",
+                payload={"timeout_seconds": SECURITY_CONFIG["timeouts"]["request_seconds"]},
+            )
+            return QueryResponse(
+                success=False,
+                answer="I could not process that request safely before the timeout.",
+                error="Query timed out; no memory was committed.",
+            )
         
         if not result.get("success", False) and result.get("error"):
             emit_governance_event(
@@ -477,6 +555,7 @@ def query_assistant_endpoint(req: QueryRequest, request: Request, response: Resp
                 "tools_used": result.get("tools_used", []),
                 "row_count": result.get("row_count", 0),
                 "source_count": len(result.get("sources", []) or []),
+                "token_restore_summary": (result.get("safe_metadata") or {}).get("token_restore_summary", {}),
             },
         )
         from .safe_memory import commit_successful_turn
@@ -497,7 +576,7 @@ def query_assistant_endpoint(req: QueryRequest, request: Request, response: Resp
             success=result.get("success", False),
             answer=result.get("answer", "Sorry, I couldn't process that."),
             highlights=result.get("highlights", []),
-            sql_used=result.get("sql_used", ""),
+            sql_used=result.get("sql_used", "") if _debug_flag("show_sql_used") else "",
             row_count=result.get("row_count", 0),
             sources=result.get("sources", []),
             error=result.get("error"),
@@ -1179,12 +1258,18 @@ def get_message(message_id: int, request: Request, response: Response) -> Messag
             sex=str(r["patient_sex"] or ""),
         )
 
-        bundle = _parse_fhir_bundle(r["fhir_bundle_json"])
+        protected_output = _debug_flag("show_protected_output")
+        bundle = _parse_fhir_bundle(r["fhir_bundle_json"]) if protected_output else {
+            "resourceType": "Bundle",
+            "type": "collection",
+            "entry": [],
+            "redacted": True,
+        }
 
         return MessageDetailResponse(
             id=int(r["id"]),
             timestamp=str(r["received_at"] or ""),
-            raw_hl7=str(r["raw_hl7"] or ""),
+            raw_hl7=str(r["raw_hl7"] or "") if protected_output else "[REDACTED_PROTECTED_OUTPUT]",
             patient=patient,
             fhir_bundle=bundle,
         )

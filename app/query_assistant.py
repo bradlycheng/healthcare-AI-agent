@@ -113,11 +113,9 @@ RULES:
     - **CRITICAL: Acuity Sorting**: For "worried about" or "at risk" queries, you **MUST** prioritize by acuity. Use: `ORDER BY (CASE WHEN o.alert_level = 'CRITICAL' THEN 1 WHEN o.alert_level = 'WARNING' THEN 2 ELSE 3 END), h.received_at DESC`.
     - "Worried about" or "worry about" → **MUST** include all patients where `o.flag IN ('H', 'L')` OR `o.alert_level IS NOT NULL`. Do NOT use any other filters unless explicitly asked.
 12. **CRITICAL: Context and Pronouns.**
-    - If the user implies a specific patient (e.g., "his", "her", "their", "the patient", "what about BP?"), you **MUST** identify the patient from the CHAT HISTORY.
-    - Look at the **ASSISTANT's previous answers** to see which patient was just discussed.
-    - Example: User "Show John Smith" -> Assistant "John Smith (P123)..." -> User "What about glucose?" -> SEARCH FOR JOHN SMITH.
-    - Example: User "Show John Smith" -> Assistant "John Smith (P123)..." -> User "What about glucose?" -> SEARCH FOR JOHN SMITH.
-    - If you cannot find a patient in history, do NOT filter by patient.
+    - Do NOT use chat history or prior assistant answers as authority.
+    - Server-owned reference resolution happens before SQL generation.
+    - If the current question does not contain an explicit patient or server-provided patient constraint, do NOT filter by patient.
 13. **AMBIGUITY:**
     - If ambiguous, choose the most likely interpretation.
 
@@ -462,7 +460,7 @@ def generate_sql_from_question(question: str, history: List[Dict[str, str]] = []
 {SQL_GENERATION_PROMPT}
 
 CHAT HISTORY:
-{json.dumps(history, indent=2) if history else "No history"}
+Ignored by governance policy. Use only the current server-governed question below.
 
 USER QUESTION: {question}
 
@@ -591,7 +589,7 @@ def process_query(question: str, history: List[Dict[str, str]] = []) -> Dict[str
         }
     
     # Step 1: Generate SQL from question
-    sql, explanation, error = generate_sql_from_question(question, history)
+    sql, explanation, error = generate_sql_from_question(question, [])
     if error:
         if error.startswith("AMBIGUOUS:"):
              # User friendly return

@@ -117,6 +117,8 @@ class PHITokenMap:
         self._token_records: Dict[str, TokenRecord] = {}
         self._counter: Dict[str, int] = {}  # per-category counter
         self._request_id = request_id
+        self._restored_count = 0
+        self._redacted_count = 0
 
     def add_mapping(
         self,
@@ -161,7 +163,9 @@ class PHITokenMap:
             token = match.group(0)
             record = self._token_records.get(token)
             if self._can_restore(record, grant):
+                self._restored_count += 1
                 return self._token_to_real[token]
+            self._redacted_count += 1
             return TOKEN_REDACTION
 
         return TOKEN_PATTERN.sub(replace, text)
@@ -201,6 +205,15 @@ class PHITokenMap:
         SECURITY: Returns category names only, never actual values."""
         return list(self._counter.keys())
 
+    @property
+    def restore_summary(self) -> Dict[str, Any]:
+        return {
+            "token_count": len(self._token_records),
+            "field_types": sorted({record.field_type for record in self._token_records.values()}),
+            "restored_count": self._restored_count,
+            "redacted_count": self._redacted_count,
+        }
+
     def _increment_category(self, category: str) -> None:
         """Track which categories have been anonymized."""
         self._counter[category] = self._counter.get(category, 0) + 1
@@ -211,6 +224,8 @@ class PHITokenMap:
         self._token_to_real.clear()
         self._token_records.clear()
         self._counter.clear()
+        self._restored_count = 0
+        self._redacted_count = 0
 
     def _can_restore(self, record: Optional[TokenRecord], grant: Optional[IntentGrant]) -> bool:
         if record is None or record.token not in self._token_to_real:
@@ -475,7 +490,7 @@ class WardenPolicy:
             return decision
 
         # Check 3: Tool-Specific Policy
-        decision = self._check_tool_policy(tool_name, tool_input)
+        decision = self._check_tool_policy(tool_name, tool_input, grant)
 
         # Attach PHI tokenization metadata (counts only, never values)
         if token_map:
@@ -548,14 +563,19 @@ class WardenPolicy:
 
         return WardenDecision(action="ALLOW", tool_name=tool_name, reason="No blocked tokens")
 
-    def _check_tool_policy(self, tool_name: str, tool_input: Dict[str, Any]) -> WardenDecision:
+    def _check_tool_policy(
+        self,
+        tool_name: str,
+        tool_input: Dict[str, Any],
+        grant: Optional[IntentGrant] = None,
+    ) -> WardenDecision:
         """Check 3: Tool-specific deterministic rules."""
         if tool_name == "query_database":
             return self._validate_query_database(tool_input)
         elif tool_name == "search_guidelines":
             return self._validate_search_guidelines(tool_input)
         elif tool_name == "get_patient_context":
-            return self._validate_get_patient_context(tool_input)
+            return self._validate_get_patient_context(tool_input, grant)
         elif tool_name == "clinical_calculator":
             return self._validate_clinical_calculator(tool_input)
         elif tool_name == "ask_clarification":
@@ -631,7 +651,11 @@ class WardenPolicy:
             reason="Query within limits",
         )
 
-    def _validate_get_patient_context(self, tool_input: Dict[str, Any]) -> WardenDecision:
+    def _validate_get_patient_context(
+        self,
+        tool_input: Dict[str, Any],
+        grant: Optional[IntentGrant] = None,
+    ) -> WardenDecision:
         """Require valid patient ID or name."""
         pid = tool_input.get("patient_id")
         pname = tool_input.get("patient_name")
@@ -640,6 +664,13 @@ class WardenPolicy:
                 action="DENY", tool_name="get_patient_context",
                 reason="No patient_id or patient_name provided",
                 evidence="At least one patient identifier required",
+            )
+        if grant and grant.subject and pid and str(pid) != str(grant.subject):
+            return WardenDecision(
+                action="DENY",
+                tool_name="get_patient_context",
+                reason="Patient identifier outside grant subject",
+                evidence="Tool patient_id must match server-owned grant subject",
             )
         return WardenDecision(
             action="ALLOW", tool_name="get_patient_context",
@@ -869,6 +900,9 @@ class WardenContext:
     def deanonymize(self, text: str) -> str:
         """OUT-GATE: Rehydrate tokens in LLM response for the user."""
         return self._anonymizer.deanonymize(text, self.token_map, self._grant)
+
+    def restore_summary(self) -> Dict[str, Any]:
+        return self.token_map.restore_summary
 
     # --- Clinical Surrogation ---
 

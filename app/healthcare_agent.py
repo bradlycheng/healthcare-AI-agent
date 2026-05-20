@@ -449,7 +449,9 @@ class HealthcareAgent:
                     try:
                         # Pass history for context-aware tools
                         if tool_name == ToolName.QUERY_DATABASE.value:
-                            result = self._tools[tool_name](real_tool_input, safe_history)
+                            result = self._tools[tool_name](real_tool_input, [], grant)
+                        elif tool_name == ToolName.GET_PATIENT_CONTEXT.value:
+                            result = self._tools[tool_name](real_tool_input, grant)
                         else:
                             result = self._tools[tool_name](real_tool_input)
                         
@@ -520,7 +522,10 @@ class HealthcareAgent:
                     sources=all_sources,
                     sql_used=sql_used,
                     row_count=row_count,
-                    safe_metadata=self._safe_metadata_from_results(step.tool_results),
+                    safe_metadata={
+                        **self._safe_metadata_from_results(step.tool_results),
+                        "token_restore_summary": warden_ctx.restore_summary(),
+                    },
                 )
             
         except LLMError as e:
@@ -730,8 +735,12 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
     # Tool Implementations
     # =========================================================================
     
-    def _tool_query_database(self, input_data: Dict[str, Any], 
-                              history: List[Dict[str, str]] = None) -> Dict[str, Any]:
+    def _tool_query_database(
+        self,
+        input_data: Dict[str, Any],
+        history: List[Dict[str, str]] = None,
+        grant: Optional[IntentGrant] = None,
+    ) -> Dict[str, Any]:
         """Execute natural language query against patient database."""
         from .query_assistant import (
             generate_sql_from_question,
@@ -748,7 +757,10 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         query = sanitize_text(query)
         
         # Generate SQL
-        sql, explanation, error = generate_sql_from_question(query, history or [])
+        if grant and grant.subject:
+            query = f"{query} for patient {grant.subject}"
+
+        sql, explanation, error = generate_sql_from_question(query, [])
         if error:
             if error.startswith("AMBIGUOUS:"):
                 return {
@@ -760,16 +772,14 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
             return {"error": error, "results": [], "row_count": 0, "sql": ""}
         
         # Validate SQL
-        sql_grant = narrow_to_tool(
-            build_query_grant(
-                session_id="agent_internal",
-                intent="clinical_query",
-                scope="clinical_read",
-                requested_tools=[ToolName.QUERY_DATABASE.value],
-                max_rows=50,
-            ),
-            ToolName.QUERY_DATABASE.value,
+        base_grant = grant or build_query_grant(
+            session_id="agent_internal",
+            intent="clinical_query",
+            scope="clinical_read",
+            requested_tools=[ToolName.QUERY_DATABASE.value],
+            max_rows=50,
         )
+        sql_grant = narrow_to_tool(base_grant, ToolName.QUERY_DATABASE.value)
         guard_result = validate_sql_select(sql, sql_grant)
         if not guard_result.allowed:
             return {"error": f"Invalid SQL: {guard_result.reason}", "results": [], "row_count": 0}
@@ -807,7 +817,11 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
             "sources": sources
         }
     
-    def _tool_get_patient_context(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _tool_get_patient_context(
+        self,
+        input_data: Dict[str, Any],
+        grant: Optional[IntentGrant] = None,
+    ) -> Dict[str, Any]:
         """Get comprehensive patient context."""
         from .patient_timeline import get_patient_timeline
         
@@ -846,6 +860,8 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         
         if not patient_id:
             return {"error": "Could not find patient", "patient": None}
+        if grant and grant.subject and str(patient_id) != str(grant.subject):
+            return {"error": "Patient request denied by grant subject", "patient": None}
         
         try:
             timeline = get_patient_timeline(patient_id)

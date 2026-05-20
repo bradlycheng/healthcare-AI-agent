@@ -479,6 +479,27 @@ def get_conversation_state(
         conn.close()
 
 
+def cleanup_expired_security_state(db_path: str = DB_PATH) -> Dict[str, int]:
+    """Expire transient governance state only; never resumes clinical work."""
+    init_db(db_path)
+    conn = get_connection(db_path)
+    now = datetime.utcnow().isoformat()
+    deleted: Dict[str, int] = {}
+    try:
+        for table in (
+            "hl7_parse_sessions",
+            "conversation_states",
+            "conversation_result_refs",
+            "demo_sessions",
+        ):
+            cur = conn.execute(f"DELETE FROM {table} WHERE expires_at <= ?", (now,))
+            deleted[table] = int(cur.rowcount or 0)
+        conn.commit()
+        return deleted
+    finally:
+        conn.close()
+
+
 def save_contact_request(email: str, ip_address: str, db_path: str = DB_PATH) -> bool:
     """
     Save a contact request to the database.
