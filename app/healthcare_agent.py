@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Callable
 
+from .grant_builder import build_query_grant, narrow_to_tool
 from .llm_gateway import LLMError, agent_planning, agent_synthesis, deep_reflection
 from .security import sanitize_text, detect_injection_patterns
 from .security_validation import IntentGrant, iso_after, new_request_id
@@ -324,25 +325,12 @@ class HealthcareAgent:
         row_count = 0
         
         try:
-            grant = IntentGrant(
-                intent="clinical_query",
-                risk="medium",
+            grant = build_query_grant(
                 session_id="agent_internal",
-                request_id=new_request_id(),
+                intent="clinical_query",
                 scope="demo",
-                allowed_tools=[tool.value for tool in ToolName],
-                allowed_tables=["hl7_messages", "observations", "visits", "medications", "diagnoses"],
-                output_fields=[
-                    "answer",
-                    "highlights",
-                    "sources",
-                    "patient_name",
-                    "patient_id",
-                    "patient_dob",
-                    "provider_name",
-                ],
+                requested_tools=[tool.value for tool in ToolName],
                 max_rows=50,
-                expires_at=iso_after(minutes=5),
             )
             # === MCP WARDEN: Create request-scoped security context ===
             # PHITokenMap is session-pinned, ephemeral (RAM-only)
@@ -739,8 +727,7 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
             execute_safe_query,
             retrieve_context
         )
-        from .security_validation import IntentGrant, iso_after, new_request_id
-        from .sql_guard import DEFAULT_ALLOWED_COLUMNS, validate_sql_select
+        from .sql_guard import validate_sql_select
         
         query = input_data.get("query", "")
         if not query:
@@ -762,18 +749,15 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
             return {"error": error, "results": [], "row_count": 0, "sql": ""}
         
         # Validate SQL
-        sql_grant = IntentGrant(
-            intent="clinical_query",
-            risk="medium",
-            session_id="agent_internal",
-            request_id=new_request_id(),
-            scope="clinical_read",
-            allowed_tools=[ToolName.QUERY_DATABASE.value],
-            allowed_tables=sorted(DEFAULT_ALLOWED_COLUMNS.keys()),
-            allowed_columns={table: sorted(columns) for table, columns in DEFAULT_ALLOWED_COLUMNS.items()},
-            output_fields=["clinical_answer", "row_count", "sources"],
-            max_rows=50,
-            expires_at=iso_after(minutes=5),
+        sql_grant = narrow_to_tool(
+            build_query_grant(
+                session_id="agent_internal",
+                intent="clinical_query",
+                scope="clinical_read",
+                requested_tools=[ToolName.QUERY_DATABASE.value],
+                max_rows=50,
+            ),
+            ToolName.QUERY_DATABASE.value,
         )
         guard_result = validate_sql_select(sql, sql_grant)
         if not guard_result.allowed:

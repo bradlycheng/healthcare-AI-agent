@@ -13,10 +13,11 @@ import re
 import sqlite3
 from typing import Any, Dict, List, Optional
 
+from .grant_builder import build_query_grant
 from .llm_gateway import LLMError, sql_generation, call_llm_json
 from .security import sanitize_text
-from .security_validation import IntentGrant, iso_after, new_request_id
-from .sql_guard import DEFAULT_ALLOWED_COLUMNS, validate_sql_select
+from .security_validation import IntentGrant
+from .sql_guard import validate_sql_select
 
 DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
 
@@ -294,18 +295,12 @@ FORBIDDEN_KEYWORDS = [
 
 
 def _default_sql_grant(max_rows: int = 50) -> IntentGrant:
-    return IntentGrant(
-        intent="clinical_query",
-        risk="medium",
+    return build_query_grant(
         session_id="legacy_query",
-        request_id=new_request_id(),
+        intent="clinical_query",
         scope="clinical_read",
-        allowed_tools=["query_database"],
-        allowed_tables=sorted(DEFAULT_ALLOWED_COLUMNS.keys()),
-        allowed_columns={table: sorted(columns) for table, columns in DEFAULT_ALLOWED_COLUMNS.items()},
-        output_fields=["clinical_answer", "row_count", "sources"],
+        requested_tools=["query_database"],
         max_rows=max_rows,
-        expires_at=iso_after(minutes=5),
     )
 
 
