@@ -606,18 +606,28 @@ def query_assistant_endpoint(req: QueryRequest, request: Request, response: Resp
 # ---------- RAG Routes ----------
 
 @app.get("/api/document/{filename}")
-def get_document_content(filename: str, request: Request):
+def get_document_content(filename: str, request: Request, response: Response):
     """
     Get full text content of a RAG document.
     """
     # 1. Rate Limiting (Simple)
     client_ip = request.client.host if request.client else "unknown"
+    request_id = new_request_id()
+    session_id = get_or_create_demo_session(request, response)
     now_ts = __import__("time").time()
     # Use a separate key prefix for internal docs to avoid blocking chat
     limit_key = f"doc_{client_ip}"
     last_ts = _RATE_LIMIT_STORE.get(limit_key, 0.0)
     
     if now_ts - last_ts < 0.5: # 0.5s limit to prevent scraping
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.document",
+            action="DENY",
+            reason_code="document_rate_limited",
+            payload={},
+        )
         raise HTTPException(status_code=429, detail="Too many requests.")
     
     _RATE_LIMIT_STORE[limit_key] = now_ts
@@ -625,12 +635,28 @@ def get_document_content(filename: str, request: Request):
     # 2. Filename Validation (Strict Regex)
     import re
     if not re.match(r'^[a-zA-Z0-9_\-\.]+$', filename):
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.document",
+            action="DENY",
+            reason_code="document_invalid_filename",
+            payload={},
+        )
         raise HTTPException(status_code=400, detail="Invalid filename format")
     
     # 3. Extension Whitelist
     ALLOWED_EXTENSIONS = {'.txt', '.md', '.pdf', '.json', '.csv'}
     ext = os.path.splitext(filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.document",
+            action="DENY",
+            reason_code="document_extension_denied",
+            payload={"extension": ext},
+        )
         raise HTTPException(status_code=400, detail="File type not allowed")
     
     # 4. Path Traversal Prevention (Strict)
@@ -640,22 +666,62 @@ def get_document_content(filename: str, request: Request):
         
         # Ensure the resolved path starts with the docs directory
         if not file_path.startswith(docs_dir):
+            emit_governance_event(
+                request_id=request_id,
+                session_id=session_id,
+                component="api.document",
+                action="DENY",
+                reason_code="document_path_denied",
+                payload={},
+            )
             raise HTTPException(status_code=403, detail="Access denied")
             
         if not os.path.exists(file_path):
+            emit_governance_event(
+                request_id=request_id,
+                session_id=session_id,
+                component="api.document",
+                action="DENY",
+                reason_code="document_not_found",
+                payload={"extension": ext},
+            )
             raise HTTPException(status_code=404, detail="Document not found")
         
         # 5. Size Limit (e.g. 5MB) to prevent DOS
         if os.path.getsize(file_path) > 5 * 1024 * 1024:
+             emit_governance_event(
+                request_id=request_id,
+                session_id=session_id,
+                component="api.document",
+                action="DENY",
+                reason_code="document_too_large",
+                payload={"extension": ext},
+             )
              raise HTTPException(status_code=400, detail="Document too large")
 
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.document",
+            action="ALLOW",
+            reason_code="document_read",
+            payload={"extension": ext, "size_bytes": os.path.getsize(file_path)},
+        )
         return {"filename": filename, "content": content}
     except HTTPException:
         raise
     except Exception as e:
         print(f"Error reading doc {filename}: {e}")
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.document",
+            action="DENY",
+            reason_code="document_read_exception",
+            payload={"error_type": type(e).__name__},
+        )
         raise HTTPException(status_code=500, detail="Error reading document")
     
 
@@ -791,24 +857,43 @@ class ResetRequest(BaseModel):
     password: str
 
 @app.delete("/messages", status_code=204)
-def clear_all_messages_endpoint(req: ResetRequest):
+def clear_all_messages_endpoint(req: ResetRequest, request: Request, response: Response):
     """
     Reset database to original sample data.
     Requires password validation.
     """
     from .db import delete_all_messages
     from .seed import seed_database
+
+    request_id = new_request_id()
+    session_id = get_or_create_demo_session(request, response)
     
     # Require an environment variable to be explicitly set
     admin_password = os.environ.get("ADMIN_PASSWORD")
     if not admin_password:
         print("SECURITY: Reset attempt blocked. ADMIN_PASSWORD is not configured.")
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.messages.delete",
+            action="DENY",
+            reason_code="admin_password_not_configured",
+            payload={},
+        )
         raise HTTPException(status_code=403, detail="Reset functionality is disabled. ADMIN_PASSWORD is not configured.")
 
     if req.password != admin_password:
         import time
         time.sleep(1.0) # Anti-brute force delay
         print(f"SECURITY: Failed reset attempt. Invalid password.")
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.messages.delete",
+            action="DENY",
+            reason_code="admin_password_invalid",
+            payload={},
+        )
         raise HTTPException(status_code=401, detail="Invalid admin password")
 
     try:
@@ -817,8 +902,24 @@ def clear_all_messages_endpoint(req: ResetRequest):
         
         # 2. Re-seed default data
         seed_database(verbose=False)
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.messages.delete",
+            action="ALLOW",
+            reason_code="admin_messages_reset",
+            payload={},
+        )
         return
     except Exception as e:
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.messages.delete",
+            action="DENY",
+            reason_code="admin_messages_reset_exception",
+            payload={"error_type": type(e).__name__},
+        )
         raise HTTPException(status_code=500, detail=f"Failed to reset database: {e}")
 
 
@@ -1388,24 +1489,50 @@ class ResetRequest(BaseModel):
     password: str
 
 @app.post("/admin/reset")
-async def reset_demo_data(req: ResetRequest):
+async def reset_demo_data(req: ResetRequest, request: Request, response: Response):
     """
     Reset database to initial demo state.
     Deletes all messages and reseeds with sample data.
     Requires password.
     """
     # Load password from env, requires explicit configuration
+    request_id = new_request_id()
+    session_id = get_or_create_demo_session(request, response)
     admin_password = os.environ.get("ADMIN_PASSWORD")
     if not admin_password:
         print("SECURITY: Reset attempt blocked. ADMIN_PASSWORD is not configured.")
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.admin.reset",
+            action="DENY",
+            reason_code="admin_password_not_configured",
+            payload={},
+        )
         raise HTTPException(status_code=403, detail="Reset functionality is disabled. ADMIN_PASSWORD is not configured.")
 
     if req.password != admin_password:
         # Anti-brute force delay
         time.sleep(1.0)
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.admin.reset",
+            action="DENY",
+            reason_code="admin_password_invalid",
+            payload={},
+        )
         raise HTTPException(status_code=401, detail="Incorrect Password")
 
     if reset_lock.locked():
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.admin.reset",
+            action="DENY",
+            reason_code="admin_reset_already_running",
+            payload={},
+        )
         raise HTTPException(status_code=409, detail="Reset already in progress. Please wait.")
 
     async with reset_lock:
@@ -1419,10 +1546,26 @@ async def reset_demo_data(req: ResetRequest):
                 seed_database(verbose=False)
                 
             await loop.run_in_executor(None, _perform_reset)
+            emit_governance_event(
+                request_id=request_id,
+                session_id=session_id,
+                component="api.admin.reset",
+                action="ALLOW",
+                reason_code="admin_reset_completed",
+                payload={},
+            )
             
             return {"success": True, "message": "Database reset with 100 realistic patients and corresponding clinical data."}
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Reset failed: {str(e)}")
+            emit_governance_event(
+                request_id=request_id,
+                session_id=session_id,
+                component="api.admin.reset",
+                action="DENY",
+                reason_code="admin_reset_exception",
+                payload={"error_type": type(e).__name__},
+            )
+            raise HTTPException(status_code=500, detail="Reset failed.")
 
 # ---------- Contact and Lead Gen ----------
 

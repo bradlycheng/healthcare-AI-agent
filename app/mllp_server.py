@@ -7,10 +7,12 @@ from typing import Tuple
 
 from .agent import run_oru_pipeline
 from .hl7_msh import parse_msh, build_ack
+from .security_validation import emit_governance_event, new_request_id
 
 VT = b"\x0b"  # <SB>
 FS = b"\x1c"  # <EB>
 CR = b"\x0d"  # <CR>
+MLLP_SESSION_ID = "mllp_server"
 
 
 def _recv_mllp_message(conn: socket.socket) -> str:
@@ -39,6 +41,37 @@ def _send_mllp(conn: socket.socket, hl7_text: str) -> None:
     conn.sendall(payload)
 
 
+def process_mllp_hl7(hl7: str) -> None:
+    """Process MLLP HL7 through the same deterministic ingress guard."""
+    from .hl7_guard import validate_hl7_message
+
+    request_id = new_request_id()
+    guard_result = validate_hl7_message(hl7)
+    if not guard_result.ok:
+        emit_governance_event(
+            request_id=request_id,
+            session_id=MLLP_SESSION_ID,
+            component="mllp.ingest",
+            action="DENY",
+            reason_code="hl7_guard_denied",
+            payload={
+                "errors": [issue.code for issue in guard_result.errors],
+                "metadata": guard_result.metadata,
+            },
+        )
+        raise ValueError("Invalid HL7 message.")
+
+    run_oru_pipeline(hl7)
+    emit_governance_event(
+        request_id=request_id,
+        session_id=MLLP_SESSION_ID,
+        component="mllp.ingest",
+        action="ALLOW",
+        reason_code="mllp_hl7_persisted",
+        payload={"segment_count": guard_result.metadata.get("segment_count", 0)},
+    )
+
+
 def _handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
     try:
         while True:
@@ -53,7 +86,7 @@ def _handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
 
             try:
                 # Ingest + store
-                run_oru_pipeline(hl7)
+                process_mllp_hl7(hl7)
                 ack = build_ack(msh, ack_code="AA")
             except Exception as e:
                 ack = build_ack(msh, ack_code="AE", text=str(e)[:200])

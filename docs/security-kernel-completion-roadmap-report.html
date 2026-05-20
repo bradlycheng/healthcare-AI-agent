@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Security Kernel 2.0 Completion And Roadmap Report</title>
+  <style>
+    :root {
+      --ink: #16212f;
+      --muted: #5d6b7c;
+      --line: #d8dee7;
+      --paper: #f6f8fb;
+      --panel: #ffffff;
+      --done: #177245;
+      --done-bg: #e8f5ee;
+      --active: #2357a6;
+      --active-bg: #eaf1ff;
+      --future: #8a5a12;
+      --future-bg: #fff4df;
+      --risk: #a83232;
+      --risk-bg: #fff0f0;
+      --shadow: 0 10px 30px rgba(26, 42, 68, 0.09);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      line-height: 1.45;
+    }
+
+    header {
+      padding: 40px 48px 26px;
+      background: #101923;
+      color: #fff;
+      border-bottom: 5px solid #2f80ed;
+    }
+
+    header p {
+      max-width: 980px;
+      margin: 10px 0 0;
+      color: #d9e5f3;
+      font-size: 17px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 54px);
+      letter-spacing: 0;
+      line-height: 1.05;
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    section {
+      margin: 22px 0;
+      padding: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .meta div, .card, .node, .lane, .mini-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 14px;
+    }
+
+    .meta strong {
+      display: block;
+      color: #f4f8ff;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 5px;
+    }
+
+    .meta div {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.18);
+      color: #fff;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .tag {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .done { color: var(--done); background: var(--done-bg); }
+    .active { color: var(--active); background: var(--active-bg); }
+    .future { color: var(--future); background: var(--future-bg); }
+    .risk { color: var(--risk); background: var(--risk-bg); }
+
+    ul {
+      margin: 8px 0 0;
+      padding-left: 19px;
+    }
+
+    li { margin: 5px 0; }
+
+    .diagram {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(9, minmax(120px, 1fr));
+      gap: 10px;
+      align-items: stretch;
+      overflow-x: auto;
+      padding-bottom: 6px;
+    }
+
+    .node {
+      min-height: 118px;
+      position: relative;
+      background: #fbfcfe;
+    }
+
+    .node:not(:last-child)::after {
+      content: ">";
+      position: absolute;
+      right: -10px;
+      top: 42%;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .node b {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .node span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .lanes {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(180px, 1fr));
+      gap: 12px;
+      overflow-x: auto;
+    }
+
+    .lane {
+      min-height: 250px;
+      background: #fbfcfe;
+    }
+
+    .lane h3 {
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      padding: 10px 9px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    th {
+      background: #f0f3f8;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+
+    code {
+      font-family: Consolas, Monaco, monospace;
+      background: #edf1f6;
+      padding: 2px 5px;
+      border-radius: 5px;
+    }
+
+    .callout {
+      border-left: 5px solid #2f80ed;
+      background: #f3f8ff;
+      padding: 14px 16px;
+      border-radius: 8px;
+      color: #20324a;
+    }
+
+    .roadmap {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(220px, 1fr));
+      gap: 12px;
+      overflow-x: auto;
+    }
+
+    .roadmap .card {
+      min-height: 250px;
+    }
+
+    @media (max-width: 900px) {
+      header { padding: 30px 22px; }
+      main { padding: 18px; }
+      .meta, .grid, .grid.two, .grid.four { grid-template-columns: 1fr; }
+      section { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Security Kernel 2.0 Completion And Roadmap</h1>
+    <p>
+      Big-picture status report for the Healthcare Agent governance build:
+      what is now implemented, what is validated, what remains open, and where
+      each execution path sits relative to the kernel.
+    </p>
+    <div class="meta">
+      <div><strong>Branch</strong>codex/security-kernel-next-hardening</div>
+      <div><strong>Commit</strong>9a85aee</div>
+      <div><strong>Validation</strong>136 tests passed, compile gate passed</div>
+      <div><strong>Mode</strong>Demo/session security, not full RBAC</div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>Executive Summary</h2>
+      <div class="grid">
+        <div class="card">
+          <span class="tag done">Completed</span>
+          <h3>Kernel Spine Is Real</h3>
+          <p>Core query, HL7 parse, message save, Warden, SQL, token, memory, and audit paths now have deterministic governance gates.</p>
+        </div>
+        <div class="card">
+          <span class="tag active">Validated</span>
+          <h3>Hardening Tests Pass</h3>
+          <p>The focused and full test suite pass locally: compile gate plus <code>pytest tests -q</code> at 131 passing tests.</p>
+        </div>
+        <div class="card">
+          <span class="tag future">Future</span>
+          <h3>Not Production Complete</h3>
+          <p>Full users/RBAC, durable taint metadata, read-output grants, MLLP governance, and UI escaping verification remain future slices.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Current Governed Query Flow</h2>
+      <div class="flow">
+        <div class="node"><span class="tag done">Gate</span><b>Request</b><span>/api/query receives question, session, request ID.</span></div>
+        <div class="node"><span class="tag done">Memory</span><b>Safe State</b><span>Load typed metadata only; no raw history authority.</span></div>
+        <div class="node"><span class="tag done">Resolver</span><b>Reference Guard</b><span>Pronouns narrow, clarify, or deny before classifier.</span></div>
+        <div class="node"><span class="tag done">Classifier</span><b>Intent Label</b><span>LLM labels only; server creates grant.</span></div>
+        <div class="node"><span class="tag done">Grant</span><b>IntentGrant</b><span>Allowed tools, scope, subject, rows, output fields.</span></div>
+        <div class="node"><span class="tag done">Warden</span><b>Tool Gate</b><span>Registered tool, exact schema, grant, subject policy.</span></div>
+        <div class="node"><span class="tag done">SQLGuard</span><b>Read Guard</b><span>SELECT only, allowlists, limit, no note text by default.</span></div>
+        <div class="node"><span class="tag done">Token Gate</span><b>Restore Gate</b><span>Opaque request tokens restore only by grant.</span></div>
+        <div class="node"><span class="tag done">Commit</span><b>Memory Gate</b><span>Only successful, non-clarifying turns commit metadata.</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Endpoint Coverage Map</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Endpoint / Execution</th>
+            <th>Status</th>
+            <th>Governance Now</th>
+            <th>Remaining Gap</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>POST /api/query</code></td>
+            <td><span class="tag done">Strong</span></td>
+            <td>Reference resolver, classifier, server grant, Warden, SQLGuard, TokenGuard, timeout, audit, memory commit gate.</td>
+            <td>ContextBuilder not fully wired into prompts; result refs still schema-only.</td>
+          </tr>
+          <tr>
+            <td><code>POST /oru/parse</code></td>
+            <td><span class="tag active">Good</span></td>
+            <td>HL7 guard, direct-persist deny, parse timeout, parse session, PHI-free audit.</td>
+            <td>Preview still returns patient/FHIR for demo UI without full output grant.</td>
+          </tr>
+          <tr>
+            <td><code>POST /messages</code></td>
+            <td><span class="tag done">Strong</span></td>
+            <td>Requires same-session parse ID, single-use claim, ignores tampered client clinical JSON, audit events.</td>
+            <td>Legacy compatibility flag must stay off unless explicitly needed.</td>
+          </tr>
+          <tr>
+            <td><code>GET /messages/{id}</code></td>
+            <td><span class="tag active">Improved</span></td>
+            <td>Raw HL7 and FHIR are redacted by default; audited reads.</td>
+            <td>Patient identifiers still returned for demo read UI without read-output grants.</td>
+          </tr>
+          <tr>
+            <td><code>GET /messages/{id}/observations</code></td>
+            <td><span class="tag active">Improved</span></td>
+            <td>Note-like text values redacted by default; audited read.</td>
+            <td>Needs durable row-level note/taint metadata instead of heuristics.</td>
+          </tr>
+          <tr>
+            <td><code>GET /patients</code> and timeline</td>
+            <td><span class="tag future">Partial</span></td>
+            <td>Audited and raw HL7 removed from timeline query path.</td>
+            <td>Still demo-open for identifiers; needs read grants/RBAC for production.</td>
+          </tr>
+          <tr>
+            <td><code>GET /patients/{id}/summary</code></td>
+            <td><span class="tag future">Partial</span></td>
+            <td>LLM call routed through gateway; patient identifiers withheld in prompt.</td>
+            <td>Needs full output grant and stronger audit tests around generated summaries.</td>
+          </tr>
+          <tr>
+            <td><code>DELETE /messages</code>, <code>/admin/reset</code></td>
+            <td><span class="tag risk">Open</span></td>
+            <td>Password/reset protection exists.</td>
+            <td>Needs explicit governance audit tests and reset-mode decision.</td>
+          </tr>
+          <tr>
+            <td><code>/api/document/{filename}</code></td>
+            <td><span class="tag future">Partial</span></td>
+            <td>Filename, extension, path, and size guards.</td>
+            <td>Needs governance audit or documented exemption.</td>
+          </tr>
+          <tr>
+            <td><code>app/mllp_server.py</code></td>
+            <td><span class="tag risk">Open</span></td>
+            <td>Calls the ORU pipeline directly.</td>
+            <td>Must be wrapped in the same HL7 kernel path before production use.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>What Was Completed</h2>
+      <div class="lanes">
+        <div class="lane">
+          <h3>Reference And Memory</h3>
+          <ul>
+            <li>Added safe reference resolver.</li>
+            <li>Pronouns and ordinals resolve only from safe state.</li>
+            <li>Ambiguous references clarify instead of guessing.</li>
+            <li>Export and identifier jumps deny.</li>
+            <li>Failed, denied, timeout, and clarification turns skip memory commit.</li>
+          </ul>
+        </div>
+        <div class="lane">
+          <h3>Query Governance</h3>
+          <ul>
+            <li>Client history no longer acts as authority.</li>
+            <li>Resolved subjects stay structured in grants.</li>
+            <li>Warden denies patient context outside grant subject.</li>
+            <li>SQL generation ignores raw history.</li>
+            <li><code>sql_used</code> hidden unless debug-enabled.</li>
+          </ul>
+        </div>
+        <div class="lane">
+          <h3>Output Protection</h3>
+          <ul>
+            <li>Raw HL7 detail redacted by default.</li>
+            <li>FHIR detail redacted by default.</li>
+            <li>Note-like observation values redacted by default.</li>
+            <li>SQLGuard blocks note text columns unless <code>note_read</code>.</li>
+            <li>Token restore summaries are aggregate-only.</li>
+          </ul>
+        </div>
+        <div class="lane">
+          <h3>Cleanup And Timeout</h3>
+          <ul>
+            <li>Central conversation TTL used by safe memory.</li>
+            <li>Expired transient security state cleanup added.</li>
+            <li>Request timeout returns safe no-commit result.</li>
+            <li>Timeout executor is bounded.</li>
+            <li>Startup cleanup never resumes clinical work.</li>
+          </ul>
+        </div>
+        <div class="lane">
+          <h3>Multi-Agent Reports</h3>
+          <ul>
+            <li>Explorer A mapped memory/reference paths.</li>
+            <li>Explorer B mapped endpoint/output policy.</li>
+            <li>Reviewer identified bypass risks.</li>
+            <li>Lead integration summary records decisions.</li>
+            <li>Reports live under <code>docs/agent-reports/next-hardening</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Validation Summary</h2>
+      <div class="grid four">
+        <div class="mini-card"><span class="tag done">Pass</span><h3>Compile Gate</h3><p><code>compileall -q app tests</code></p></div>
+        <div class="mini-card"><span class="tag done">Pass</span><h3>Full Tests</h3><p><code>pytest tests -q</code><br>136 passed, 10 warnings.</p></div>
+        <div class="mini-card"><span class="tag done">Pass</span><h3>Focused Governance</h3><p>Reference, endpoint, SQL, HL7, token, RAG, calculator, Warden.</p></div>
+        <div class="mini-card"><span class="tag active">Known</span><h3>Warnings</h3><p>FastAPI <code>on_event</code> and Pydantic <code>dict()</code> deprecations.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Future Roadmap</h2>
+      <div class="roadmap">
+        <div class="card">
+          <span class="tag future">Slice 1</span>
+          <h3>Read Output Grants</h3>
+          <ul>
+            <li>Add read grants for patient/message/timeline endpoints.</li>
+            <li>Decide demo identifier policy versus protected mode.</li>
+            <li>Audit admin/reset/document reads.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag future">Slice 2</span>
+          <h3>Durable Taint Metadata</h3>
+          <ul>
+            <li>Add row-level note/text classification.</li>
+            <li>Backfill legacy text rows.</li>
+            <li>Use one taint source across SQL, API, timeline, synthesis.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag future">Slice 3</span>
+          <h3>Result References</h3>
+          <ul>
+            <li>Implement result-ref save/load helpers.</li>
+            <li>Add TTL and same-session ownership.</li>
+            <li>Resolve result references without exposing raw rows pre-grant.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag future">Slice 4</span>
+          <h3>Production Boundary</h3>
+          <ul>
+            <li>Wrap MLLP server in HL7 kernel.</li>
+            <li>Add RBAC/OAuth or production auth.</li>
+            <li>Replace debug flags with actor/grant authorization.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Bottom Line</h2>
+      <div class="callout">
+        The core kernel is now strong enough for the next demo-security checkpoint:
+        LLM output does not create authority, client clinical JSON does not create
+        truth, failed/denied/timeout requests do not commit memory, and the highest
+        risk query/HL7/message paths have tests. The remaining work is mostly about
+        expanding the same kernel guarantees to read endpoints, production auth,
+        durable taint metadata, MLLP ingestion, and UI validation.
+      </div>
+    </section>
+  </main>
+</body>
+</html>

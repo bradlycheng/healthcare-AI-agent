@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Security Kernel Testing Strategy And Future Validation Plan</title>
+  <style>
+    :root {
+      --ink: #172331;
+      --muted: #657386;
+      --line: #d8e0ea;
+      --paper: #f5f7fb;
+      --panel: #ffffff;
+      --pass: #16693f;
+      --pass-bg: #e8f5ee;
+      --partial: #8a5a12;
+      --partial-bg: #fff4df;
+      --open: #a33b37;
+      --open-bg: #fff0ef;
+      --info: #245aa5;
+      --info-bg: #eaf2ff;
+      --shadow: 0 10px 28px rgba(20, 36, 62, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      line-height: 1.46;
+    }
+
+    header {
+      padding: 42px 48px 30px;
+      color: #fff;
+      background: #101923;
+      border-bottom: 5px solid #2f80ed;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 52px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    p { margin: 8px 0; }
+
+    header p {
+      max-width: 960px;
+      color: #dce7f5;
+      font-size: 17px;
+      margin-top: 12px;
+    }
+
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    section {
+      margin: 22px 0;
+      padding: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(170px, 1fr));
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .meta div {
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.08);
+    }
+
+    .meta strong {
+      display: block;
+      margin-bottom: 5px;
+      color: #f7fbff;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 16px;
+    }
+
+    .tag {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .pass { color: var(--pass); background: var(--pass-bg); }
+    .partial { color: var(--partial); background: var(--partial-bg); }
+    .open { color: var(--open); background: var(--open-bg); }
+    .info { color: var(--info); background: var(--info-bg); }
+
+    code {
+      font-family: Consolas, Monaco, monospace;
+      background: #edf2f8;
+      padding: 2px 5px;
+      border-radius: 5px;
+    }
+
+    pre {
+      overflow-x: auto;
+      padding: 14px;
+      border-radius: 8px;
+      background: #111923;
+      color: #e6edf7;
+      font-size: 13px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 10px 9px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f0f4f9;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+
+    ul {
+      margin: 8px 0 0;
+      padding-left: 19px;
+    }
+
+    li { margin: 5px 0; }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(150px, 1fr));
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+    }
+
+    .step {
+      min-height: 140px;
+      position: relative;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .step:not(:last-child)::after {
+      content: ">";
+      position: absolute;
+      top: 45%;
+      right: -10px;
+      color: var(--muted);
+      font-weight: 900;
+    }
+
+    .matrix {
+      display: grid;
+      grid-template-columns: 220px repeat(4, minmax(150px, 1fr));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .matrix div {
+      padding: 11px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+      min-height: 58px;
+    }
+
+    .matrix .head {
+      background: #f0f4f9;
+      font-weight: 800;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+
+    .callout {
+      border-left: 5px solid #2f80ed;
+      background: #f3f8ff;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    @media (max-width: 900px) {
+      header { padding: 30px 22px; }
+      main { padding: 18px; }
+      section { padding: 18px; }
+      .meta, .grid, .grid.two, .grid.four { grid-template-columns: 1fr; }
+      .matrix { grid-template-columns: 1fr; }
+      .matrix div { border-right: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Security Kernel Testing Strategy</h1>
+    <p>
+      A visual report for how the Healthcare Agent security kernel is validated:
+      compile safety, governed execution behavior, endpoint coverage, audit checks,
+      known gaps, and the future test plan.
+    </p>
+    <div class="meta">
+      <div><strong>Current Branch</strong>codex/security-kernel-next-hardening</div>
+      <div><strong>Latest Commit</strong>9a85aee</div>
+      <div><strong>Full Suite</strong>136 passed, 10 warnings</div>
+      <div><strong>Testing Posture</strong>Strong core kernel, read/admin/document/MLLP audit improved</div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>Testing Strategy At A Glance</h2>
+      <div class="pipeline">
+        <div class="step">
+          <span class="tag pass">1</span>
+          <h3>Compile Gate</h3>
+          <p>Proves Python files in <code>app</code> and <code>tests</code> compile before behavior checks run.</p>
+        </div>
+        <div class="step">
+          <span class="tag pass">2</span>
+          <h3>Static Import Gate</h3>
+          <p>Checks module imports and guards against low-level LLM calls bypassing the gateway.</p>
+        </div>
+        <div class="step">
+          <span class="tag pass">3</span>
+          <h3>Unit Guards</h3>
+          <p>Exercises SQLGuard, Hl7Guard, TokenGuard, RAG, calculator specs, grants, and memory rules.</p>
+        </div>
+        <div class="step">
+          <span class="tag pass">4</span>
+          <h3>Endpoint Flows</h3>
+          <p>Validates query, ORU parse, parse-session save, replay denial, wrong-session denial, and redaction.</p>
+        </div>
+        <div class="step">
+          <span class="tag info">5</span>
+          <h3>Abuse Tests</h3>
+          <p>Locks down prompt injection, SQL-like HL7 notes, stale history authority, guessed tokens, and bad grants.</p>
+        </div>
+        <div class="step">
+          <span class="tag partial">6</span>
+          <h3>Future Gates</h3>
+          <p>Add production read grants, UI escaping, durable taint metadata, and deeper admin/read authorization tests.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Commands And Current Results</h2>
+      <div class="grid two">
+        <div class="card">
+          <span class="tag pass">Passing</span>
+          <h3>Compile Gate</h3>
+          <pre>C:\Users\bradl\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe -m compileall -q app tests</pre>
+          <p>Status: passed.</p>
+        </div>
+        <div class="card">
+          <span class="tag pass">Passing</span>
+          <h3>Full Test Suite</h3>
+          <pre>pytest tests -q</pre>
+          <p>Status: 136 passed, 10 warnings.</p>
+        </div>
+      </div>
+      <p class="callout">
+        The warnings are deprecation warnings from FastAPI <code>on_event</code>
+        and Pydantic <code>dict()</code>. They are not test failures, but they
+        should become a cleanup slice before production hardening.
+      </p>
+    </section>
+
+    <section>
+      <h2>Governance Coverage Matrix</h2>
+      <div class="matrix">
+        <div class="head">Boundary</div>
+        <div class="head">Compile</div>
+        <div class="head">Unit Guard</div>
+        <div class="head">Endpoint Flow</div>
+        <div class="head">Future Need</div>
+
+        <div><strong>/api/query</strong></div>
+        <div><span class="tag pass">Yes</span></div>
+        <div><span class="tag pass">Yes</span><br>Classifier, grants, Warden, SQL, memory.</div>
+        <div><span class="tag pass">Yes</span><br>Deny, timeout, references, no history authority.</div>
+        <div>ContextBuilder prompt integration and result refs.</div>
+
+        <div><strong>Warden Tool Calls</strong></div>
+        <div><span class="tag pass">Yes</span></div>
+        <div><span class="tag pass">Yes</span><br>Schema, grant, subject, unknown tools.</div>
+        <div><span class="tag pass">Indirect</span><br>Through query endpoint and agent tests.</div>
+        <div>More end-to-end tests for each planned tool combination.</div>
+
+        <div><strong>SQL Execution</strong></div>
+        <div><span class="tag pass">Yes</span></div>
+        <div><span class="tag pass">Yes</span><br>SELECT only, blocked tables, columns, notes, limits.</div>
+        <div><span class="tag pass">Partial</span><br>Query endpoint and agent path covered.</div>
+        <div>Subject predicate enforcement for SQL should get deeper tests.</div>
+
+        <div><strong>HL7 Parse</strong></div>
+        <div><span class="tag pass">Yes</span></div>
+        <div><span class="tag pass">Yes</span><br>ORU shape, malformed messages, SQL-like notes.</div>
+        <div><span class="tag pass">Yes</span><br>Parse preview and parse ID session flow.</div>
+        <div>MLLP now uses HL7Guard plus PHI-free governance events; full parse-session parity remains future work.</div>
+
+        <div><strong>/messages Save</strong></div>
+        <div><span class="tag pass">Yes</span></div>
+        <div><span class="tag pass">Yes</span><br>Parse-session helpers and ownership.</div>
+        <div><span class="tag pass">Yes</span><br>Same-session save, replay fail, tamper ignored.</div>
+        <div>Keep legacy compatibility off or add explicit migration tests.</div>
+
+        <div><strong>Token Restore</strong></div>
+        <div><span class="tag pass">Yes</span></div>
+        <div><span class="tag pass">Yes</span><br>Current, stale, guessed, wrong-session, out-of-grant.</div>
+        <div><span class="tag pass">Indirect</span><br>Warden and query synthesis path.</div>
+        <div>Audit restore summaries across more live response shapes.</div>
+
+        <div><strong>Safe Memory</strong></div>
+        <div><span class="tag pass">Yes</span></div>
+        <div><span class="tag pass">Yes</span><br>Commit, skip, TTL, cleanup.</div>
+        <div><span class="tag pass">Yes</span><br>Timeout and clarification no-commit.</div>
+        <div>First-class result refs and scheduled cleanup.</div>
+
+        <div><strong>Read Endpoints</strong></div>
+        <div><span class="tag pass">Yes</span></div>
+        <div><span class="tag partial">Partial</span><br>Timeline and redaction helpers.</div>
+        <div><span class="tag partial">Partial</span><br>Message detail and observations covered.</div>
+        <div>Read grants for patients, timelines, message lists, and summaries.</div>
+
+        <div><strong>Admin / Document / UI</strong></div>
+        <div><span class="tag pass">Yes</span></div>
+        <div><span class="tag partial">Partial</span><br>Document path validation exists.</div>
+        <div><span class="tag open">Limited</span></div>
+        <div>Admin/document audit now has endpoint tests; browser UI escaping remains future work.</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>What Is Covered Well</h2>
+      <div class="grid">
+        <div class="card">
+          <span class="tag pass">Strong</span>
+          <h3>Core Query Kernel</h3>
+          <ul>
+            <li>Classifier failure fails closed.</li>
+            <li>Deny intents do not call the agent.</li>
+            <li>Client history cannot create authority.</li>
+            <li>References resolve from safe state only.</li>
+            <li>Timeouts do not commit memory.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag pass">Strong</span>
+          <h3>Database And Tool Governance</h3>
+          <ul>
+            <li>Warden blocks unregistered tools and bad schemas.</li>
+            <li>Grant subject limits patient context.</li>
+            <li>SQLGuard blocks mutation/control SQL.</li>
+            <li>Raw HL7/FHIR SQL columns are denied.</li>
+            <li>Note text columns require <code>note_read</code>.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag pass">Strong</span>
+          <h3>HL7 And Persistence</h3>
+          <ul>
+            <li>Invalid HL7 is denied safely.</li>
+            <li>SQL-like note content is denied.</li>
+            <li>Parse preview creates server-owned <code>parse_id</code>.</li>
+            <li>Wrong-session and replayed parse IDs fail.</li>
+            <li>Client-tampered clinical JSON is ignored.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Coverage Gaps</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Gap</th>
+            <th>Why It Matters</th>
+            <th>Recommended Test Slice</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Read-output grants</td>
+            <td>Patient/message list endpoints still return demo identifiers without per-request output grants.</td>
+            <td>Add endpoint tests for patient list, timeline, summary, message list, and protected fields.</td>
+          </tr>
+          <tr>
+            <td>Durable taint metadata</td>
+            <td>Note redaction currently uses naming heuristics like <code>NOTE</code> or display text.</td>
+            <td>Add ingestion-time note/text classification and verify every read path consumes it.</td>
+          </tr>
+          <tr>
+            <td>MLLP ingestion</td>
+            <td><code>app/mllp_server.py</code> can call the ORU pipeline outside the API kernel path.</td>
+            <td>Current tests prove HL7Guard and audit before pipeline. Future tests should add parse-session parity if MLLP stays enabled.</td>
+          </tr>
+          <tr>
+            <td>Admin and document audit</td>
+            <td>Basic PHI-free audit is now covered for reset and document access.</td>
+            <td>Add actor-aware authorization once users/RBAC exist.</td>
+          </tr>
+          <tr>
+            <td>UI escaping</td>
+            <td>Server guards are strong, but browser rendering can still become an output boundary.</td>
+            <td>Use browser tests for escaped HL7, FHIR, RAG snippets, markdown, traces, and notes.</td>
+          </tr>
+          <tr>
+            <td>True cancellation</td>
+            <td>Python threads cannot forcibly kill already-running LLM/tool work after timeout.</td>
+            <td>Add cooperative cancellation or process/job isolation tests for long-running LLM/RAG/SQL paths.</td>
+          </tr>
+          <tr>
+            <td>Result references</td>
+            <td><code>conversation_result_refs</code> exists but is not a complete lifecycle yet.</td>
+            <td>Add save/load/expire/wrong-session tests, then wire reference resolution to live result refs.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Future Validation Plan</h2>
+      <div class="grid four">
+        <div class="card">
+          <span class="tag info">Next</span>
+          <h3>Read Endpoint Gate</h3>
+          <ul>
+            <li>Patient list grants.</li>
+            <li>Timeline grants.</li>
+            <li>Summary output grants.</li>
+            <li>Message list/detail grants.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag info">Next</span>
+          <h3>Taint And Notes</h3>
+          <ul>
+            <li>Add persisted taint fields.</li>
+            <li>Backfill legacy rows.</li>
+            <li>Test SQL, API, timeline, synthesis.</li>
+            <li>Remove heuristic-only redaction.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag info">Next</span>
+          <h3>Execution Completeness</h3>
+          <ul>
+            <li>MLLP parse-session parity.</li>
+            <li>Admin audit gate.</li>
+            <li>Document governance decision.</li>
+            <li>Scheduled cleanup tests.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag info">Next</span>
+          <h3>UI And Production</h3>
+          <ul>
+            <li>Browser escaping tests.</li>
+            <li>RBAC/OAuth tests.</li>
+            <li>Protected debug authorization.</li>
+            <li>FastAPI/Pydantic cleanup.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Bottom-Line Report</h2>
+      <div class="callout">
+        Compile coverage is good. Core governance execution coverage is strong.
+        Endpoint coverage is strong for query, HL7 parse, and parse-session persistence.
+        Coverage is improved for read audit, admin audit, document audit, and MLLP guard entry. The next
+        testing priority should be expanding output-grant and audit coverage to every
+        PHI-bearing read path, then validating durable note taint metadata and UI escaping.
+      </div>
+    </section>
+  </main>
+</body>
+</html>
