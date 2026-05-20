@@ -275,7 +275,13 @@ class HealthcareAgent:
             ToolName.ASK_CLARIFICATION.value: self._tool_ask_clarification,
         }
     
-    def run(self, question: str, history: List[Dict[str, str]] = None, depth: str = "standard") -> AgentResponse:
+    def run(
+        self,
+        question: str,
+        history: List[Dict[str, str]] = None,
+        depth: str = "standard",
+        grant: Optional[IntentGrant] = None,
+    ) -> AgentResponse:
         """
         Main agent entry point with Reasoning Router.
         
@@ -289,11 +295,16 @@ class HealthcareAgent:
             
         # Router
         if depth == ReasoningDepth.DEEP.value:
-            return self._run_deep(question, history)
+            return self._run_deep(question, history, grant)
         else:
-            return self._run_standard(question, history)
+            return self._run_standard(question, history, grant)
 
-    def _run_standard(self, question: str, history: List[Dict[str, str]] = None) -> AgentResponse:
+    def _run_standard(
+        self,
+        question: str,
+        history: List[Dict[str, str]] = None,
+        grant: Optional[IntentGrant] = None,
+    ) -> AgentResponse:
         """
         Standard ReAct Loop (Legacy 'run' method).
         """
@@ -325,7 +336,7 @@ class HealthcareAgent:
         row_count = 0
         
         try:
-            grant = build_query_grant(
+            grant = grant or build_query_grant(
                 session_id="agent_internal",
                 intent="clinical_query",
                 scope="demo",
@@ -958,7 +969,12 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
     # Reasoning Modes
     # =========================================================================
 
-    def _run_deep(self, question: str, history: List[Dict[str, str]]) -> AgentResponse:
+    def _run_deep(
+        self,
+        question: str,
+        history: List[Dict[str, str]],
+        grant: Optional[IntentGrant] = None,
+    ) -> AgentResponse:
         """
         Deep Mode: Reflection + Standard ReAct.
         """
@@ -1007,7 +1023,7 @@ Output valid JSON only. Do not use code blocks.
 
             # Reflection is advisory only. Do not prepend LLM-generated strategy
             # into user text, because strategy text is not authority.
-            response = self._run_standard(question, history)
+            response = self._run_standard(question, history, grant)
             
             # Prepend reflection step to trace
             reflection_step = AgentStep(
@@ -1026,7 +1042,7 @@ Output valid JSON only. Do not use code blocks.
             
         except Exception as e:
             # Fallback to standard if reflection fails
-            return self._run_standard(question, history)
+            return self._run_standard(question, history, grant)
 
 
 
@@ -1035,14 +1051,19 @@ Output valid JSON only. Do not use code blocks.
 # =============================================================================
 
 
-def run_agent_query(question: str, history: List[Dict[str, str]] = None, depth: str = "standard") -> Dict[str, Any]:
+def run_agent_query(
+    question: str,
+    history: List[Dict[str, str]] = None,
+    depth: str = "standard",
+    grant: Optional[IntentGrant] = None,
+) -> Dict[str, Any]:
     """
     Run an agent query and return the result as a dict.
     
     This is the main entry point for the API.
     """
     agent = HealthcareAgent()
-    response = agent.run(question, history, depth)
+    response = agent.run(question, history, depth, grant)
     
     return {
         "success": response.success,

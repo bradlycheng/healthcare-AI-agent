@@ -391,8 +391,66 @@ def query_assistant_endpoint(req: QueryRequest, request: Request, response: Resp
         )
     
     try:
+        from .grant_builder import build_query_grant
         from .healthcare_agent import run_agent_query
-        result = run_agent_query(req.question, req.history, depth=req.reasoning_depth)
+        from .intent_classifier import IntentClassificationError, classify_query_intent
+
+        try:
+            classification = classify_query_intent(
+                req.question,
+                safe_state_present=prior_state is not None,
+            )
+        except IntentClassificationError as e:
+            emit_governance_event(
+                request_id=request_id,
+                session_id=session_id,
+                component="api.query.intent",
+                action="DENY",
+                reason_code=str(e),
+                payload={},
+            )
+            return QueryResponse(
+                success=False,
+                answer="I could not classify that request safely. Please rephrase as a normal clinical question.",
+                error="Intent classification failed closed.",
+            )
+
+        grant = build_query_grant(
+            session_id=session_id,
+            request_id=request_id,
+            intent=classification.intent,
+            scope=classification.scope,
+            max_rows=50,
+        )
+        emit_governance_event(
+            request_id=request_id,
+            session_id=session_id,
+            component="api.query.intent",
+            action="DENY" if classification.deny or grant.risk == "deny" else "ALLOW",
+            reason_code=classification.reason_code,
+            payload={
+                "intent": classification.intent,
+                "scope": classification.scope,
+                "risk": grant.risk,
+                "allowed_tools": grant.allowed_tools,
+            },
+        )
+        if classification.deny or grant.risk == "deny":
+            return QueryResponse(
+                success=False,
+                answer="I can't perform that request. Please ask a normal read-only clinical question.",
+                error="Request denied by governance policy.",
+            )
+        if classification.needs_clarification:
+            return QueryResponse(
+                success=True,
+                answer="Could you clarify what clinical information you want me to look up?",
+                needs_clarification=True,
+                clarification_question="What clinical information should I use?",
+                clarification_options=["Patient data", "Guideline reference", "Calculator"],
+            )
+
+        result = run_agent_query(req.question, req.history, depth=req.reasoning_depth, grant=grant)
         
         if not result.get("success", False) and result.get("error"):
             emit_governance_event(
