@@ -10,7 +10,17 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <meta name="description" content="Legacy archive of Health Data Agent landing concepts.">
+    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Health Data Agent Archive">
+    <meta property="og:description" content="Legacy archive of Health Data Agent landing concepts.">
+    <meta property="og:image" content="og-image.png">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
@@ -22,18 +32,18 @@
 
     <nav class="navbar">
         <a href="/" class="logo">
-            <i class="fa-solid fa-staff-snake"></i>
+            <img src="brain_transparent.png" alt="Health Data Agent Logo">
             <span>Health Data Agent</span>
         </a>
         <div class="nav-links">
-            <a href="/" class="active">Dashboard</a>
-            <a href="/ingest.html">Process Data</a>
+            <a href="/index.html#features">Features</a>
+            <a href="/index.html#tech-stack">Technology</a>
+            <a href="/process-data.html">Process Data</a>
+            <a href="/dashboard.html">Dashboard</a>
+            <a href="/warden.html">Warden 1.0</a>
             <a href="/about.html">About</a>
         </div>
-        <a href="/docs" target="_blank" class="btn-primary">API Docs</a>
-        <a href="/ingest.html" class="btn-primary" style="margin-left: 10px;">
-            <i class="fa-solid fa-plus"></i> New Message
-        </a>
+        <a href="/dashboard.html" class="btn-primary">Get Started</a>
     </nav>
 
     <header class="hero">
@@ -81,7 +91,7 @@ OBX|1|NM|GLUCOSE||105|...</code></pre>
             <h2>Capabilities</h2>
             <p>Powered by modern LLMs and robust parsing logic.</p>
         </div>
-        <div class="feature-grid">
+        <div class="feature-grid balanced-three">
             <div class="feature-card">
                 <div class="icon-box">
                     <i class="fa-solid fa-dna"></i>
@@ -237,8 +247,8 @@ OBX|3|TX|NOTE^Clinical Note||50 y/o male presenting with crushing chest pain rad
 
     <section id="tech-stack" class="tech-stack">
         <div class="section-header">
-            <h2>Built for Scale & Security</h2>
-            <p>Enterprise-grade architecture designed for modern healthcare systems.</p>
+            <h2>Built for Clinical AI Workflows</h2>
+            <p>Architecture for useful AI workflows, interoperable health data, and Warden 1.0 guardrails.</p>
         </div>
         <div class="tech-grid">
             <div class="tech-card">
@@ -258,8 +268,8 @@ OBX|3|TX|NOTE^Clinical Note||50 y/o male presenting with crushing chest pain rad
             </div>
             <div class="tech-card">
                 <i class="fa-solid fa-shield-halved"></i>
-                <h4>HIPAA Ready</h4>
-                <p>Secure data handling and encrypted transmission.</p>
+                <h4>HIPAA-Aware</h4>
+                <p>Designed around secure data handling and privacy-conscious transmission.</p>
             </div>
         </div>
     </section>
@@ -280,7 +290,10 @@ OBX|3|TX|NOTE^Clinical Note||50 y/o male presenting with crushing chest pain rad
 
     <footer class="footer">
         <p>&copy; 2024 Health Data Agent | Created by Bradly Cheng</p>
-        <div class="social-links">
+        <div class="social-links footer-links">
+            <a href="/about.html" class="footer-email"
+                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">About
+                <i class="fa-solid fa-circle-info"></i></a>
             <a href="https://www.linkedin.com/in/bradly-cheng/" target="_blank" rel="noopener"><i
                     class="fa-brands fa-linkedin"></i></a>
         </div>

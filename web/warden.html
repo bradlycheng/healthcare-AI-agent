@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warden 1.0 | Health Data Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <meta name="description"
+        content="Warden 1.0 provides PHI-aware privacy, request guardrails, and audit-aware controls for Health Data Agent clinical AI workflows.">
+    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Warden 1.0 | Health Data Agent">
+    <meta property="og:description"
+        content="PHI-aware guardrails, request checks, and audit-aware controls for clinical AI workflows.">
+    <meta property="og:image" content="og-image.png">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Warden Specific Styles */
+        .use-case-section, .architecture-section, .compliance-section {
+            padding: 5rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .problem-solution-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .problem-card, .solution-card {
+            background: rgba(13, 17, 23, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 2.5rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .problem-card {
+            border-top: 4px solid #ef4444;
+        }
+
+        .solution-card {
+            border-top: 4px solid #10b981;
+        }
+
+        .compliance-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .compliance-card {
+            background: rgba(13, 17, 23, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .compliance-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .compliance-card i {
+            font-size: 2.5rem;
+            background: var(--gradient-main);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .gate-flow {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .gate {
+            display: flex;
+            align-items: center;
+            background: rgba(13, 17, 23, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 2rem;
+        }
+
+        .gate-icon {
+            font-size: 3rem;
+            margin-right: 2rem;
+            color: var(--primary);
+            flex-shrink: 0;
+            width: 80px;
+            text-align: center;
+        }
+
+        .gate-content h3 {
+            margin-bottom: 0.5rem;
+            color: var(--text-main);
+        }
+
+        .gate-content p {
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .reveal-cta {
+            margin-top: 1.5rem;
+        }
+
+        .section-cta {
+            margin-top: 2.5rem;
+            text-align: center;
+        }
+
+        @media (max-width: 1000px) {
+            .compliance-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .problem-solution-grid {
+                grid-template-columns: 1fr;
+            }
+            .gate {
+                flex-direction: column;
+                text-align: center;
+            }
+            .gate-icon {
+                margin-right: 0;
+                margin-bottom: 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="background-glow"></div>
+
+    <nav class="navbar">
+        <a href="/" class="logo">
+            <img src="brain_transparent.png" alt="Health Data Agent Logo">
+            <span>Health Data Agent</span>
+        </a>
+        <div class="nav-links">
+            <a href="/index.html#features">Features</a>
+            <a href="/index.html#tech-stack">Technology</a>
+            <a href="/process-data.html">Process Data</a>
+            <a href="/dashboard.html">Dashboard</a>
+            <a href="/warden.html" class="active">Warden 1.0</a>
+            <a href="/about.html">About</a>
+        </div>
+        <a href="/dashboard.html" class="btn-primary">Get Started</a>
+    </nav>
+
+    <header class="hero">
+        <div class="hero-content" style="max-width: 800px; margin: 0 auto;">
+            <div class="badge">
+                <i class="fa-solid fa-shield-halved"></i>
+                Warden 1.0 Guardrails
+            </div>
+            <h1>Warden 1.0: <br><span class="gradient-text">PHI-Aware AI Guardrails</span></h1>
+            <p class="hero-sub">
+                A privacy and governance layer for clinical AI workflows, designed to reduce model-facing PHI exposure while keeping answers useful, auditable, and policy-aware.
+            </p>
+            <div class="hero-actions" style="justify-content: center;">
+                <a href="/dashboard.html" class="btn-primary large">Launch Demo</a>
+                <a href="#security-controls" class="btn-secondary large">View Controls</a>
+            </div>
+        </div>
+    </header>
+
+    <section class="use-case-section">
+        <div class="section-header text-center">
+            <h2>The Use Case</h2>
+            <p>Why clinical AI needs enforceable governance beyond a polished safety story.</p>
+        </div>
+        <div class="problem-solution-grid">
+            <div class="problem-card">
+                <h3><i class="fa-solid fa-triangle-exclamation" style="color: #ef4444; margin-right: 10px;"></i> The Problem</h3>
+                <p style="color: var(--text-muted); margin-top: 1rem; line-height: 1.6;">
+                    Healthcare organizations want to leverage generative AI platforms like OpenAI, AWS Bedrock, and Google Gemini to analyze complex clinical notes, extract insights, and assist doctors.
+                </p>
+                <p style="color: var(--text-muted); margin-top: 1rem; line-height: 1.6;">
+                    But PHI exposure risk makes ordinary AI workflows difficult to approve, govern, and trust in real clinical settings.
+                </p>
+            </div>
+            <div class="solution-card">
+                <h3><i class="fa-solid fa-check-circle" style="color: #10b981; margin-right: 10px;"></i> The Solution</h3>
+                <p style="color: var(--text-muted); margin-top: 1rem; line-height: 1.6;">
+                    <strong>Warden 1.0</strong> creates an AI safety boundary, helping demonstrate how clinical intelligence can be paired with tokenization, guardrails, and audit events.
+                </p>
+                <p style="color: var(--text-muted); margin-top: 1rem; line-height: 1.6;">
+                    Warden 1.0 adds request guardrails, policy checks, and audit-aware events around the clinical AI workflow.
+                </p>
+                <div class="reveal-cta">
+                    <a href="/about.html" class="btn-secondary">See Why This Isn't Enough</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="security-controls" class="architecture-section" style="background: rgba(255, 255, 255, 0.02);">
+        <div class="section-header text-center">
+            <h2>Security Controls</h2>
+            <p>How Warden 1.0 adds privacy boundaries, request checks, and audit-aware controls to the workflow.</p>
+        </div>
+        <div class="gate-flow">
+            <div class="gate">
+                <div class="gate-icon">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <div class="gate-content">
+                    <h3>1. PHI Exposure Prevention</h3>
+                    <p>Patient-identifying information is prohibited from model exposure while the workflow preserves enough clinical context for useful reasoning.</p>
+                </div>
+            </div>
+            <div class="gate">
+                <div class="gate-icon">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div class="gate-content">
+                    <h3>2. AI Request Guardrails</h3>
+                    <p>AI requests are screened against safety policies to reduce prompt injection risk, block unauthorized data access, and keep clinical workflows within approved boundaries.</p>
+                </div>
+            </div>
+            <div class="gate">
+                <div class="gate-icon">
+                    <i class="fa-solid fa-clipboard-check"></i>
+                </div>
+                <div class="gate-content">
+                    <h3>3. Audit-Ready Governance</h3>
+                    <p>AI decisions and governance events are captured in a PHI-conscious audit trail, giving teams visibility without turning logs into a liability.</p>
+                </div>
+            </div>
+        </div>
+        <div class="section-cta">
+            <a href="/about.html" class="btn-secondary large">See Why This Isn't Enough</a>
+        </div>
+    </section>
+
+    <section class="compliance-section">
+        <div class="section-header text-center">
+            <h2>Federal Compliance Frameworks</h2>
+            <p>Security controls aligned with NIST and HIPAA priorities.</p>
+        </div>
+        <div class="compliance-grid">
+            <div class="compliance-card">
+                <i class="fa-solid fa-scale-balanced"></i>
+                <h3>NIST AI RMF</h3>
+                <p style="color: var(--text-muted); margin-top: 1rem; line-height: 1.5; font-size: 0.95rem;">
+                    <strong>Map, Measure, Manage:</strong> Warden 1.0 helps teams identify AI risks, apply request-level guardrails, and support governance reviews with evidence.
+                </p>
+            </div>
+            <div class="compliance-card">
+                <i class="fa-solid fa-file-shield"></i>
+                <h3>NIST SP 800-53</h3>
+                <p style="color: var(--text-muted); margin-top: 1rem; line-height: 1.5; font-size: 0.95rem;">
+                    <strong>Audit & Access Controls:</strong> Supports auditability and least-privilege design by tracking governance decisions while minimizing sensitive data exposure in logs.
+                </p>
+            </div>
+            <div class="compliance-card">
+                <i class="fa-solid fa-user-doctor"></i>
+                <h3>HIPAA Security Rule</h3>
+                <p style="color: var(--text-muted); margin-top: 1rem; line-height: 1.5; font-size: 0.95rem;">
+                    <strong>Technical Safeguards:</strong> Designed around HIPAA Security Rule safeguards (&sect;164.312), including controls that prohibit PHI from being read by the LLM.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <p>&copy; 2026 Health Data Agent | Created by Bradly Cheng <a href="https://www.linkedin.com/in/bradly-cheng/"
+                target="_blank" rel="noopener" style="margin-left: 0.25rem; color: inherit;"><i
+                    class="fa-brands fa-linkedin"></i></a></p>
+        <div class="social-links footer-links">
+            <a href="/about.html" class="footer-email"
+                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">About
+                <i class="fa-solid fa-circle-info"></i></a>
+            <a href="mailto:healthdataagent@gmail.com" class="footer-email"
+                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">HealthDataAgent@gmail.com
+                <i class="fa-solid fa-envelope"></i></a>
+        </div>
+    </footer>
+
+    <script src="script.js?v=1.1.1"></script>
+</body>
+
+</html>

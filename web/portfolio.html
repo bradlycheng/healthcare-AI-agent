@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio | Bradly Cheng</title>
+    <meta name="description"
+        content="Portfolio projects by Bradly Cheng, creator of Health Data Agent and Warden 1.0.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .portfolio-container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 8rem 2rem 4rem;
+        }
+
+        .portfolio-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .portfolio-header h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            background: var(--gradient-main);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .portfolio-header p {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            line-height: 1.7;
+            max-width: 720px;
+            margin: 0 auto;
+        }
+
+        .portfolio-grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .portfolio-card {
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 2rem;
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .portfolio-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--primary);
+        }
+
+        .portfolio-card h2 {
+            font-size: 1.6rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .portfolio-card p {
+            color: var(--text-muted);
+            line-height: 1.7;
+            margin-bottom: 1.5rem;
+        }
+
+        .portfolio-actions {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="background-glow"></div>
+
+    <nav class="navbar">
+        <a href="/" class="logo">
+            <img src="brain_transparent.png" alt="Health Data Agent Logo">
+            <span>Health Data Agent</span>
+        </a>
+        <div class="nav-links">
+            <a href="/index.html#features">Features</a>
+            <a href="/index.html#tech-stack">Technology</a>
+            <a href="/process-data.html">Process Data</a>
+            <a href="/dashboard.html">Dashboard</a>
+            <a href="/warden.html">Warden 1.0</a>
+            <a href="/about.html">About</a>
+        </div>
+        <a href="/dashboard.html" class="btn-primary">Get Started</a>
+    </nav>
+
+    <main class="portfolio-container">
+        <section class="portfolio-header">
+            <h1>Portfolio</h1>
+            <p>
+                A few projects outside the Health Data Agent demo, showing software, creative tools, and web work.
+            </p>
+        </section>
+
+        <section class="portfolio-grid" aria-label="Portfolio projects">
+            <article class="portfolio-card">
+                <h2>EvadeMan</h2>
+                <p>
+                    A strategic survival game built with Godot Engine. Navigate through pressure, survive, and reach the
+                    goal.
+                </p>
+                <div class="portfolio-actions">
+                    <a href="/game.html" class="btn-primary large">
+                        <i class="fa-solid fa-play"></i> Play Game
+                    </a>
+                </div>
+            </article>
+
+            <article class="portfolio-card">
+                <h2>BC Dawgs</h2>
+                <p>
+                    A custom website built for a dog sitting service, focused on simple branding, trust, and clear
+                    customer action.
+                </p>
+                <div class="portfolio-actions">
+                    <a href="https://bcdawgs.com" target="_blank" rel="noopener" class="btn-primary large">
+                        <i class="fa-solid fa-globe"></i> Visit Website
+                    </a>
+                </div>
+            </article>
+
+            <article class="portfolio-card">
+                <h2>What's That Human Thing?</h2>
+                <p>
+                    AI-assisted video editing and storytelling experiments exploring how human ideas can be shaped with
+                    modern creative tools.
+                </p>
+                <div class="portfolio-actions">
+                    <a href="https://www.youtube.com/@WhatsThatHumanThing" target="_blank" rel="noopener"
+                        class="btn-primary large">
+                        <i class="fa-brands fa-youtube"></i> Watch Channel
+                    </a>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Health Data Agent | Created by Bradly Cheng <a href="https://www.linkedin.com/in/bradly-cheng/"
+                target="_blank" rel="noopener" style="margin-left: 0.25rem; color: inherit;"><i
+                    class="fa-brands fa-linkedin"></i></a></p>
+        <div class="social-links footer-links">
+            <a href="/about.html" class="footer-email"
+                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">About
+                <i class="fa-solid fa-circle-info"></i></a>
+            <a href="mailto:healthdataagent@gmail.com" class="footer-email"
+                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">HealthDataAgent@gmail.com
+                <i class="fa-solid fa-envelope"></i></a>
+        </div>
+    </footer>
+    <script src="script.js?v=1.1.1"></script>
+</body>
+
+</html>

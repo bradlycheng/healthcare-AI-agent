@@ -4,14 +4,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard | Healthcare AI Agent</title>
+    <title>Dashboard | Health Data Agent</title>
+    <meta name="description"
+        content="AI-powered medical data dashboard for clinical intelligence and patient analysis.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Dashboard | Health Data Agent">
+    <meta property="og:description"
+        content="AI-powered medical data dashboard for clinical intelligence and patient analysis.">
+    <meta property="og:image" content="og-image.png">
+
+    <link rel="stylesheet" href="boxy.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 
 <body class="dashboard-page">
@@ -19,7 +33,7 @@
 
     <nav class="navbar">
         <a href="/" class="logo">
-            <i class="fa-solid fa-staff-snake"></i>
+            <img src="brain_transparent.png" alt="Health Data Agent Logo">
             <span>Health Data Agent</span>
         </a>
         <div class="nav-links">
@@ -27,9 +41,10 @@
             <a href="/index.html#tech-stack">Technology</a>
             <a href="/process-data.html">Process Data</a>
             <a href="/dashboard.html" class="active">Dashboard</a>
+            <a href="/warden.html">Warden 1.0</a>
             <a href="/about.html">About</a>
         </div>
-        <a href="/process-data.html" class="btn-primary">Get Started</a>
+        <a href="/dashboard.html" class="btn-primary">Get Started</a>
     </nav>
 
     <!-- Critical Alerts Banner -->
@@ -39,6 +54,7 @@
             <span><strong>CRITICAL ALERTS DETECTED</strong> - <span id="alert-count">0</span> patient(s) require
                 immediate attention</span>
         </div>
+        <button id="alerts-dismiss" class="alerts-dismiss" title="Dismiss Alert">&times;</button>
     </div>
 
     <main class="dashboard-container">
@@ -58,8 +74,8 @@
             </div>
         </header>
 
-        <!-- Active Alerts Banner -->
-        <div id="alerts-banner" class="active-alerts-banner">
+        <!-- Active Alerts Alert Box -->
+        <div id="active-alerts-box" class="active-alerts-banner">
             <i class="fa-solid fa-triangle-exclamation fa-beat"></i>
             <div>
                 <p>CRITICAL ALERTS DETECTED</p>
@@ -114,6 +130,11 @@
                         <i class="fa-solid fa-robot"></i>
                         <span>AI Assistant</span>
                     </div>
+                    <div class="warden-badge">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        Warden 1.0 Guardrails Active
+                        <a href="/about.html" class="context-link" style="margin-left: 0.35rem;">About</a>
+                    </div>
                 </div>
                 <div class="query-messages" id="query-messages">
                     <div class="message message-ai">
@@ -123,9 +144,9 @@
                         <div class="message-content">
                             <p>Hi! I can help you explore your patient data. Try asking:</p>
                             <ul class="message-examples">
-                                <li>"Analyze blood pressure trends for Sarah Jenkins"</li>
-                                <li>"What is John Smith's latest glucose?"</li>
                                 <li>"Who has the highest heart rate?"</li>
+                                <li>"Show me patients with critical vitals"</li>
+                                <li>"Show all patients with Diabetes"</li>
                             </ul>
                         </div>
                     </div>
@@ -134,7 +155,6 @@
                     <input type="text" id="query-input" placeholder="Ask about your patient data...">
                     <div class="reasoning-selector-container">
                         <select id="reasoning-depth" class="query-depth-select">
-                            <option value="fast">Fast</option>
                             <option value="standard" selected>Standard</option>
                             <option value="deep">Deep</option>
                         </select>
@@ -144,10 +164,18 @@
                     </button>
                 </div>
                 <div class="query-suggestions">
-                    <button class="suggestion-chip" data-query="Analyze blood pressure trends for Sarah Jenkins"
-                        data-depth="deep">Sarah Jenkins BP</button>
-                    <button class="suggestion-chip" data-query="Who has the highest glucose?">Highest Glucose</button>
-                    <button class="suggestion-chip" data-query="Show abnormal results">Abnormal Results</button>
+                    <button class="suggestion-chip" data-query="Which patients should I be worried about?">Patients I
+                        should worry about</button>
+                    <button class="suggestion-chip" data-query="Show patients with diabetes AND Glucose > 150">Diabetics
+                        with High Glucose</button>
+                    <button class="suggestion-chip" data-query="Show patients with HR > 100 or SpO2 < 95">Critical
+                        Vitals</button>
+                    <button class="suggestion-chip" data-query="Show list of patients with eGFR < 60">CKD Risk (Low
+                        eGFR)</button>
+                </div>
+                <div class="query-disclaimer">
+                    Health Data Agent provides AI-generated information based on retrieved medical data. This is NOT
+                    medical advice. Health Data Agent is powered by AI and can make mistakes.
                 </div>
             </div>
         </section>
@@ -297,10 +325,20 @@
     </main>
 
     <footer class="footer">
-        <p>&copy; 2024 Healthcare AI Agent. Built with Python & DeepMind.</p>
+        <p>&copy; 2026 Health Data Agent | Created by Bradly Cheng <a href="https://www.linkedin.com/in/bradly-cheng/"
+                target="_blank" rel="noopener" style="margin-left: 0.25rem; color: inherit;"><i
+                    class="fa-brands fa-linkedin"></i></a></p>
+        <div class="social-links footer-links">
+            <a href="/about.html" class="footer-email"
+                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">About
+                <i class="fa-solid fa-circle-info"></i></a>
+            <a href="mailto:healthdataagent@gmail.com" class="footer-email"
+                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">HealthDataAgent@gmail.com
+                <i class="fa-solid fa-envelope"></i></a>
+        </div>
     </footer>
 
-    <script src="dashboard.js?v=7"></script>
+    <script src="dashboard.js?v=8"></script>
 </body>
 
 </html>

@@ -10,7 +10,19 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <meta name="description"
+        content="Clinical Intelligence for healthcare data. Process HL7 streams, convert to FHIR R4, and unlock patient insights with AI.">
+    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Health Data Agent | Intelligent Healthcare Interoperability">
+    <meta property="og:description"
+        content="Process HL7 streams, convert to FHIR R4, and unlock patient insights with AI.">
+    <meta property="og:image" content="og-image.png">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
@@ -22,17 +34,18 @@
 
     <nav class="navbar">
         <a href="/" class="logo">
-            <i class="fa-solid fa-staff-snake"></i>
+            <img src="brain_transparent.png" alt="Health Data Agent Logo">
             <span>Health Data Agent</span>
         </a>
         <div class="nav-links">
-            <a href="#features">Features</a>
-            <a href="#tech-stack">Technology</a>
+            <a href="/index.html#features">Features</a>
+            <a href="/index.html#tech-stack">Technology</a>
             <a href="/process-data.html">Process Data</a>
             <a href="/dashboard.html">Dashboard</a>
+            <a href="/warden.html">Warden 1.0</a>
             <a href="/about.html">About</a>
         </div>
-        <a href="/process-data.html" class="btn-primary">Get Started</a>
+        <a href="/dashboard.html" class="btn-primary">Get Started</a>
     </nav>
 
     <header class="hero">
@@ -43,12 +56,14 @@
             </div>
             <h1>Health Data <br><span class="gradient-text">Agent</span></h1>
             <p class="hero-sub">
-                Clinical Intelligence. Process HL7 data streams, convert to FHIR R4, and unlock patient insights with
-                AI.
+                Clinical intelligence for HL7, FHIR, and patient-data chat, protected by Warden 1.0
+                guardrails for PHI-aware clinical AI workflows.
             </p>
             <div class="hero-actions">
-                <a href="/dashboard.html" class="btn-primary large">Launch Dashboard</a>
-                <a href="/process-data.html" class="btn-secondary large">Process HL7 Message</a>
+                <a href="/dashboard.html" class="btn-primary">Launch Dashboard</a>
+                <a href="/process-data.html" class="btn-secondary">Process Data</a>
+                <a href="/warden.html" class="btn-warden">View Warden 1.0</a>
+                <a href="/about.html" class="btn-secondary">About</a>
             </div>
         </div>
         <div class="hero-visual">
@@ -61,21 +76,23 @@
                 </div>
                 <div class="chat-interface">
                     <div class="chat-message user-msg">
-                        <p>Latest vitals for John?</p>
+                        <p>What patients should I be worried about?</p>
                     </div>
                     <div class="chat-message ai-msg">
-                        <p>BP 120/80, HR 72. Glucose steady at 98 mg/dL.</p>
+                        <p>I identified <strong>John Smith</strong> with concerning vitals:<br>• HR: 110 bpm (High)<br>•
+                            BP: 160/95 (High)<br>• SpO2: 94% (Low)</p>
                     </div>
                     <div class="chat-message user-msg delayed-1">
-                        <p>Any cardiac events?</p>
+                        <p>Show me John's details</p>
                     </div>
                     <div class="chat-message ai-msg delayed-2">
-                        <p>Negative. Troponin levels normal.</p>
+                        <p>Opening patient record P-12345...</p>
                     </div>
                     <div class="typing-indicator">
                         <span></span><span></span><span></span>
                     </div>
                 </div>
+
             </div>
         </div>
     </header>
@@ -85,7 +102,7 @@
             <h2>Use Cases</h2>
             <p>From ingestion to insight.</p>
         </div>
-        <div class="feature-grid">
+        <div class="feature-grid balanced-four">
             <div class="feature-card">
                 <div class="icon-box">
                     <i class="fa-solid fa-fire-flame-curved"></i>
@@ -105,7 +122,15 @@
                     <i class="fa-solid fa-comments"></i>
                 </div>
                 <h3>Chat with Data</h3>
-                <p>Ask the dashboard: "Show me patients I should be worried about"</p>
+                <p>Ask the dashboard: "What patients should I be worried about?"</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon-box">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <h3>Warden 1.0 Guardrails</h3>
+                <p>Warden 1.0 adds audit-aware privacy boundaries, request checks, and model-facing PHI minimization.
+                    <a href="/about.html" class="context-link">Learn more</a></p>
             </div>
         </div>
     </section>
@@ -172,14 +197,8 @@
     <section id="demo" class="cta-section">
         <div class="cta-content">
             <h2>Ready for the Future?</h2>
-            <p>Join the waitlist.</p>
-            <form class="cta-form" id="contact-form">
-                <input type="email" id="contact-email" placeholder="Enter your email" required>
-                <!-- Honeypot field for spam bots -->
-                <input type="text" id="contact-nickname" name="nickname" style="display:none;" tabindex="-1"
-                    autocomplete="off">
-                <button type="submit" class="btn-primary large">Request Access</button>
-            </form>
+            <p>See the product story, governance thesis, and request a review on the About page.</p>
+            <a href="/about.html#signup" class="btn-primary large">Request Governance Review</a>
             <p style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
                 Or email us at <a href="mailto:healthdataagent@gmail.com"
                     style="color: var(--primary);">healthdataagent@gmail.com</a>
@@ -188,10 +207,16 @@
     </section>
 
     <footer class="footer">
-        <p>&copy; 2024 Health Data Agent | Created by Bradly Cheng</p>
-        <div class="social-links">
-            <a href="https://www.linkedin.com/in/bradly-cheng/" target="_blank" rel="noopener"><i
-                    class="fa-brands fa-linkedin"></i></a>
+        <p>&copy; 2026 Health Data Agent | Created by Bradly Cheng <a href="https://www.linkedin.com/in/bradly-cheng/"
+                target="_blank" rel="noopener" style="margin-left: 0.25rem; color: inherit;"><i
+                    class="fa-brands fa-linkedin"></i></a></p>
+        <div class="social-links footer-links">
+            <a href="/about.html" class="footer-email"
+                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">About
+                <i class="fa-solid fa-circle-info"></i></a>
+            <a href="mailto:healthdataagent@gmail.com" class="footer-email"
+                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">HealthDataAgent@gmail.com
+                <i class="fa-solid fa-envelope"></i></a>
         </div>
     </footer>
 

@@ -10,7 +10,17 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <meta name="description" content="Real-time HL7 to FHIR processing with AI-powered clinical identification.">
+    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Process Data | Health Data Agent">
+    <meta property="og:description" content="Real-time HL7 to FHIR processing with AI-powered clinical identification.">
+    <meta property="og:image" content="og-image.png">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
@@ -22,7 +32,7 @@
 
     <nav class="navbar">
         <a href="/" class="logo">
-            <i class="fa-solid fa-staff-snake"></i>
+            <img src="brain_transparent.png" alt="Health Data Agent Logo">
             <span>Health Data Agent</span>
         </a>
         <div class="nav-links">
@@ -30,9 +40,10 @@
             <a href="/index.html#tech-stack">Technology</a>
             <a href="/process-data.html" class="active">Process Data</a>
             <a href="/dashboard.html">Dashboard</a>
+            <a href="/warden.html">Warden 1.0</a>
             <a href="/about.html">About</a>
         </div>
-        <a href="/process-data.html" class="btn-primary">Get Started</a>
+        <a href="/dashboard.html" class="btn-primary">Get Started</a>
     </nav>
 
     <div style="margin-top: 100px;"></div>
@@ -42,6 +53,15 @@
         <div class="section-header">
             <h2>Process Data</h2>
             <p>Paste raw HL7 (ORU) messages below to extract observations and convert to FHIR.</p>
+        </div>
+
+        <div class="trust-callout compact">
+            <i class="fa-solid fa-user-shield"></i>
+            <div>
+                <strong>Protected by Warden 1.0</strong>
+                <p>When AI analysis is enabled, the workflow uses Warden 1.0 guardrails for PHI-aware processing,
+                    request checks, and audit-aware events. <a href="/about.html" class="context-link">Learn more</a></p>
+            </div>
         </div>
 
 
@@ -140,10 +160,16 @@ OBX|3|TX|NOTE^Clinical Note||50 y/o male presenting with crushing chest pain rad
     </section>
 
     <footer class="footer">
-        <p>&copy; 2024 Health Data Agent | Created by Bradly Cheng</p>
-        <div class="social-links">
-            <a href="https://www.linkedin.com/in/bradly-cheng/" target="_blank" rel="noopener"><i
-                    class="fa-brands fa-linkedin"></i></a>
+        <p>&copy; 2026 Health Data Agent | Created by Bradly Cheng <a href="https://www.linkedin.com/in/bradly-cheng/"
+                target="_blank" rel="noopener" style="margin-left: 0.25rem; color: inherit;"><i
+                    class="fa-brands fa-linkedin"></i></a></p>
+        <div class="social-links footer-links">
+            <a href="/about.html" class="footer-email"
+                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">About
+                <i class="fa-solid fa-circle-info"></i></a>
+            <a href="mailto:healthdataagent@gmail.com" class="footer-email"
+                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">HealthDataAgent@gmail.com
+                <i class="fa-solid fa-envelope"></i></a>
         </div>
     </footer>
 
