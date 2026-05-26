@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>About | Health Data Agent</title>
+    <title>About | Health Data Agent AI Governance Case Study</title>
     <meta name="description"
-        content="Learn more about Health Data Agent, the clinical intelligence platform for interoperable healthcare.">
+        content="Health Data Agent is an intentionally incomplete healthcare AI MVP that shows why Warden 1.0 is not enough and how Warden 2.0 hardens AI governance.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -18,9 +18,9 @@
 
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="About | Health Data Agent">
+    <meta property="og:title" content="About | Health Data Agent AI Governance Case Study">
     <meta property="og:description"
-        content="Learn more about Health Data Agent, the clinical intelligence platform for interoperable healthcare.">
+        content="An intentionally incomplete healthcare AI MVP showing Warden 1.0 gaps and the Warden 2.0 governance control plane.">
     <meta property="og:image" content="og-image.png">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -116,6 +116,91 @@
             background: var(--primary);
             transform: translateY(-2px);
         }
+
+        .case-note {
+            background: rgba(0, 242, 255, 0.08);
+            border: 1px solid rgba(0, 242, 255, 0.22);
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            margin: 2rem auto;
+            text-align: left;
+            color: var(--text-main);
+        }
+
+        .case-note .note-lead {
+            color: var(--primary);
+        }
+
+        .case-note .note-warning {
+            color: #facc15;
+        }
+
+        .case-note .note-closing {
+            color: var(--text-main);
+        }
+
+        .legal-emphasis {
+            color: #fb7185;
+            font-weight: 800;
+        }
+
+        .case-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.25rem;
+            margin-top: 2rem;
+        }
+
+        .case-grid.four-up {
+            grid-template-columns: 1fr;
+            align-items: stretch;
+        }
+
+        .case-grid.balanced-three {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            align-items: stretch;
+        }
+
+        .case-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 1.25rem;
+            text-align: left;
+            height: 100%;
+        }
+
+        .case-card strong {
+            color: var(--primary);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .case-list {
+            text-align: left;
+            color: var(--text-muted);
+            line-height: 1.7;
+            max-width: 800px;
+            margin: 1.5rem auto 0;
+        }
+
+        .case-list li {
+            margin-bottom: 0.65rem;
+        }
+
+        @media (max-width: 900px) {
+            .case-grid.balanced-three {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .case-grid,
+            .case-grid.balanced-three,
+            .case-grid.four-up {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 
@@ -132,7 +217,7 @@
             <a href="/index.html#tech-stack">Technology</a>
             <a href="/process-data.html">Process Data</a>
             <a href="/dashboard.html">Dashboard</a>
-            <a href="/warden.html">The Warden</a>
+            <a href="/warden.html">Warden 1.0</a>
             <a href="/about.html" class="active">About</a>
         </div>
 
@@ -147,54 +232,110 @@
             <h1>Health Data Agent</h1>
             <div class="text-content">
                 <p>
-                    The <strong>Health Data Agent</strong> is a healthcare AI project focused on clinical intelligence,
-                    interoperability, and AI governance for <strong>sensitive healthcare data</strong>. It combines
-                    practical AI engineering with PHI-safe controls that make clinical workflows easier to review,
-                    audit, and trust.
+                    <strong>Health Data Agent</strong> is a working healthcare AI MVP and governance case study. It
+                    demonstrates HL7 to FHIR processing, patient-data chat, clinical summaries, and useful AI workflows
+                    for healthcare data.
                 </p>
-
-                <div style="margin-top: 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem;">
-                    <div class="feature-card"
-                        style="background: rgba(255, 255, 255, 0.03); padding: 1.2rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
-                        <strong style="color: var(--primary); font-size: 1.1rem; display:block; margin-bottom: 0.5rem;">
-                            <i class="fa-solid fa-user-shield"></i> The Warden
-                        </strong>
-                        <p style="font-size: 0.9em; margin: 0; color: var(--text-muted);">
-                            AI governance and security controls for PHI-safe workflows, request guardrails, and
-                            audit-aware clinical AI access.
-                        </p>
-                    </div>
-
-                    <div class="feature-card"
-                        style="background: rgba(255, 255, 255, 0.03); padding: 1.2rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
-                        <strong style="color: var(--primary); font-size: 1.1rem; display:block; margin-bottom: 0.5rem;">
-                            <i class="fa-solid fa-network-wired"></i> Process Data
-                        </strong>
-                        <p style="font-size: 0.9em; margin: 0; color: var(--text-muted);">
-                            Ingest legacy HL7 v2 messages and convert them to FHIR R4, using AI to <strong>analyze
-                                clinical notes</strong> and extract key insights.
-                        </p>
-                    </div>
-
-                    <div class="feature-card"
-                        style="background: rgba(255, 255, 255, 0.03); padding: 1.2rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
-                        <strong style="color: var(--primary); font-size: 1.1rem; display:block; margin-bottom: 0.5rem;">
-                            <i class="fa-solid fa-chart-line"></i> Dashboard & Chat
-                        </strong>
-                        <p style="font-size: 0.9em; margin: 0; color: var(--text-muted);">
-                            A practical AI interface for asking patient-data questions, reviewing insights, and
-                            exploring clinical risk signals.
-                        </p>
-                    </div>
+                <div class="case-note">
+                    <strong class="note-lead">At first, the site is meant to feel like a strong AI product.</strong>
+                    Warden 1.0 is the version a viewer can trust at first glance: polished, useful, and wrapped in the
+                    right safety language. <strong class="note-warning">But Warden 1.0 is intentionally flawed to point
+                        toward the real question.</strong> When an AI product touches sensitive data, including health
+                    records, identity details, financial context, private communications, or internal business
+                    information, what does governance actually require? How is liability tracked?
+                    <strong class="note-closing">And what is true safety without accountability?</strong>
                 </div>
-                <div class="highlight-box">
-                    <h3><i class="fa-solid fa-shield-halved"></i> Governance & Security Focus</h3>
-                    <p style="margin-bottom: 0;">
-                        The Warden is the core security and governance layer: it keeps PHI out of model exposure,
-                        applies request-level guardrails, and records audit-aware governance events. The broader system
-                        is built with <strong>Python/FastAPI</strong>, <strong>AWS Bedrock</strong>, typed Pydantic
-                        validation, HL7/FHIR workflows, and <strong>ChromaDB</strong> for semantic memory.
-                    </p>
+
+                <p style="margin-top: 1rem;">
+                    This is not only a data-protection problem. When AI touches sensitive workflows, one hallucination,
+                    missed detail, or flawed summary can influence decisions that affect real people: their care,
+                    finances, rights, safety, or reputation. <strong>If that mistake causes harm, the organization is
+                        not just facing a technical failure. It may be facing <span class="legal-emphasis">lawsuits</span>, regulatory scrutiny, and legal
+                        exposure that can threaten the business itself.</strong> AI governance is what makes that failure
+                    defensible with an audit trail.
+                </p>
+            </div>
+        </section>
+
+        <section class="section-block">
+            <h2>Warden 1.0: The Marketing Layer Is Not Enough</h2>
+            <div class="text-content">
+                <p>
+                    Warden 1.0 demonstrates the first version of the safety story: PHI tokenization, basic prompt
+                    guardrails, policy checks around tool calls, and PHI-conscious audit events. Those controls are real,
+                    but the demo intentionally shows that they are not a complete governance system.
+                </p>
+                <ul class="case-list">
+                    <li><strong>Identity gap:</strong> a system cannot assign responsibility if it does not know who is using it.</li>
+                    <li><strong>Scope gap:</strong> clinicians may need PHI, but access still needs role, patient, and purpose boundaries.</li>
+                    <li><strong>Provenance gap:</strong> clinical ingestion needs trusted sources, not just valid-looking HL7.</li>
+                    <li><strong>Token gap:</strong> internal safety markers must not become predictable decoder rings.</li>
+                    <li><strong>Audit gap:</strong> governance logs must help answer who accessed or changed what, why, and under which policy.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="section-block">
+            <h2>Why Show the Broken Version?</h2>
+            <div class="text-content">
+                <p>
+                    Real AI governance starts by making failure modes visible. Warden 1.0 is useful because it looks like
+                    the kind of safety layer many AI products advertise: privacy language, guardrail language, audit
+                    language, and an impressive demo. The lesson is that those claims need enforceable controls behind
+                    them.
+                </p>
+                <p style="margin-top: 1rem;">
+                    This MVP is incomplete by design so the next version has a clear target. The demo shows the app, the
+                    risk, and the fix path in one place.
+                </p>
+            </div>
+        </section>
+
+        <section class="section-block">
+            <h2>From Demo to Liability Surface</h2>
+            <div class="text-content">
+                <p>
+                    The core risk is not that clinicians can see PHI. Clinicians often need PHI. The liability question
+                    is whether the system can prove the access was authorized, scoped, necessary, sourced from a trusted
+                    workflow, and recorded in a useful audit trail.
+                </p>
+                <p style="margin-top: 1rem;">
+                    Health Data Agent uses the current MVP to make that question concrete. When an AI system connects
+                    natural language to clinical data, ingestion workflows, and summaries, governance becomes the control
+                    plane around every capability.
+                </p>
+            </div>
+        </section>
+
+        <section class="section-block">
+            <h2>Warden 2.0: The Control Plane</h2>
+            <div class="text-content">
+                <p>
+                    Warden 2.0 is the hardened build and architecture for turning this from a compelling MVP into a
+                    production-minded governance system. It treats AI safety as an access-control and accountability
+                    problem around the model, not a prompt-only problem inside the model.
+                </p>
+                <div class="case-grid four-up">
+                    <div class="case-card">
+                        <strong>Audit Trail</strong>
+                        A governed AI product should leave a clear record of what happened, why it happened, which data
+                        was involved, and who is responsible for reviewing it.
+                    </div>
+                    <div class="case-card">
+                        <strong>Attributable Access</strong>
+                        Clinical AI should know which authorized user is making the request, which patient or workflow it
+                        applies to, and whether that access is appropriate.
+                    </div>
+                    <div class="case-card">
+                        <strong>Failure Review</strong>
+                        AI systems need a way to review hallucinations, flawed summaries, rejected outputs, and human
+                        corrections without treating model confidence as proof.
+                    </div>
+                    <div class="case-card">
+                        <strong>Clinical Provenance</strong>
+                        A governed AI product should understand where clinical information came from, whether it is
+                        structured or free text, and whether it is reliable enough to use.
+                    </div>
                 </div>
             </div>
         </section>
@@ -204,60 +345,48 @@
             <h2>About the Creator</h2>
             <div class="text-content">
                 <p>
-                    Hi, I'm Bradly Cheng, a software developer and AI engineer focused on AI governance, healthcare data
-                    security, interoperability, and practical clinical AI systems.
+                    Hi, I'm Bradly Cheng, a software developer and AI engineer focused on healthcare AI governance,
+                    interoperability, security, and practical clinical AI systems.
                 </p>
                 <p style="margin-top: 1rem;">
-                    I built Health Data Agent to show that useful AI is only half the problem in healthcare. The harder
-                    question is how to make AI access controlled, PHI-safe, auditable, and aligned with real clinical
-                    data workflows.
+                    I built Health Data Agent to show that building the AI workflow is only half the work. The more
+                    serious challenge is identifying where the first safety story fails, then designing the controls that
+                    make the system attributable, scoped, auditable, and production-minded.
                 </p>
                 <p style="margin-top: 1rem;">
-                    My strongest interest is the Warden side of the project: AI security, request guardrails, HIPAA-aware
-                    governance, and systems that let organizations use LLMs without treating sensitive data casually. I
-                    still build the AI applications themselves, but I am especially interested in making them safe enough
-                    to operate in regulated environments.
+                    Warden 1.0 is the visible demo layer. Warden 2.0 is the direction I care most about: governance that
+                    can stand up to real questions about liability, trust, PHI minimization, and clinical data integrity.
+                </p>
+                <p style="margin-top: 1rem;">
+                    Healthcare is the test case because the stakes are obvious, but the same governance problem applies
+                    to any AI system working with sensitive data: finance, identity, legal records, private
+                    communications, internal company data, or any workflow where the output can affect real people.
                 </p>
                 <div class="social-links-large">
                     <a href="https://www.linkedin.com/in/bradly-cheng/" target="_blank" class="social-btn">
                         <i class="fa-brands fa-linkedin"></i> LinkedIn
                     </a>
+                    <a href="/portfolio.html" class="social-btn">
+                        <i class="fa-solid fa-folder-open"></i> Other Projects
+                    </a>
                 </div>
             </div>
         </section>
 
-        <!-- Portfolio/Game Section (Linked, not embedded) -->
-        <section class="section-block">
-            <h2>Portfolio Showcase</h2>
-            <div class="game-card">
-                <h3 style="font-size: 1.8rem; margin-bottom: 1rem;">EvadeMan</h3>
-                <p style="color: var(--text-muted); margin-bottom: 2rem;">
-                    Game built using Godot Engine. Evade the enemies and capture the flag.
+        <section id="signup" class="cta-section">
+            <div class="cta-content">
+                <h2>Get Your AI Product Governed</h2>
+                <p>Building with sensitive data? Request a governance review for safer AI access, liability tracking,
+                    audit visibility, and Warden-style controls.</p>
+                <form class="cta-form" id="contact-form" action="mailto:healthdataagent@gmail.com" method="post"
+                    enctype="text/plain">
+                    <input type="email" id="contact-email" name="email" placeholder="Enter your email" required>
+                    <button type="submit" class="btn-primary large">Request Governance Review</button>
+                </form>
+                <p style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
+                    Or email <a href="mailto:healthdataagent@gmail.com"
+                        style="color: var(--primary);">healthdataagent@gmail.com</a>
                 </p>
-                <a href="/game.html" class="btn-primary large">
-                    <i class="fa-solid fa-play"></i> Play Game
-                </a>
-            </div>
-
-            <div class="game-card">
-                <h3 style="font-size: 1.8rem; margin-bottom: 1rem;">BC Dawgs</h3>
-                <p style="color: var(--text-muted); margin-bottom: 2rem;">
-                    A custom website I built for a dogsitting service.
-                </p>
-                <a href="https://bcdawgs.com" target="_blank" class="btn-primary large">
-                    <i class="fa-solid fa-globe"></i> Visit Website
-                </a>
-            </div>
-
-            <div class="game-card">
-                <h3 style="font-size: 1.8rem; margin-bottom: 1rem;">What's That Human Thing?</h3>
-                <p style="color: var(--text-muted); margin-bottom: 2rem;">
-                    AI-assisted video editing and storytelling experiments exploring how human ideas can be shaped with
-                    modern creative tools.
-                </p>
-                <a href="https://www.youtube.com/@WhatsThatHumanThing" target="_blank" class="btn-primary large">
-                    <i class="fa-brands fa-youtube"></i> Watch Channel
-                </a>
             </div>
         </section>
 
@@ -267,12 +396,16 @@
         <p>&copy; 2026 Health Data Agent | Created by Bradly Cheng <a href="https://www.linkedin.com/in/bradly-cheng/"
                 target="_blank" rel="noopener" style="margin-left: 0.25rem; color: inherit;"><i
                     class="fa-brands fa-linkedin"></i></a></p>
-        <div class="social-links">
+        <div class="social-links footer-links">
+            <a href="/about.html" class="footer-email"
+                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">About
+                <i class="fa-solid fa-circle-info"></i></a>
             <a href="mailto:healthdataagent@gmail.com" class="footer-email"
                 style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">HealthDataAgent@gmail.com
                 <i class="fa-solid fa-envelope"></i></a>
         </div>
     </footer>
+    <script src="script.js?v=1.1.1"></script>
 </body>
 
 </html>

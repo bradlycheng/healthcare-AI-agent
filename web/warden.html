@@ -4,23 +4,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Warden | Health Data Agent</title>
+    <title>Warden 1.0 | Health Data Agent</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <meta name="description"
-        content="Enterprise-grade privacy and governance for clinical AI workflows. Protect sensitive data while keeping AI useful, auditable, and policy-aware.">
+        content="Warden 1.0 provides PHI-aware privacy, request guardrails, and audit-aware controls for Health Data Agent clinical AI workflows.">
     <link rel="stylesheet" href="style.css?v=9">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="The Warden | Health Data Agent">
+    <meta property="og:title" content="Warden 1.0 | Health Data Agent">
     <meta property="og:description"
-        content="Enterprise-grade privacy and governance for clinical AI workflows. Protect sensitive data while keeping AI useful, auditable, and policy-aware.">
+        content="PHI-aware guardrails, request checks, and audit-aware controls for clinical AI workflows.">
     <meta property="og:image" content="og-image.png">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -57,7 +57,7 @@
 
         .compliance-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 2rem;
             margin-top: 3rem;
         }
@@ -121,6 +121,21 @@
             line-height: 1.6;
         }
 
+        .reveal-cta {
+            margin-top: 1.5rem;
+        }
+
+        .section-cta {
+            margin-top: 2.5rem;
+            text-align: center;
+        }
+
+        @media (max-width: 1000px) {
+            .compliance-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         @media (max-width: 768px) {
             .problem-solution-grid {
                 grid-template-columns: 1fr;
@@ -150,7 +165,7 @@
             <a href="/index.html#tech-stack">Technology</a>
             <a href="/process-data.html">Process Data</a>
             <a href="/dashboard.html">Dashboard</a>
-            <a href="/warden.html" class="active">The Warden</a>
+            <a href="/warden.html" class="active">Warden 1.0</a>
             <a href="/about.html">About</a>
         </div>
         <a href="/dashboard.html" class="btn-primary">Get Started</a>
@@ -160,11 +175,11 @@
         <div class="hero-content" style="max-width: 800px; margin: 0 auto;">
             <div class="badge">
                 <i class="fa-solid fa-shield-halved"></i>
-                PHI-Safe Clinical AI
+                Warden 1.0 Guardrails
             </div>
-            <h1>The Warden: <br><span class="gradient-text">PHI-Safe AI for Healthcare</span></h1>
+            <h1>Warden 1.0: <br><span class="gradient-text">PHI-Aware AI Guardrails</span></h1>
             <p class="hero-sub">
-                A HIPAA-aware privacy and governance layer for clinical AI workflows, designed to prohibit LLM exposure to patient-identifying data while keeping AI useful, auditable, and policy-aware.
+                A privacy and governance layer for clinical AI workflows, designed to reduce model-facing PHI exposure while keeping answers useful, auditable, and policy-aware.
             </p>
             <div class="hero-actions" style="justify-content: center;">
                 <a href="/dashboard.html" class="btn-primary large">Launch Demo</a>
@@ -176,7 +191,7 @@
     <section class="use-case-section">
         <div class="section-header text-center">
             <h2>The Use Case</h2>
-            <p>Why clinical AI needs PHI exposure prevention built in from the start.</p>
+            <p>Why clinical AI needs enforceable governance beyond a polished safety story.</p>
         </div>
         <div class="problem-solution-grid">
             <div class="problem-card">
@@ -191,11 +206,14 @@
             <div class="solution-card">
                 <h3><i class="fa-solid fa-check-circle" style="color: #10b981; margin-right: 10px;"></i> The Solution</h3>
                 <p style="color: var(--text-muted); margin-top: 1rem; line-height: 1.6;">
-                    The <strong>Warden</strong> creates a PHI-safe AI boundary, helping teams use clinical intelligence while prohibiting patient-identifying data from reaching the model.
+                    <strong>Warden 1.0</strong> creates an AI safety boundary, helping demonstrate how clinical intelligence can be paired with tokenization, guardrails, and audit events.
                 </p>
                 <p style="color: var(--text-muted); margin-top: 1rem; line-height: 1.6;">
-                    It also adds AI request guardrails, policy enforcement, and audit-ready governance, so clinical users can receive useful answers without exposing PHI to the model.
+                    Warden 1.0 adds request guardrails, policy checks, and audit-aware events around the clinical AI workflow.
                 </p>
+                <div class="reveal-cta">
+                    <a href="/about.html" class="btn-secondary">See Why This Isn't Enough</a>
+                </div>
             </div>
         </div>
     </section>
@@ -203,7 +221,7 @@
     <section id="security-controls" class="architecture-section" style="background: rgba(255, 255, 255, 0.02);">
         <div class="section-header text-center">
             <h2>Security Controls</h2>
-            <p>How the Warden turns clinical AI into a secure, HIPAA-aware workflow.</p>
+            <p>How Warden 1.0 adds privacy boundaries, request checks, and audit-aware controls to the workflow.</p>
         </div>
         <div class="gate-flow">
             <div class="gate">
@@ -234,6 +252,9 @@
                 </div>
             </div>
         </div>
+        <div class="section-cta">
+            <a href="/about.html" class="btn-secondary large">See Why This Isn't Enough</a>
+        </div>
     </section>
 
     <section class="compliance-section">
@@ -246,7 +267,7 @@
                 <i class="fa-solid fa-scale-balanced"></i>
                 <h3>NIST AI RMF</h3>
                 <p style="color: var(--text-muted); margin-top: 1rem; line-height: 1.5; font-size: 0.95rem;">
-                    <strong>Map, Measure, Manage:</strong> The Warden helps teams identify AI risks, apply request-level guardrails, and support governance reviews with evidence.
+                    <strong>Map, Measure, Manage:</strong> Warden 1.0 helps teams identify AI risks, apply request-level guardrails, and support governance reviews with evidence.
                 </p>
             </div>
             <div class="compliance-card">
@@ -270,6 +291,14 @@
         <p>&copy; 2026 Health Data Agent | Created by Bradly Cheng <a href="https://www.linkedin.com/in/bradly-cheng/"
                 target="_blank" rel="noopener" style="margin-left: 0.25rem; color: inherit;"><i
                     class="fa-brands fa-linkedin"></i></a></p>
+        <div class="social-links footer-links">
+            <a href="/about.html" class="footer-email"
+                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">About
+                <i class="fa-solid fa-circle-info"></i></a>
+            <a href="mailto:healthdataagent@gmail.com" class="footer-email"
+                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">HealthDataAgent@gmail.com
+                <i class="fa-solid fa-envelope"></i></a>
+        </div>
     </footer>
 
     <script src="script.js?v=1.1.1"></script>

@@ -30,50 +30,29 @@ document.addEventListener('DOMContentLoaded', () => {
         observer.observe(el);
     });
 
-    // Toast Notification Logic
+    // Waitlist email handoff
     const ctaForm = document.getElementById('contact-form');
     // Fallback for older class-based selection if ID missing
     const formRef = ctaForm || document.querySelector('.cta-form');
 
     if (formRef) {
-        formRef.addEventListener('submit', async (e) => {
+        formRef.addEventListener('submit', (e) => {
             e.preventDefault();
             const emailInput = formRef.querySelector('input[type="email"]');
-            const email = emailInput.value;
-            const honeyInput = formRef.querySelector('#contact-nickname');
-            const nickname = honeyInput ? honeyInput.value : '';
+            const email = emailInput ? emailInput.value.trim() : '';
 
             const btn = formRef.querySelector('button');
-
-            const originalText = btn.innerText;
-            btn.innerText = 'Sending...';
-            btn.disabled = true;
-
-            try {
-                const res = await fetch('/api/contact', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: email, nickname: nickname })
-                });
-
-                if (res.ok) {
-                    showToast(`Thanks! We've saved ${email} to our list.`, 'success');
-                    formRef.reset();
-                } else {
-                    const err = await res.json();
-                    if (res.status === 429) {
-                        showToast(err.detail || 'Too many requests. Please wait a bit.', 'warning');
-                    } else {
-                        showToast(err.detail || 'Something went wrong.', 'error');
-                    }
-                }
-            } catch (error) {
-                console.error(error);
-                showToast('Network error. Please try again.', 'error');
-            } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
+            if (!emailInput || !emailInput.checkValidity()) {
+                emailInput?.reportValidity();
+                return;
             }
+
+            const subject = encodeURIComponent('AI governance review request');
+            const body = encodeURIComponent(`I would like to request an AI governance review.\n\nContact email:\n${email}`);
+            window.location.href = `mailto:healthdataagent@gmail.com?subject=${subject}&body=${body}`;
+            showToast('Opening your email app to finish the signup.', 'success');
+            formRef.reset();
+            if (btn) btn.blur();
         });
     }
 
