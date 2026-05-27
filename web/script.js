@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const subject = encodeURIComponent('AI governance review request');
             const body = encodeURIComponent(`I would like to request an AI governance review.\n\nContact email:\n${email}`);
-            window.location.href = `mailto:healthdataagent@gmail.com?subject=${subject}&body=${body}`;
+            window.location.href = `mailto:bradly@healthdataagent.com?subject=${subject}&body=${body}`;
             showToast('Opening your email app to finish the signup.', 'success');
             formRef.reset();
             if (btn) btn.blur();
