@@ -30,32 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
         observer.observe(el);
     });
 
-    // Waitlist email handoff
-    const ctaForm = document.getElementById('contact-form');
-    // Fallback for older class-based selection if ID missing
-    const formRef = ctaForm || document.querySelector('.cta-form');
-
-    if (formRef) {
-        formRef.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const emailInput = formRef.querySelector('input[type="email"]');
-            const email = emailInput ? emailInput.value.trim() : '';
-
-            const btn = formRef.querySelector('button');
-            if (!emailInput || !emailInput.checkValidity()) {
-                emailInput?.reportValidity();
-                return;
-            }
-
-            const subject = encodeURIComponent('AI governance review request');
-            const body = encodeURIComponent(`I would like to request an AI governance review.\n\nContact email:\n${email}`);
-            window.location.href = `mailto:bradly@healthdataagent.com?subject=${subject}&body=${body}`;
-            showToast('Opening your email app to finish the signup.', 'success');
-            formRef.reset();
-            if (btn) btn.blur();
-        });
-    }
-
     function showToast(message, type = 'info') {
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
