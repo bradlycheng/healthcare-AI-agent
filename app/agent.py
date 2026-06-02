@@ -309,7 +309,7 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
                 else:
                     llm_raw_result = hl7_note_extraction(safe_prompt)
                     # OUT-GATE: deanonymize string fields that may contain PHI tokens.
-                    # Do NOT call anonymize_json() here — output must be deanonymized,
+                    # Do NOT call anonymize_json() here -- output must be deanonymized,
                     # not re-tokenized.
                     if isinstance(llm_raw_result, dict):
                         llm_raw_str = _json.dumps(llm_raw_result)

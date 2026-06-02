@@ -39,6 +39,7 @@ venv.bak/
 
 # Logs
 *.log
+*.jsonl
 
 # OS
 .DS_Store
