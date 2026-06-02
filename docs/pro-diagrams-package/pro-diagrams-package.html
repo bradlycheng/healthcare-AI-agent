@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Professional Workflow Diagram Package</title>
+  <style>
+    :root {
+      --ink: #162231;
+      --muted: #66758a;
+      --paper: #f5f7fb;
+      --panel: #ffffff;
+      --line: #d8e0ea;
+      --dark: #101923;
+      --blue: #245aa5;
+      --blue-bg: #eaf2ff;
+      --green: #16693f;
+      --green-bg: #e8f5ee;
+      --amber: #8a5a12;
+      --amber-bg: #fff4df;
+      --red: #a33b37;
+      --red-bg: #fff0ef;
+      --violet: #5842a3;
+      --violet-bg: #f0edff;
+      --gray-bg: #f8fafc;
+      --shadow: 0 10px 28px rgba(20, 36, 62, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+      line-height: 1.46;
+    }
+
+    header {
+      padding: 42px 48px 30px;
+      color: #fff;
+      background: var(--dark);
+      border-bottom: 5px solid #2f80ed;
+    }
+
+    header h1 {
+      margin: 0 0 10px;
+      font-size: 34px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    header p {
+      margin: 0;
+      max-width: 1080px;
+      color: #d9e6f7;
+      font-size: 16px;
+    }
+
+    main {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 30px 28px 48px;
+    }
+
+    section {
+      margin: 0 0 24px;
+      padding: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 18px 0 10px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    p { margin: 0 0 12px; }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: #eef2f7;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.94em;
+    }
+
+    .intro-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .card {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcff;
+    }
+
+    .card strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .quick-card {
+      min-height: 82px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .quick-card strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+
+    .quick-card span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .diagram {
+      margin-top: 16px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow-x: auto;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(155px, 1fr));
+      gap: 12px;
+      min-width: 980px;
+      align-items: stretch;
+    }
+
+    .flow.five {
+      grid-template-columns: repeat(5, minmax(165px, 1fr));
+      min-width: 880px;
+    }
+
+    .flow.four {
+      grid-template-columns: repeat(4, minmax(185px, 1fr));
+      min-width: 780px;
+    }
+
+    .flow.three {
+      grid-template-columns: repeat(3, minmax(220px, 1fr));
+      min-width: 720px;
+    }
+
+    .node {
+      position: relative;
+      min-height: 116px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--gray-bg);
+    }
+
+    .node:not(:last-child)::after {
+      content: ">";
+      position: absolute;
+      top: 50%;
+      right: -11px;
+      width: 18px;
+      height: 18px;
+      transform: translateY(-50%);
+      border-radius: 50%;
+      color: #fff;
+      background: #8292a8;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 18px;
+      text-align: center;
+      z-index: 2;
+    }
+
+    .node h4 {
+      margin: 0 0 6px;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    .node p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .tag {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .blue { border-color: #b8cdf0; background: var(--blue-bg); }
+    .green { border-color: #b8dfc9; background: var(--green-bg); }
+    .amber { border-color: #ecd49d; background: var(--amber-bg); }
+    .red { border-color: #e8b6b2; background: var(--red-bg); }
+    .violet { border-color: #cbc3f4; background: var(--violet-bg); }
+
+    .blue .tag { background: var(--blue); }
+    .green .tag { background: var(--green); }
+    .amber .tag { background: var(--amber); }
+    .red .tag { background: var(--red); }
+    .violet .tag { background: var(--violet); }
+
+    .zone-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(250px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .zone {
+      min-height: 190px;
+      padding: 14px;
+      border: 2px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .zone h4 {
+      margin: 0 0 10px;
+      font-size: 15px;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .pill {
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #f8fafc;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .arrow {
+      color: #7b8ba2;
+      font-weight: 700;
+    }
+
+    .matrix {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      font-size: 14px;
+    }
+
+    .matrix th,
+    .matrix td {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .matrix th {
+      color: #fff;
+      background: #243243;
+    }
+
+    .matrix td { background: #fff; }
+
+    .split {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 14px;
+    }
+
+    .callout {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-left: 5px solid var(--blue);
+      border-radius: 6px;
+      background: #f8fbff;
+    }
+
+    @media (max-width: 1080px) {
+      header { padding: 32px 24px 24px; }
+      main { padding: 22px 16px 34px; }
+      .intro-grid, .split { grid-template-columns: 1fr; }
+      .quick-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
+      .zone-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .quick-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Professional Workflow Diagram Package</h1>
+    <p>
+      A generic production-grade diagram set for documenting a system. Use this
+      package to explain architecture, data movement, trust, authorization, controls,
+      observability, deployment, resilience, release flow, lifecycle, and incident response.
+    </p>
+  </header>
+
+  <main>
+    <section>
+      <div class="intro-grid">
+        <div>
+          <h2>Package Overview</h2>
+          <p>
+            This is a reusable template, not a project-specific model. Replace generic
+            nodes with real systems, owners, controls, evidence, tests, and risk decisions.
+          </p>
+          <div class="quick-grid">
+            <div class="quick-card"><strong>Architecture</strong><span>Context, components, deployment.</span></div>
+            <div class="quick-card"><strong>Security</strong><span>Trust, authorization, controls, threats.</span></div>
+            <div class="quick-card"><strong>Runtime</strong><span>Sequences, state, data flow.</span></div>
+            <div class="quick-card"><strong>Operations</strong><span>Audit, observability, resilience.</span></div>
+            <div class="quick-card"><strong>Governance</strong><span>Lifecycle, CI/CD, incident response.</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <strong>Professional standard</strong>
+          A diagram is useful when it answers a review question and connects to an
+          owner, a control, an enforcement point, a test, a log, an alert, or a runbook.
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>1. Context Diagram</h2>
+      <p>Shows the system in its outside world: users, external systems, and major data exchanges.</p>
+      <div class="diagram">
+        <div class="flow five">
+          <div class="node blue"><span class="tag">User</span><h4>Human Actors</h4><p>Customers, operators, admins, reviewers, support teams.</p></div>
+          <div class="node blue"><span class="tag">Client</span><h4>Web / Mobile / API Client</h4><p>Primary interface that sends requests and receives responses.</p></div>
+          <div class="node green"><span class="tag">System</span><h4>Core Product System</h4><p>The application being reviewed and operated.</p></div>
+          <div class="node violet"><span class="tag">External</span><h4>Third-Party Services</h4><p>Identity, payments, email, storage, analytics, AI, or vendor APIs.</p></div>
+          <div class="node amber"><span class="tag">Ops</span><h4>Operations And Compliance</h4><p>Monitoring, audits, support workflows, incident response.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. Component Diagram</h2>
+      <p>Shows major internal services and what each one owns.</p>
+      <div class="diagram">
+        <div class="flow six">
+          <div class="node blue"><span class="tag">Edge</span><h4>Gateway</h4><p>TLS, routing, rate limits, request IDs, coarse filtering.</p></div>
+          <div class="node green"><span class="tag">API</span><h4>Application API</h4><p>Business endpoints, validation, orchestration, response shaping.</p></div>
+          <div class="node violet"><span class="tag">Auth</span><h4>Identity Service</h4><p>Login, sessions, tokens, RBAC, service credentials.</p></div>
+          <div class="node amber"><span class="tag">Worker</span><h4>Background Workers</h4><p>Async jobs, retries, queue consumers, scheduled tasks.</p></div>
+          <div class="node green"><span class="tag">Data</span><h4>Datastores</h4><p>Primary DB, cache, object store, search index, backups.</p></div>
+          <div class="node blue"><span class="tag">Ops</span><h4>Observability</h4><p>Logs, metrics, traces, alerts, audit records.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Data Flow Diagram</h2>
+      <p>Shows where data enters, transforms, stores, and exits.</p>
+      <div class="diagram">
+        <div class="flow six">
+          <div class="node blue"><span class="tag">Input</span><h4>External Request</h4><p>Untrusted user input, partner payload, uploaded file, API call.</p></div>
+          <div class="node amber"><span class="tag">Validate</span><h4>Input Validation</h4><p>Schema, size, type, authentication, authorization, canonicalization.</p></div>
+          <div class="node green"><span class="tag">Process</span><h4>Business Logic</h4><p>Transform data under explicit policy and transactional rules.</p></div>
+          <div class="node violet"><span class="tag">Store</span><h4>Storage Layer</h4><p>Persist records, indexes, objects, caches, and audit evidence.</p></div>
+          <div class="node amber"><span class="tag">Shape</span><h4>Output Policy</h4><p>Redact, filter, escape, paginate, and format response data.</p></div>
+          <div class="node blue"><span class="tag">Output</span><h4>Response / Event</h4><p>Return to user, emit event, call vendor, or trigger job.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>4. Trust Boundary Diagram</h2>
+      <p>Separates untrusted, controlled, trusted, and sensitive zones.</p>
+      <div class="zone-grid">
+        <div class="zone blue">
+          <h4>Untrusted Zone</h4>
+          <div class="pill-row">
+            <span class="pill">browser input</span>
+            <span class="pill">uploads</span>
+            <span class="pill">webhooks</span>
+            <span class="pill">third-party responses</span>
+          </div>
+        </div>
+        <div class="zone amber">
+          <h4>Controlled Zone</h4>
+          <div class="pill-row">
+            <span class="pill">gateway</span>
+            <span class="pill">API validation</span>
+            <span class="pill">policy engine</span>
+            <span class="pill">workers</span>
+          </div>
+        </div>
+        <div class="zone green">
+          <h4>Sensitive Zone</h4>
+          <div class="pill-row">
+            <span class="pill">primary DB</span>
+            <span class="pill">secrets</span>
+            <span class="pill">audit logs</span>
+            <span class="pill">backups</span>
+          </div>
+        </div>
+      </div>
+      <div class="callout">Review question: what validation, authentication, authorization, logging, and encryption occurs at each boundary crossing?</div>
+    </section>
+
+    <section>
+      <h2>5. Critical Sequence Diagram</h2>
+      <p>Shows runtime order for one important operation.</p>
+      <div class="diagram">
+        <div class="flow six">
+          <div class="node blue"><span class="tag">1</span><h4>Client Request</h4><p>Client sends action with identity token and payload.</p></div>
+          <div class="node violet"><span class="tag">2</span><h4>Authenticate</h4><p>Gateway/API validates session, token, tenant, and request ID.</p></div>
+          <div class="node amber"><span class="tag">3</span><h4>Authorize</h4><p>Policy engine checks role, resource, action, and context.</p></div>
+          <div class="node green"><span class="tag">4</span><h4>Execute</h4><p>Business service performs allowed operation transactionally.</p></div>
+          <div class="node blue"><span class="tag">5</span><h4>Audit</h4><p>Decision and side effect are logged with safe evidence.</p></div>
+          <div class="node green"><span class="tag">6</span><h4>Respond</h4><p>Output policy shapes response and hides internal state.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>6. State Machine Diagram</h2>
+      <p>Shows valid lifecycle states for a generic stateful object.</p>
+      <div class="diagram">
+        <div class="flow six">
+          <div class="node blue"><span class="tag">Start</span><h4>Created</h4><p>Object exists but is not yet validated or active.</p></div>
+          <div class="node amber"><span class="tag">Check</span><h4>Validated</h4><p>Schema, ownership, and policy have been checked.</p></div>
+          <div class="node green"><span class="tag">Use</span><h4>Active</h4><p>Object can be used under current policy.</p></div>
+          <div class="node amber"><span class="tag">Work</span><h4>Processing</h4><p>Object is claimed by one operation to avoid duplicates.</p></div>
+          <div class="node green"><span class="tag">Done</span><h4>Completed</h4><p>Object reached final successful state.</p></div>
+          <div class="node red"><span class="tag">Closed</span><h4>Failed / Expired</h4><p>Object can no longer be used except for safe audit review.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>7. Authorization Matrix</h2>
+      <p>Shows who can do what. This catches policies that only exist in the UI.</p>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Role</th>
+            <th>Read</th>
+            <th>Create</th>
+            <th>Update</th>
+            <th>Delete</th>
+            <th>Export</th>
+            <th>Admin</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Viewer</td><td>Own scope</td><td>No</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+          <tr><td>Operator</td><td>Assigned scope</td><td>Allowed types</td><td>Assigned scope</td><td>No</td><td>No</td><td>No</td></tr>
+          <tr><td>Manager</td><td>Team scope</td><td>Allowed types</td><td>Team scope</td><td>Limited</td><td>Approved only</td><td>No</td></tr>
+          <tr><td>Admin</td><td>Tenant scope</td><td>Yes</td><td>Yes</td><td>Policy gated</td><td>Policy gated</td><td>Yes</td></tr>
+          <tr><td>Service</td><td>Purpose bound</td><td>Purpose bound</td><td>Purpose bound</td><td>No by default</td><td>No by default</td><td>No</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>8. Control Enforcement Map</h2>
+      <p>Maps security rules to the exact enforcement location.</p>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Control</th>
+            <th>Decision Point</th>
+            <th>Enforcement Point</th>
+            <th>Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Authentication</td><td>Identity provider</td><td>Gateway/API middleware</td><td>Auth log, request ID, session ID</td></tr>
+          <tr><td>Authorization</td><td>Policy engine</td><td>API/service method</td><td>Allow/deny audit event</td></tr>
+          <tr><td>Input validation</td><td>Schema validator</td><td>API boundary</td><td>Validation result and safe reason code</td></tr>
+          <tr><td>Output filtering</td><td>Output policy</td><td>Response builder</td><td>Redaction counts and field categories</td></tr>
+          <tr><td>Data retention</td><td>Retention policy</td><td>Cleanup job / lifecycle rule</td><td>Deletion job record</td></tr>
+          <tr><td>Secrets handling</td><td>KMS / secret manager</td><td>Runtime config and deploy pipeline</td><td>Access log and rotation record</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>9. Threat Model Diagram</h2>
+      <p>Shows attacker paths and where controls interrupt them.</p>
+      <div class="diagram">
+        <div class="flow five">
+          <div class="node red"><span class="tag">Attack</span><h4>Entry Point</h4><p>Phishing, stolen token, bad upload, injection, webhook abuse.</p></div>
+          <div class="node amber"><span class="tag">Probe</span><h4>Discovery</h4><p>Enumerate IDs, inspect errors, test debug paths, replay handles.</p></div>
+          <div class="node amber"><span class="tag">Exploit</span><h4>Control Gap</h4><p>Find missing auth, bad validation, stale state, or overbroad service role.</p></div>
+          <div class="node green"><span class="tag">Control</span><h4>Mitigation</h4><p>Auth, rate limits, gates, state checks, output policy, audit alerts.</p></div>
+          <div class="node blue"><span class="tag">Detect</span><h4>Response</h4><p>Alert, investigate, contain, rotate, patch, add regression test.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>10. Audit And Observability Diagram</h2>
+      <p>Shows logs, metrics, traces, alerts, and review paths.</p>
+      <div class="diagram">
+        <div class="flow six">
+          <div class="node blue"><span class="tag">App</span><h4>Event Created</h4><p>Request, decision, side effect, error, or policy denial occurs.</p></div>
+          <div class="node amber"><span class="tag">Shape</span><h4>Sanitize</h4><p>Remove secrets, private data, raw payloads, and unsafe values.</p></div>
+          <div class="node green"><span class="tag">Collect</span><h4>Logs / Metrics / Traces</h4><p>Central collection with request correlation.</p></div>
+          <div class="node violet"><span class="tag">Store</span><h4>Audit Store</h4><p>Durable restricted records for compliance and investigation.</p></div>
+          <div class="node amber"><span class="tag">Watch</span><h4>Alerts</h4><p>Thresholds, anomaly patterns, denied action spikes, abuse signals.</p></div>
+          <div class="node blue"><span class="tag">Review</span><h4>Dashboards / Reports</h4><p>Ops, security, compliance, and product review.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>11. Deployment Diagram</h2>
+      <p>Shows where the system runs and which networks/storage are public or private.</p>
+      <div class="zone-grid">
+        <div class="zone blue">
+          <h4>Public Edge</h4>
+          <div class="pill-row">
+            <span class="pill">DNS</span>
+            <span class="pill">CDN</span>
+            <span class="pill">WAF</span>
+            <span class="pill">Load balancer</span>
+          </div>
+        </div>
+        <div class="zone amber">
+          <h4>Private App Network</h4>
+          <div class="pill-row">
+            <span class="pill">API containers</span>
+            <span class="pill">workers</span>
+            <span class="pill">queues</span>
+            <span class="pill">service mesh</span>
+          </div>
+        </div>
+        <div class="zone green">
+          <h4>Restricted Data Network</h4>
+          <div class="pill-row">
+            <span class="pill">database</span>
+            <span class="pill">object store</span>
+            <span class="pill">KMS</span>
+            <span class="pill">backups</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>12. Resilience And Failure Diagram</h2>
+      <p>Shows expected failures and safe behavior.</p>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Failure</th>
+            <th>Expected Behavior</th>
+            <th>Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Database unavailable</td><td>Fail closed for writes, safe error for reads, no partial commit.</td><td>Error metric, trace, incident log.</td></tr>
+          <tr><td>Queue backlog</td><td>Throttle producers, expose degraded status, preserve idempotency.</td><td>Queue depth alert, retry counts.</td></tr>
+          <tr><td>Third-party timeout</td><td>Bounded retry, fallback if safe, no duplicate side effects.</td><td>Timeout reason code, vendor metric.</td></tr>
+          <tr><td>Worker crash</td><td>Job remains retryable or fails explicitly, no ambiguous state.</td><td>Job state transition and dead-letter log.</td></tr>
+          <tr><td>Region outage</td><td>Failover or declared downtime with recovery point objective.</td><td>Status event and recovery audit.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>13. CI/CD Release Flow</h2>
+      <p>Shows how code becomes production.</p>
+      <div class="diagram">
+        <div class="flow six">
+          <div class="node blue"><span class="tag">Code</span><h4>Branch / PR</h4><p>Developer proposes change with tests and review context.</p></div>
+          <div class="node amber"><span class="tag">Check</span><h4>Static Gates</h4><p>Lint, typecheck, dependency scan, secret scan, policy checks.</p></div>
+          <div class="node green"><span class="tag">Test</span><h4>Automated Tests</h4><p>Unit, integration, endpoint, security, regression, browser tests.</p></div>
+          <div class="node violet"><span class="tag">Build</span><h4>Artifact</h4><p>Signed image/package with SBOM and provenance.</p></div>
+          <div class="node amber"><span class="tag">Approve</span><h4>Release Gate</h4><p>Owner approval, risk review, migration check, rollback plan.</p></div>
+          <div class="node green"><span class="tag">Deploy</span><h4>Progressive Rollout</h4><p>Canary, monitor, promote, rollback if signals fail.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>14. Data Lifecycle And Retention Map</h2>
+      <p>Shows how data is created, stored, retained, archived, and deleted.</p>
+      <div class="diagram">
+        <div class="flow six">
+          <div class="node blue"><span class="tag">Create</span><h4>Collection</h4><p>Data enters with purpose, consent/legal basis, and classification.</p></div>
+          <div class="node amber"><span class="tag">Use</span><h4>Processing</h4><p>Purpose-bound transformations and access controls.</p></div>
+          <div class="node green"><span class="tag">Store</span><h4>Primary Storage</h4><p>Encrypted storage, access logs, retention metadata.</p></div>
+          <div class="node violet"><span class="tag">Replicate</span><h4>Backups / Exports</h4><p>Encrypted backups, restricted exports, data lineage.</p></div>
+          <div class="node amber"><span class="tag">Retain</span><h4>Retention Window</h4><p>Legal, operational, and product retention rules.</p></div>
+          <div class="node red"><span class="tag">Delete</span><h4>Disposal</h4><p>Verified deletion, tombstone, audit record, backup handling.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>15. Incident Response Flow</h2>
+      <p>Shows what happens when something goes wrong.</p>
+      <div class="diagram">
+        <div class="flow six">
+          <div class="node red"><span class="tag">Detect</span><h4>Signal</h4><p>Alert, user report, audit anomaly, vulnerability finding, outage.</p></div>
+          <div class="node amber"><span class="tag">Triage</span><h4>Severity</h4><p>Classify impact, affected systems, data exposure, urgency.</p></div>
+          <div class="node amber"><span class="tag">Contain</span><h4>Stop Spread</h4><p>Disable endpoint, revoke tokens, block actor, freeze deploys.</p></div>
+          <div class="node green"><span class="tag">Eradicate</span><h4>Fix</h4><p>Patch bug, rotate secrets, remove bad config, clean state.</p></div>
+          <div class="node blue"><span class="tag">Recover</span><h4>Restore</h4><p>Validate systems, monitor closely, communicate status.</p></div>
+          <div class="node violet"><span class="tag">Learn</span><h4>Postmortem</h4><p>Root cause, action items, regression tests, control improvements.</p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

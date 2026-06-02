@@ -909,3 +909,37 @@ class WardenContext:
     def surrogate_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
         """Apply clinical surrogation (pass-through in demo mode)."""
         return self._surrogator.surrogate_record(record)
+
+    # --- New-patient identifier registration ---
+
+    def register_identifiers(self, patient: dict) -> None:
+        """Register current-request patient identifiers into the token map.
+
+        Call this for new patients not yet persisted to DB, before anonymizing
+        any text that may contain their identifiers.  If a value already has a
+        token in the map (e.g. from a prior DB query) it is left unchanged to
+        avoid duplicate remapping.
+        """
+        first = (patient.get("first_name") or "").strip()
+        last = (patient.get("last_name") or "").strip()
+        pid = (patient.get("id") or patient.get("patient_id") or "").strip()
+        dob = (patient.get("dob") or "").strip()
+
+        if first and last:
+            full_name = f"{first} {last}"
+            if self.token_map.get_token(full_name) is None:
+                self.token_map.add_mapping(
+                    full_name, _new_phi_token("PAT"), field_type="patient_name"
+                )
+
+        if pid:
+            if self.token_map.get_token(pid) is None:
+                self.token_map.add_mapping(
+                    pid, _new_phi_token("PID"), field_type="patient_id"
+                )
+
+        if dob:
+            if self.token_map.get_token(dob) is None:
+                self.token_map.add_mapping(
+                    dob, _new_phi_token("DOB"), field_type="patient_dob"
+                )

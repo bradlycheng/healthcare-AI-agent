@@ -14,6 +14,8 @@ from .hl7_parser import parse_oru
 from .llm_gateway import LLMError, hl7_note_extraction
 from .alerts import check_alert
 from .security import sanitize_text
+from .warden import Warden
+from .security_validation import IntentGrant, iso_after, new_request_id
 
 # Toggle this if/when you want to actually use AI for enrichment.
 USE_LLM = True
@@ -265,7 +267,69 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
     if USE_LLM and use_llm and _needs_ai_analysis(structured_observations):
         try:
             prompt = _build_llm_prompt(patient, structured_observations)
-            llm_raw = hl7_note_extraction(prompt)
+
+            # Warden IN-GATE: wrap hl7_note_extraction in a request scope so
+            # patient PHI in clinical notes is tokenized before reaching the LLM.
+            ingestion_grant = IntentGrant(
+                intent="hl7_note_extraction",
+                risk="medium",
+                session_id="hl7_ingestion",
+                request_id=new_request_id(),
+                scope="hl7_ingestion",
+                allowed_tools=[],
+                output_fields=["new_observations"],
+                max_rows=0,
+                expires_at=iso_after(minutes=5),
+            )
+            warden = Warden()
+            with warden.request_scope(grant=ingestion_grant) as warden_ctx:
+                # Register new patient identifiers before DB write so first-time
+                # patients are tokenized even when not yet in the DB token map.
+                warden_ctx.register_identifiers(patient)
+                safe_prompt = warden_ctx.anonymize(prompt)
+
+                # Post-anonymize completeness check: verify no raw PHI leaked
+                # through the anonymize step before the prompt reaches the LLM.
+                _phi_identifiers = [
+                    (patient.get("first_name") or "").strip(),
+                    (patient.get("last_name") or "").strip(),
+                    (f"{(patient.get('first_name') or '').strip()} {(patient.get('last_name') or '').strip()}").strip(),
+                    (patient.get("id") or patient.get("patient_id") or "").strip(),
+                    (patient.get("dob") or "").strip(),
+                ]
+                _phi_leaked = any(
+                    v and v in safe_prompt for v in _phi_identifiers
+                )
+                if _phi_leaked:
+                    print(
+                        "WARDEN: PHI detected in prompt after anonymize -- skipping LLM call",
+                        file=sys.stderr, flush=True
+                    )
+                    llm_raw = {}
+                else:
+                    llm_raw_result = hl7_note_extraction(safe_prompt)
+                    # OUT-GATE: deanonymize string fields that may contain PHI tokens.
+                    # Do NOT call anonymize_json() here — output must be deanonymized,
+                    # not re-tokenized.
+                    if isinstance(llm_raw_result, dict):
+                        llm_raw_str = _json.dumps(llm_raw_result)
+                        _deanon_str = warden_ctx.deanonymize(llm_raw_str)
+                        llm_raw = _json.loads(_deanon_str)
+
+                        # Post-deanonymize PHI validation: verify LLM output does
+                        # not contain raw patient identifiers that bypassed tokenization.
+                        _llm_out_str = _json.dumps(llm_raw)
+                        _llm_phi_leaked = any(
+                            v and v in _llm_out_str for v in _phi_identifiers
+                        )
+                        if _llm_phi_leaked:
+                            print(
+                                "WARDEN: PHI detected in LLM output after deanonymize -- discarding",
+                                file=sys.stderr, flush=True
+                            )
+                            llm_raw = {}
+                    else:
+                        llm_raw = llm_raw_result
 
             patient, clinical_summary, structured_observations, fhir_bundle = _merge_llm_output(
                 patient, clinical_summary, structured_observations, fhir_bundle, llm_raw
@@ -283,7 +347,7 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
     
 
     for ob in structured_observations:
-        alert = check_alert(ob.get("code"), ob.get("value"))
+        alert = check_alert(ob.get("code"), ob.get("value"), ob.get("unit", ""))
         if alert:
             ob["alert_level"], ob["alert_message"] = alert["level"], alert["message"]
 

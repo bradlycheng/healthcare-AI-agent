@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Audit And Observability Map</title>
+  <style>
+    :root {
+      --ink: #162231;
+      --muted: #66758a;
+      --paper: #f5f7fb;
+      --panel: #ffffff;
+      --line: #d8e0ea;
+      --dark: #101923;
+      --blue: #245aa5;
+      --blue-bg: #eaf2ff;
+      --green: #16693f;
+      --green-bg: #e8f5ee;
+      --amber: #8a5a12;
+      --amber-bg: #fff4df;
+      --red: #a33b37;
+      --red-bg: #fff0ef;
+      --violet: #5842a3;
+      --violet-bg: #f0edff;
+      --gray-bg: #f8fafc;
+      --shadow: 0 10px 28px rgba(20, 36, 62, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+      line-height: 1.46;
+    }
+
+    header {
+      padding: 42px 48px 30px;
+      color: #fff;
+      background: var(--dark);
+      border-bottom: 5px solid #2f80ed;
+    }
+
+    header h1 {
+      margin: 0 0 10px;
+      font-size: 34px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    header p {
+      margin: 0;
+      max-width: 1080px;
+      color: #d9e6f7;
+      font-size: 16px;
+    }
+
+    main {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 30px 28px 48px;
+    }
+
+    section {
+      margin: 0 0 24px;
+      padding: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 18px 0 10px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    p { margin: 0 0 12px; }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: #eef2f7;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.94em;
+    }
+
+    .intro-grid {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .card {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcff;
+    }
+
+    .card strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .diagram {
+      margin-top: 16px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow-x: auto;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(150px, 1fr));
+      gap: 12px;
+      min-width: 1120px;
+      align-items: stretch;
+    }
+
+    .flow.six {
+      grid-template-columns: repeat(6, minmax(160px, 1fr));
+      min-width: 980px;
+    }
+
+    .flow.five {
+      grid-template-columns: repeat(5, minmax(170px, 1fr));
+      min-width: 900px;
+    }
+
+    .node {
+      position: relative;
+      min-height: 116px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--gray-bg);
+    }
+
+    .node:not(:last-child)::after {
+      content: ">";
+      position: absolute;
+      top: 50%;
+      right: -11px;
+      width: 18px;
+      height: 18px;
+      transform: translateY(-50%);
+      border-radius: 50%;
+      color: #fff;
+      background: #8292a8;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 18px;
+      text-align: center;
+      z-index: 2;
+    }
+
+    .node h4 {
+      margin: 0 0 6px;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    .node p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .tag {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .blue { border-color: #b8cdf0; background: var(--blue-bg); }
+    .green { border-color: #b8dfc9; background: var(--green-bg); }
+    .amber { border-color: #ecd49d; background: var(--amber-bg); }
+    .red { border-color: #e8b6b2; background: var(--red-bg); }
+    .violet { border-color: #cbc3f4; background: var(--violet-bg); }
+
+    .blue .tag { background: var(--blue); }
+    .green .tag { background: var(--green); }
+    .amber .tag { background: var(--amber); }
+    .red .tag { background: var(--red); }
+    .violet .tag { background: var(--violet); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 14px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(240px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .box {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--gray-bg);
+    }
+
+    .box h4 {
+      margin: 0 0 6px;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    .box p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .lane {
+      display: grid;
+      grid-template-columns: 190px 1fr;
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .lane-title {
+      padding: 14px;
+      color: #fff;
+      background: #243243;
+      font-weight: 700;
+    }
+
+    .lane-body {
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .lane-title:not(:last-of-type),
+    .lane-body:not(:last-of-type) {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .pill {
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #f8fafc;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .matrix {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      font-size: 14px;
+    }
+
+    .matrix th,
+    .matrix td {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .matrix th {
+      color: #fff;
+      background: #243243;
+    }
+
+    .matrix td { background: #fff; }
+
+    .callout {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-left: 5px solid var(--blue);
+      border-radius: 6px;
+      background: #f8fbff;
+    }
+
+    @media (max-width: 1080px) {
+      header { padding: 32px 24px 24px; }
+      main { padding: 22px 16px 34px; }
+      .intro-grid, .grid-2 { grid-template-columns: 1fr; }
+      .grid-3 { grid-template-columns: 1fr; }
+      .lane { grid-template-columns: 1fr; }
+      .lane-title { border-bottom: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Audit And Observability Map</h1>
+    <p>
+      A professional map for proving what happened without leaking sensitive data:
+      event sources, sanitization, logs, metrics, traces, audit records, alerts,
+      dashboards, retention, ownership, and incident review.
+    </p>
+  </header>
+
+  <main>
+    <section>
+      <div class="intro-grid">
+        <div>
+          <h2>Purpose</h2>
+          <p>
+            Audit and observability are related, but not identical. Observability helps
+            operators understand system health. Audit helps reviewers prove who did what,
+            when, and why.
+          </p>
+          <p>
+            The pro move is to design both deliberately so logs do not become a second
+            database of secrets.
+          </p>
+        </div>
+        <div class="card">
+          <strong>Golden rule</strong>
+          Record enough to prove the decision and diagnose the system, never enough to
+          reconstruct private data, secrets, raw payloads, or token-real mappings.
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>1. End-To-End Audit Flow</h2>
+      <div class="diagram">
+        <div class="flow">
+          <div class="node blue"><span class="tag">Source</span><h4>Decision Or Event</h4><p>Request, auth decision, policy denial, write, export, admin action, failure.</p></div>
+          <div class="node amber"><span class="tag">Shape</span><h4>Structured Event</h4><p>Use IDs, categories, counts, reason codes, and component names.</p></div>
+          <div class="node red"><span class="tag">Sanitize</span><h4>Redaction Gate</h4><p>Remove secrets, raw payloads, tokens, PII/PHI, stack traces, and unsafe values.</p></div>
+          <div class="node green"><span class="tag">Route</span><h4>Telemetry Router</h4><p>Send appropriate fields to logs, metrics, traces, audit, and alerting.</p></div>
+          <div class="node violet"><span class="tag">Store</span><h4>Protected Storage</h4><p>Retain audit and telemetry with access control and retention rules.</p></div>
+          <div class="node amber"><span class="tag">Detect</span><h4>Alert Rules</h4><p>Trigger on abuse patterns, failures, policy bypass indicators, and anomalies.</p></div>
+          <div class="node blue"><span class="tag">Review</span><h4>Investigation</h4><p>Dashboards, reports, incident timelines, compliance evidence, postmortems.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. Telemetry Types</h2>
+      <div class="grid-3">
+        <div class="box blue"><span class="tag">Logs</span><h4>What Happened</h4><p>Discrete events, errors, decisions, denials, state transitions, admin actions.</p></div>
+        <div class="box green"><span class="tag">Metrics</span><h4>How Much / How Fast</h4><p>Counts, durations, rates, queue depths, denial spikes, latency, error ratios.</p></div>
+        <div class="box amber"><span class="tag">Traces</span><h4>Where Time Went</h4><p>Request path across services with spans, timing, dependencies, and correlation IDs.</p></div>
+        <div class="box violet"><span class="tag">Audit</span><h4>Who Did What</h4><p>Actor, action, resource category, decision, reason, time, source, safe evidence.</p></div>
+        <div class="box red"><span class="tag">Alerts</span><h4>What Needs Attention</h4><p>Threshold, anomaly, security signal, incident trigger, paging or ticket routing.</p></div>
+        <div class="box blue"><span class="tag">Reports</span><h4>What To Prove</h4><p>Compliance summaries, access reviews, abuse reports, postmortem evidence.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Event Source Map</h2>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Events To Emit</th>
+            <th>Must Not Emit</th>
+            <th>Primary Consumers</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Gateway</td><td>request accepted/blocked, rate limits, auth failures.</td><td>raw bodies, secrets, full tokens.</td><td>SRE, security.</td></tr>
+          <tr><td>API</td><td>endpoint allow/deny, validation failure, state transition, write result.</td><td>raw sensitive payloads, stack traces to audit.</td><td>Engineering, security, support.</td></tr>
+          <tr><td>Policy Engine</td><td>authorization decisions, deny reasons, scope categories.</td><td>private record contents, full permission tokens.</td><td>Security, compliance.</td></tr>
+          <tr><td>Worker</td><td>job claimed, completed, failed, retried, dead-lettered.</td><td>full job payload if sensitive.</td><td>SRE, product engineering.</td></tr>
+          <tr><td>Database</td><td>migration, backup, restore, access anomalies, replication health.</td><td>query results or raw rows in logs.</td><td>DBA, SRE, security.</td></tr>
+          <tr><td>Admin Surface</td><td>login, reset, config change, export, user/role change.</td><td>passwords, secrets, raw export contents.</td><td>Security, compliance, leadership.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>4. Sanitization Contract</h2>
+      <div class="lane">
+        <div class="lane-title">Allowed</div>
+        <div class="lane-body"><div class="pill-row"><span class="pill">request_id</span><span class="pill">actor_id hash</span><span class="pill">resource category</span><span class="pill">action</span><span class="pill">reason_code</span><span class="pill">counts</span><span class="pill">durations</span></div></div>
+        <div class="lane-title">Restricted</div>
+        <div class="lane-body"><div class="pill-row"><span class="pill">stable user IDs</span><span class="pill">tenant IDs</span><span class="pill">resource IDs</span><span class="pill">IP addresses</span><span class="pill">device IDs</span></div></div>
+        <div class="lane-title">Blocked</div>
+        <div class="lane-body"><div class="pill-row"><span class="pill">passwords</span><span class="pill">API keys</span><span class="pill">raw payloads</span><span class="pill">private content</span><span class="pill">token-real pairs</span><span class="pill">full stack traces</span><span class="pill">exports</span></div></div>
+      </div>
+      <div class="callout">Restricted fields may be allowed in tightly controlled security logs, but should be minimized, access-controlled, and retention-bound.</div>
+    </section>
+
+    <section>
+      <h2>5. Correlation Model</h2>
+      <p>Every event should be joinable without exposing sensitive content.</p>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Correlation Field</th>
+            <th>Purpose</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>request_id</code></td><td>Trace one request across services.</td><td>Generated at boundary; returned in safe errors when appropriate.</td></tr>
+          <tr><td><code>trace_id</code></td><td>Join distributed trace spans.</td><td>Used for performance and dependency investigation.</td></tr>
+          <tr><td><code>actor_ref</code></td><td>Identify user/service for audit.</td><td>May be hashed or internal ID depending on policy.</td></tr>
+          <tr><td><code>tenant_ref</code></td><td>Scope access and impact.</td><td>Useful for multi-tenant incident containment.</td></tr>
+          <tr><td><code>resource_ref</code></td><td>Identify affected record category or ID.</td><td>Prefer category for broad logs; restricted audit may store exact ID.</td></tr>
+          <tr><td><code>policy_version</code></td><td>Know which rules produced a decision.</td><td>Critical when policy changes over time.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>6. Alert Map</h2>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Signal</th>
+            <th>Possible Meaning</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Authentication failures spike</td><td>Password spraying, token replay, outage, bad deploy.</td><td>Rate limit, inspect source, notify security.</td></tr>
+          <tr><td>Authorization denials spike</td><td>Attack probing, broken policy rollout, UI/backend mismatch.</td><td>Review reason codes and recent deploys.</td></tr>
+          <tr><td>Export attempts increase</td><td>Exfiltration attempt or unusual business event.</td><td>Require approval, throttle, review actor scope.</td></tr>
+          <tr><td>Replay/idempotency failures spike</td><td>Automation bug, attacker replaying handles, flaky client retry.</td><td>Inspect request sources and state transitions.</td></tr>
+          <tr><td>Redaction count spike</td><td>Prompt/data injection, output policy drift, accidental secret exposure.</td><td>Review samples safely, add regression tests.</td></tr>
+          <tr><td>Audit write failures</td><td>Loss of evidence, storage issue, permission problem.</td><td>Page immediately; fail closed for high-risk actions if policy requires.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>7. Audit Store Structure</h2>
+      <div class="diagram">
+        <div class="flow five">
+          <div class="node blue"><span class="tag">Schema</span><h4>Structured Fields</h4><p>Time, actor, action, component, decision, reason, request, resource category.</p></div>
+          <div class="node amber"><span class="tag">Payload</span><h4>Safe Evidence</h4><p>Counts, categories, validation codes, policy version, redaction summary.</p></div>
+          <div class="node green"><span class="tag">Protection</span><h4>Access Control</h4><p>Restrict read access, separate admin roles, review access logs.</p></div>
+          <div class="node violet"><span class="tag">Integrity</span><h4>Tamper Evidence</h4><p>Append-only storage, hash chain, external sink, write-once retention where needed.</p></div>
+          <div class="node red"><span class="tag">Retention</span><h4>Lifecycle</h4><p>Keep based on legal, compliance, and operational policy; delete on schedule.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>8. Dashboard Map</h2>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Dashboard</th>
+            <th>Audience</th>
+            <th>Questions It Answers</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>System Health</td><td>SRE / engineering</td><td>Is the system up, fast, and processing work?</td></tr>
+          <tr><td>Security Signals</td><td>Security</td><td>Are there suspicious auth, replay, denial, export, or probing patterns?</td></tr>
+          <tr><td>Audit Review</td><td>Compliance / security</td><td>Who did what, when, under which policy, and why was it allowed?</td></tr>
+          <tr><td>Release Impact</td><td>Engineering / product</td><td>Did a deploy change error rates, denial rates, latency, or audit volume?</td></tr>
+          <tr><td>Data Lifecycle</td><td>Privacy / compliance</td><td>Are retention jobs, deletion requests, exports, and backups behaving correctly?</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>9. Ownership And Retention</h2>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Artifact</th>
+            <th>Owner</th>
+            <th>Retention</th>
+            <th>Access</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Application logs</td><td>Engineering/SRE</td><td>Short to medium operational window.</td><td>Engineering and SRE.</td></tr>
+          <tr><td>Security audit records</td><td>Security/compliance</td><td>Policy/legal defined.</td><td>Restricted, reviewed, monitored.</td></tr>
+          <tr><td>Metrics</td><td>SRE/platform</td><td>Aggregated longer than raw logs.</td><td>Engineering and operations.</td></tr>
+          <tr><td>Traces</td><td>SRE/platform</td><td>Shorter due to volume and detail.</td><td>Engineering and SRE.</td></tr>
+          <tr><td>Incident records</td><td>Security/SRE</td><td>Long-term according to incident policy.</td><td>Need-to-know plus leadership/legal when required.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>10. Review Checklist</h2>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Question</th>
+            <th>Pass Criteria</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Can every high-risk action be reconstructed from audit?</td><td>Actor, action, resource category, decision, reason, time, and request correlation exist.</td></tr>
+          <tr><td>Can audit records leak sensitive data?</td><td>Sanitization tests cover raw payloads, secrets, IDs, stack traces, and token maps.</td></tr>
+          <tr><td>Are alerts tied to response actions?</td><td>Each high-severity alert has an owner and runbook.</td></tr>
+          <tr><td>Are logs correlated across services?</td><td>Request ID and trace ID appear across gateway, API, worker, and audit paths.</td></tr>
+          <tr><td>Are audit and telemetry retained appropriately?</td><td>Retention windows, access control, and deletion policies are documented.</td></tr>
+          <tr><td>Can telemetry survive incidents?</td><td>Audit write failures are detected, and critical evidence is stored outside the failing service.</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

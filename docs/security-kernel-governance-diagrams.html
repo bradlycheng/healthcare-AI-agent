@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Security Kernel Governance Diagrams</title>
+  <style>
+    :root {
+      --ink: #172331;
+      --muted: #66758a;
+      --paper: #f5f7fb;
+      --panel: #ffffff;
+      --line: #d8e0ea;
+      --dark: #101923;
+      --blue: #245aa5;
+      --blue-bg: #eaf2ff;
+      --green: #16693f;
+      --green-bg: #e8f5ee;
+      --amber: #8a5a12;
+      --amber-bg: #fff4df;
+      --red: #a33b37;
+      --red-bg: #fff0ef;
+      --violet: #5842a3;
+      --violet-bg: #f0edff;
+      --gray-bg: #f8fafc;
+      --shadow: 0 10px 28px rgba(20, 36, 62, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+      line-height: 1.46;
+    }
+
+    header {
+      padding: 42px 48px 30px;
+      color: #fff;
+      background: var(--dark);
+      border-bottom: 5px solid #2f80ed;
+    }
+
+    header h1 {
+      margin: 0 0 10px;
+      font-size: 34px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    header p {
+      margin: 0;
+      max-width: 1060px;
+      color: #d9e6f7;
+      font-size: 16px;
+    }
+
+    main {
+      max-width: 1460px;
+      margin: 0 auto;
+      padding: 30px 28px 48px;
+    }
+
+    section {
+      margin: 0 0 24px;
+      padding: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 18px 0 10px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    p { margin: 0 0 12px; }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: #eef2f7;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.94em;
+    }
+
+    .intro-grid {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .card {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcff;
+    }
+
+    .card strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .map-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(170px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .mini-card {
+      min-height: 96px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .mini-card strong { display: block; margin-bottom: 6px; }
+    .mini-card span { color: var(--muted); font-size: 13px; }
+
+    .diagram {
+      margin-top: 16px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow-x: auto;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(150px, 1fr));
+      gap: 12px;
+      min-width: 1080px;
+      align-items: stretch;
+    }
+
+    .flow.six { grid-template-columns: repeat(6, minmax(150px, 1fr)); min-width: 930px; }
+    .flow.five { grid-template-columns: repeat(5, minmax(155px, 1fr)); min-width: 820px; }
+    .flow.four { grid-template-columns: repeat(4, minmax(180px, 1fr)); min-width: 760px; }
+
+    .node {
+      position: relative;
+      min-height: 118px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--gray-bg);
+    }
+
+    .node:not(:last-child)::after {
+      content: ">";
+      position: absolute;
+      top: 50%;
+      right: -11px;
+      width: 18px;
+      height: 18px;
+      transform: translateY(-50%);
+      border-radius: 50%;
+      color: #fff;
+      background: #8292a8;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 18px;
+      text-align: center;
+      z-index: 2;
+    }
+
+    .node h4 {
+      margin: 0 0 6px;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    .node p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .tag {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .blue { border-color: #b8cdf0; background: var(--blue-bg); }
+    .green { border-color: #b8dfc9; background: var(--green-bg); }
+    .amber { border-color: #ecd49d; background: var(--amber-bg); }
+    .red { border-color: #e8b6b2; background: var(--red-bg); }
+    .violet { border-color: #cbc3f4; background: var(--violet-bg); }
+
+    .blue .tag { background: var(--blue); }
+    .green .tag { background: var(--green); }
+    .amber .tag { background: var(--amber); }
+    .red .tag { background: var(--red); }
+    .violet .tag { background: var(--violet); }
+
+    .matrix {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      font-size: 14px;
+    }
+
+    .matrix th,
+    .matrix td {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .matrix th {
+      color: #fff;
+      background: #243243;
+    }
+
+    .matrix td {
+      background: #fff;
+    }
+
+    .lane {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .lane-title {
+      padding: 14px;
+      color: #fff;
+      background: #243243;
+      font-weight: 700;
+    }
+
+    .lane-body {
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .lane-title:not(:last-of-type),
+    .lane-body:not(:last-of-type) {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .pill {
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #f8fafc;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .arrow {
+      color: #7b8ba2;
+      font-weight: 700;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 14px;
+    }
+
+    .callout {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-left: 5px solid var(--blue);
+      border-radius: 6px;
+      background: #f8fbff;
+    }
+
+    .deny-box {
+      padding: 14px;
+      border: 1px solid #e8b6b2;
+      border-radius: 8px;
+      background: var(--red-bg);
+    }
+
+    .deny-box strong { display: block; margin-bottom: 6px; color: var(--red); }
+
+    @media (max-width: 980px) {
+      header { padding: 32px 24px 24px; }
+      main { padding: 22px 16px 34px; }
+      .intro-grid, .split { grid-template-columns: 1fr; }
+      .map-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
+      .lane { grid-template-columns: 1fr; }
+      .lane-title { border-bottom: 0; }
+    }
+
+    @media (max-width: 640px) {
+      .map-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Security Kernel Governance Diagrams</h1>
+    <p>
+      Four focused views for Warden 2.0: transition diagram, invariants diagram,
+      gates diagram, and audit diagram. These diagrams separate what moves, what
+      must never break, who enforces it, and how proof is recorded.
+    </p>
+  </header>
+
+  <main>
+    <section>
+      <div class="intro-grid">
+        <div>
+          <h2>How To Read This</h2>
+          <p>
+            Use these diagrams after the state diagram. The state diagram shows where
+            things live. This page shows how things move, which laws must hold, which
+            gates enforce them, and what the audit trail should prove.
+          </p>
+          <div class="map-grid">
+            <div class="mini-card"><strong>Transitions</strong><span>Allowed movements between states.</span></div>
+            <div class="mini-card"><strong>Invariants</strong><span>Laws that must always remain true.</span></div>
+            <div class="mini-card"><strong>Gates</strong><span>Where rules are enforced in code.</span></div>
+            <div class="mini-card"><strong>Audit</strong><span>PHI-free proof of decisions and side effects.</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <strong>Hospital metaphor</strong>
+          Transitions are hallway movements. Invariants are hospital laws. Gates are
+          nurses, pharmacists, lab techs, records clerks, and security desks. Audit is
+          the receipt book that records the check without writing private chart details.
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Transition Diagram</h2>
+      <p>
+        A transition is an allowed movement. Attackers look for skipped desks:
+        client JSON directly becoming truth, RAG text becoming permission, or an old
+        parse ticket being reused.
+      </p>
+
+      <h3>Query Transition</h3>
+      <div class="diagram">
+        <div class="flow seven">
+          <div class="node blue">
+            <span class="tag">Boundary</span>
+            <h4>Raw Question</h4>
+            <p>Untrusted user text enters <code>/api/query</code>.</p>
+          </div>
+          <div class="node violet">
+            <span class="tag">Label</span>
+            <h4>Canonicalized</h4>
+            <p>Input is normalized, tainted, and tied to request/session.</p>
+          </div>
+          <div class="node green">
+            <span class="tag">Reference</span>
+            <h4>Resolved</h4>
+            <p>Safe memory may resolve pronouns, but cannot authorize.</p>
+          </div>
+          <div class="node violet">
+            <span class="tag">Authority</span>
+            <h4>Grant Built</h4>
+            <p>Server creates fresh tools, scope, subject, fields, and TTL.</p>
+          </div>
+          <div class="node amber">
+            <span class="tag">Plan</span>
+            <h4>LLM Proposes</h4>
+            <p>Planner proposes tools only. It does not grant permission.</p>
+          </div>
+          <div class="node amber">
+            <span class="tag">Execute</span>
+            <h4>Gates Check</h4>
+            <p>Warden, SQLGuard, RAGGuard, calculator specs, and TokenGuard run.</p>
+          </div>
+          <div class="node green">
+            <span class="tag">Commit</span>
+            <h4>Answer + Memory</h4>
+            <p>Output gate restores allowed tokens; safe memory commits only on success.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3>HL7 Parse/Save Transition</h3>
+      <div class="diagram">
+        <div class="flow six">
+          <div class="node blue">
+            <span class="tag">Boundary</span>
+            <h4>Raw HL7</h4>
+            <p>Message enters <code>/oru/parse</code>.</p>
+          </div>
+          <div class="node amber">
+            <span class="tag">Gate</span>
+            <h4>HL7Guard</h4>
+            <p>Reject malformed, oversized, non-ORU, or SQL-like notes.</p>
+          </div>
+          <div class="node green">
+            <span class="tag">Server Result</span>
+            <h4>Parsed</h4>
+            <p>Server builds observations, FHIR, alerts, and note policy output.</p>
+          </div>
+          <div class="node violet">
+            <span class="tag">Ticket</span>
+            <h4>parse_id</h4>
+            <p>Stored with session, raw hash, status, result, and expiry.</p>
+          </div>
+          <div class="node amber">
+            <span class="tag">Claim</span>
+            <h4>validated -> persisting</h4>
+            <p><code>/messages</code> atomically claims a same-session parse once.</p>
+          </div>
+          <div class="node green">
+            <span class="tag">Persist</span>
+            <h4>persisted</h4>
+            <p>Clinical truth is saved from server-owned parse result only.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="deny-box">
+          <strong>Denied transition</strong>
+          <code>client observations/FHIR/status -> persisted</code> is not allowed.
+        </div>
+        <div class="deny-box">
+          <strong>Denied transition</strong>
+          <code>LLM output/RAG text/HL7 note -> permission</code> is not allowed.
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Invariants Diagram</h2>
+      <p>
+        Invariants are the laws. If one breaks, the kernel has a real bug, even if
+        the happy path still works.
+      </p>
+
+      <div class="diagram">
+        <div class="flow five">
+          <div class="node violet">
+            <span class="tag">Authority</span>
+            <h4>Server-Created Only</h4>
+            <p>No client, LLM, RAG, or HL7 note can create grants, trust, or output permission.</p>
+          </div>
+          <div class="node amber">
+            <span class="tag">Tools</span>
+            <h4>No Grant, No Tool</h4>
+            <p>Every tool call requires live grant, allowed tool, schema, and policy.</p>
+          </div>
+          <div class="node amber">
+            <span class="tag">Data</span>
+            <h4>No Unguarded Execute</h4>
+            <p>SQL, HL7 parse, token restore, RAG, and calculators have deterministic gates.</p>
+          </div>
+          <div class="node green">
+            <span class="tag">State</span>
+            <h4>No Stale Authority</h4>
+            <p>Memory resolves context only; grants expire; parse IDs are same-session and single-use.</p>
+          </div>
+          <div class="node blue">
+            <span class="tag">Proof</span>
+            <h4>No PHI Audit</h4>
+            <p>Audit records reason codes and counts, not raw question, HL7, FHIR, SQL, or token maps.</p>
+          </div>
+        </div>
+      </div>
+
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Invariant</th>
+            <th>Why It Exists</th>
+            <th>Expected Failure Mode</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>No LLM output creates authority.</td>
+            <td>LLMs are tainted text processors, not policy engines.</td>
+            <td>Deny, ignore, or treat as evidence only.</td>
+          </tr>
+          <tr>
+            <td>No client JSON creates clinical truth.</td>
+            <td>Browser payloads can be tampered with.</td>
+            <td>Ignore/reject client patient, observations, FHIR, status, trust, or summary fields.</td>
+          </tr>
+          <tr>
+            <td>No stale reference widens scope.</td>
+            <td>Memory can be old, ambiguous, or attacker-influenced if mishandled.</td>
+            <td>Clarify or deny; create a fresh grant for every turn.</td>
+          </tr>
+          <tr>
+            <td>No failed request commits memory.</td>
+            <td>Attackers can force failures to poison future context.</td>
+            <td>Skip memory commit on failure, denial, timeout, interruption, stale state, or clarification.</td>
+          </tr>
+          <tr>
+            <td>No guessed token restores PHI.</td>
+            <td>Tokens are visible strings that attackers can copy or invent.</td>
+            <td>Redact unless current request, live grant, output field, and record match.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Gates Diagram</h2>
+      <p>
+        Gates are the actual staff checkpoints. A rule without a gate is just a wish.
+        Each gate should have a clear input, a decision, and an audit event.
+      </p>
+
+      <div class="lane">
+        <div class="lane-title">API Boundary</div>
+        <div class="lane-body">
+          <div class="pill-row">
+            <span class="pill">canonicalize</span>
+            <span class="arrow">-></span>
+            <span class="pill">session owner</span>
+            <span class="arrow">-></span>
+            <span class="pill">rate/size check</span>
+            <span class="arrow">-></span>
+            <span class="pill">safe error</span>
+          </div>
+        </div>
+        <div class="lane-title">Authority</div>
+        <div class="lane-body">
+          <div class="pill-row">
+            <span class="pill">intent classifier labels</span>
+            <span class="arrow">-></span>
+            <span class="pill">server grant builder</span>
+            <span class="arrow">-></span>
+            <span class="pill">deny intents closed</span>
+          </div>
+        </div>
+        <div class="lane-title">Tool Use</div>
+        <div class="lane-body">
+          <div class="pill-row">
+            <span class="pill">registered tool</span>
+            <span class="arrow">-></span>
+            <span class="pill">exact schema</span>
+            <span class="arrow">-></span>
+            <span class="pill">grant allows tool</span>
+            <span class="arrow">-></span>
+            <span class="pill">tool policy</span>
+          </div>
+        </div>
+        <div class="lane-title">Data Execution</div>
+        <div class="lane-body">
+          <div class="pill-row">
+            <span class="pill">SQLGuard</span>
+            <span class="pill">HL7Guard</span>
+            <span class="pill">RAGGuard</span>
+            <span class="pill">calculator specs</span>
+            <span class="pill">read output policy</span>
+          </div>
+        </div>
+        <div class="lane-title">Output</div>
+        <div class="lane-body">
+          <div class="pill-row">
+            <span class="pill">TokenGuard restore</span>
+            <span class="arrow">-></span>
+            <span class="pill">protected output flag</span>
+            <span class="arrow">-></span>
+            <span class="pill">escape UI</span>
+            <span class="arrow">-></span>
+            <span class="pill">safe response</span>
+          </div>
+        </div>
+      </div>
+
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Gate</th>
+            <th>Owns</th>
+            <th>Blocks</th>
+            <th>Audit Signal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Warden</td>
+            <td>Tool permission, schema, command-token checks, subject checks.</td>
+            <td>Unknown tools, extra fields, missing grant, wrong subject, unsafe tool text.</td>
+            <td>Tool allow/deny decision with PHI-free reason and field-type counts.</td>
+          </tr>
+          <tr>
+            <td>SQLGuard</td>
+            <td>SQL AST safety, table/column allowlists, row caps, note policy.</td>
+            <td>DDL/DML, comments, PRAGMA, ATTACH, blocked tables, note reads without grant.</td>
+            <td>SQL allowed/denied category, no raw SQL in canonical audit.</td>
+          </tr>
+          <tr>
+            <td>HL7Guard</td>
+            <td>HL7 shape, caps, note policy, SQL-like note denial.</td>
+            <td>Malformed ORU, missing MSH/PID/OBX, oversized fields, SQL-like clinical text.</td>
+            <td>Segment counts, denial reason, no raw HL7.</td>
+          </tr>
+          <tr>
+            <td>TokenGuard</td>
+            <td>PHI token restoration.</td>
+            <td>Guessed, stale, wrong-request, RAG-injected, or out-of-field tokens.</td>
+            <td>Restore/redaction counts and field types only.</td>
+          </tr>
+          <tr>
+            <td>Safe Memory</td>
+            <td>Typed reference state and commit rules.</td>
+            <td>Raw history authority, failed-turn memory poison, expired/wrong-session refs.</td>
+            <td>Commit skipped/allowed reason code.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Audit Diagram</h2>
+      <p>
+        Audit is not the place to store patient facts. It is the place to prove that
+        a gate made a decision and why.
+      </p>
+
+      <div class="diagram">
+        <div class="flow six">
+          <div class="node blue">
+            <span class="tag">Event</span>
+            <h4>Decision Happens</h4>
+            <p>Endpoint or guard allows, denies, redacts, claims, persists, or skips.</p>
+          </div>
+          <div class="node violet">
+            <span class="tag">Shape</span>
+            <h4>Safe Payload</h4>
+            <p>Payload uses reason codes, counts, booleans, component names, and categories.</p>
+          </div>
+          <div class="node amber">
+            <span class="tag">Sanitize</span>
+            <h4>Blocked Keys</h4>
+            <p>Strip question, answer, raw HL7, FHIR, SQL, patient names, DOBs, token maps.</p>
+          </div>
+          <div class="node green">
+            <span class="tag">Store</span>
+            <h4>governance_events</h4>
+            <p>Insert request, session, component, action, reason, payload, and time.</p>
+          </div>
+          <div class="node blue">
+            <span class="tag">Review</span>
+            <h4>Query Audit</h4>
+            <p>Investigate denied attempts, replay, unsafe input, and policy decisions.</p>
+          </div>
+          <div class="node amber">
+            <span class="tag">Future</span>
+            <h4>Monitor</h4>
+            <p>Alert on denial spikes, replay attempts, token redaction spikes, admin failures.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="split">
+        <div>
+          <h3>Good Audit Payload</h3>
+          <table class="matrix">
+            <tbody>
+              <tr><td><code>component</code></td><td><code>oru.parse</code></td></tr>
+              <tr><td><code>action</code></td><td><code>denied</code></td></tr>
+              <tr><td><code>reason_code</code></td><td><code>hl7_guard_denied</code></td></tr>
+              <tr><td><code>payload</code></td><td><code>{"segment_count": 12, "error_count": 1}</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>Bad Audit Payload</h3>
+          <table class="matrix">
+            <tbody>
+              <tr><td><code>raw_hl7</code></td><td>Full message with patient identifiers.</td></tr>
+              <tr><td><code>question</code></td><td>Raw user prompt containing PHI.</td></tr>
+              <tr><td><code>sql</code></td><td>Generated SQL with patient filters.</td></tr>
+              <tr><td><code>token_map</code></td><td>Token-real pairs.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="callout">
+        Audit invariant: record enough to prove the security decision, never enough to
+        reconstruct the patient record or token-real mapping.
+      </div>
+    </section>
+  </main>
+</body>
+</html>

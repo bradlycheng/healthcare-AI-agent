@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Professional Structural Diagram Package</title>
+  <style>
+    :root {
+      --ink: #162231;
+      --muted: #66758a;
+      --paper: #f5f7fb;
+      --panel: #ffffff;
+      --line: #d8e0ea;
+      --dark: #101923;
+      --blue: #245aa5;
+      --blue-bg: #eaf2ff;
+      --green: #16693f;
+      --green-bg: #e8f5ee;
+      --amber: #8a5a12;
+      --amber-bg: #fff4df;
+      --red: #a33b37;
+      --red-bg: #fff0ef;
+      --violet: #5842a3;
+      --violet-bg: #f0edff;
+      --gray-bg: #f8fafc;
+      --shadow: 0 10px 28px rgba(20, 36, 62, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+      line-height: 1.46;
+    }
+
+    header {
+      padding: 42px 48px 30px;
+      color: #fff;
+      background: var(--dark);
+      border-bottom: 5px solid #2f80ed;
+    }
+
+    header h1 {
+      margin: 0 0 10px;
+      font-size: 34px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    header p {
+      margin: 0;
+      max-width: 1080px;
+      color: #d9e6f7;
+      font-size: 16px;
+    }
+
+    main {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 30px 28px 48px;
+    }
+
+    section {
+      margin: 0 0 24px;
+      padding: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 18px 0 10px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    p { margin: 0 0 12px; }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: #eef2f7;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.94em;
+    }
+
+    .intro-grid {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .card {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcff;
+    }
+
+    .card strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(160px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .quick-card {
+      min-height: 86px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .quick-card strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+
+    .quick-card span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .diagram {
+      margin-top: 16px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow-x: auto;
+    }
+
+    .box {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--gray-bg);
+    }
+
+    .box h4 {
+      margin: 0 0 6px;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    .box p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .tag {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .blue { border-color: #b8cdf0; background: var(--blue-bg); }
+    .green { border-color: #b8dfc9; background: var(--green-bg); }
+    .amber { border-color: #ecd49d; background: var(--amber-bg); }
+    .red { border-color: #e8b6b2; background: var(--red-bg); }
+    .violet { border-color: #cbc3f4; background: var(--violet-bg); }
+
+    .blue .tag { background: var(--blue); }
+    .green .tag { background: var(--green); }
+    .amber .tag { background: var(--amber); }
+    .red .tag { background: var(--red); }
+    .violet .tag { background: var(--violet); }
+
+    .c4-stack {
+      display: grid;
+      gap: 14px;
+      min-width: 900px;
+    }
+
+    .ring {
+      padding: 18px;
+      border: 2px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .ring h3 {
+      margin: 0 0 12px;
+    }
+
+    .ring-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
+    .layer-stack {
+      display: grid;
+      gap: 10px;
+      min-width: 820px;
+    }
+
+    .layer {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      align-items: stretch;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .layer-name {
+      padding: 14px;
+      color: #fff;
+      background: #243243;
+      font-weight: 700;
+    }
+
+    .layer-body {
+      padding: 12px;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .pill {
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #f8fafc;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .arrow {
+      color: #7b8ba2;
+      font-weight: 700;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 14px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(240px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .dependency {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(150px, 1fr));
+      gap: 12px;
+      min-width: 900px;
+      align-items: stretch;
+    }
+
+    .dep-node {
+      position: relative;
+      min-height: 112px;
+    }
+
+    .dep-node:not(:last-child)::after {
+      content: ">";
+      position: absolute;
+      top: 50%;
+      right: -11px;
+      width: 18px;
+      height: 18px;
+      transform: translateY(-50%);
+      border-radius: 50%;
+      color: #fff;
+      background: #8292a8;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 18px;
+      text-align: center;
+      z-index: 2;
+    }
+
+    .matrix {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      font-size: 14px;
+    }
+
+    .matrix th,
+    .matrix td {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .matrix th {
+      color: #fff;
+      background: #243243;
+    }
+
+    .matrix td { background: #fff; }
+
+    .tree {
+      min-width: 760px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcff;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 14px;
+      line-height: 1.7;
+      white-space: pre;
+    }
+
+    .callout {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-left: 5px solid var(--blue);
+      border-radius: 6px;
+      background: #f8fbff;
+    }
+
+    @media (max-width: 1080px) {
+      header { padding: 32px 24px 24px; }
+      main { padding: 22px 16px 34px; }
+      .intro-grid, .grid-2 { grid-template-columns: 1fr; }
+      .quick-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
+      .grid-3 { grid-template-columns: 1fr; }
+      .layer { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .quick-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Professional Structural Diagrams</h1>
+    <p>
+      A generic structural diagram package for explaining what exists in a system:
+      boundaries, containers, components, modules, data stores, APIs, infrastructure,
+      ownership, dependencies, and repository shape.
+    </p>
+  </header>
+
+  <main>
+    <section>
+      <div class="intro-grid">
+        <div>
+          <h2>Structural Diagrams vs Workflow Diagrams</h2>
+          <p>
+            Workflow diagrams explain what happens over time. Structural diagrams explain
+            what exists, where it sits, what owns it, and how it depends on other pieces.
+          </p>
+          <div class="quick-grid">
+            <div class="quick-card"><strong>C4 Structure</strong><span>Context, containers, components, code.</span></div>
+            <div class="quick-card"><strong>Layering</strong><span>Which layer may depend on which layer.</span></div>
+            <div class="quick-card"><strong>Data Shape</strong><span>Entities, stores, schemas, ownership.</span></div>
+            <div class="quick-card"><strong>Operations</strong><span>Infra, repo, ownership, dependency map.</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <strong>Professional review question</strong>
+          Can a new engineer, auditor, or incident responder look at this package and
+          understand where the important pieces live before reading code?
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>1. C4 Structural Stack</h2>
+      <p>Use C4-style views to zoom from the outside world into code-level structure.</p>
+      <div class="diagram">
+        <div class="c4-stack">
+          <div class="ring blue">
+            <h3>Level 1: System Context</h3>
+            <div class="ring-grid">
+              <div class="box blue"><span class="tag">Actor</span><h4>Users</h4><p>Humans or systems that use the product.</p></div>
+              <div class="box green"><span class="tag">System</span><h4>Core System</h4><p>The product being documented.</p></div>
+              <div class="box violet"><span class="tag">External</span><h4>Vendors</h4><p>Identity, payment, AI, email, analytics.</p></div>
+              <div class="box amber"><span class="tag">Ops</span><h4>Compliance</h4><p>Audit, monitoring, support, incident response.</p></div>
+            </div>
+          </div>
+          <div class="ring green">
+            <h3>Level 2: Containers</h3>
+            <div class="ring-grid">
+              <div class="box blue"><span class="tag">Client</span><h4>Web App</h4><p>Browser/mobile UI and client-side state.</p></div>
+              <div class="box green"><span class="tag">Service</span><h4>API</h4><p>Request validation, orchestration, business endpoints.</p></div>
+              <div class="box amber"><span class="tag">Async</span><h4>Workers</h4><p>Background jobs, queues, scheduled tasks.</p></div>
+              <div class="box violet"><span class="tag">Data</span><h4>Stores</h4><p>DB, cache, object store, search index, audit store.</p></div>
+            </div>
+          </div>
+          <div class="ring amber">
+            <h3>Level 3: Components</h3>
+            <div class="ring-grid">
+              <div class="box blue"><span class="tag">Boundary</span><h4>Controllers</h4><p>Endpoint handlers and request parsing.</p></div>
+              <div class="box green"><span class="tag">Domain</span><h4>Services</h4><p>Business rules and use-case orchestration.</p></div>
+              <div class="box amber"><span class="tag">Policy</span><h4>Guards</h4><p>Authorization, validation, output filtering.</p></div>
+              <div class="box violet"><span class="tag">Adapters</span><h4>Repositories</h4><p>DB, vendor, cache, and queue adapters.</p></div>
+            </div>
+          </div>
+          <div class="ring violet">
+            <h3>Level 4: Code</h3>
+            <div class="ring-grid">
+              <div class="box blue"><span class="tag">Types</span><h4>Contracts</h4><p>DTOs, domain models, schemas, interfaces.</p></div>
+              <div class="box green"><span class="tag">Logic</span><h4>Functions</h4><p>Pure logic, validators, mappers, state transitions.</p></div>
+              <div class="box amber"><span class="tag">Tests</span><h4>Harness</h4><p>Unit, integration, endpoint, abuse, regression tests.</p></div>
+              <div class="box red"><span class="tag">Risks</span><h4>Footguns</h4><p>Globals, fallbacks, debug flags, broad service accounts.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. Layered Architecture Diagram</h2>
+      <p>Shows which layers are allowed to call which other layers.</p>
+      <div class="diagram">
+        <div class="layer-stack">
+          <div class="layer">
+            <div class="layer-name">Presentation</div>
+            <div class="layer-body"><div class="pill-row"><span class="pill">Web UI</span><span class="pill">Mobile UI</span><span class="pill">CLI</span><span class="pill">Public API clients</span></div></div>
+          </div>
+          <div class="layer">
+            <div class="layer-name">Boundary</div>
+            <div class="layer-body"><div class="pill-row"><span class="pill">Controllers</span><span class="pill">Request schemas</span><span class="pill">Rate limits</span><span class="pill">Canonicalization</span></div></div>
+          </div>
+          <div class="layer">
+            <div class="layer-name">Application</div>
+            <div class="layer-body"><div class="pill-row"><span class="pill">Use cases</span><span class="pill">Transactions</span><span class="pill">State transitions</span><span class="pill">Workflow orchestration</span></div></div>
+          </div>
+          <div class="layer">
+            <div class="layer-name">Domain</div>
+            <div class="layer-body"><div class="pill-row"><span class="pill">Entities</span><span class="pill">Rules</span><span class="pill">Policies</span><span class="pill">Invariants</span></div></div>
+          </div>
+          <div class="layer">
+            <div class="layer-name">Infrastructure</div>
+            <div class="layer-body"><div class="pill-row"><span class="pill">DB</span><span class="pill">Queue</span><span class="pill">Cache</span><span class="pill">Object store</span><span class="pill">Third-party APIs</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="callout">Healthy dependency direction: outer layers depend inward through interfaces; domain rules should not depend on web framework or vendor SDKs.</div>
+    </section>
+
+    <section>
+      <h2>3. Module / Package Dependency Diagram</h2>
+      <p>Shows logical package dependencies and where cycles should not exist.</p>
+      <div class="diagram">
+        <div class="dependency">
+          <div class="box dep-node blue"><span class="tag">Entry</span><h4>api</h4><p>HTTP handlers, request parsing, response shaping.</p></div>
+          <div class="box dep-node green"><span class="tag">Use Case</span><h4>application</h4><p>Workflow orchestration, service calls, transactions.</p></div>
+          <div class="box dep-node violet"><span class="tag">Core</span><h4>domain</h4><p>Entities, rules, invariants, pure decisions.</p></div>
+          <div class="box dep-node amber"><span class="tag">Port</span><h4>interfaces</h4><p>Repository, queue, vendor, and policy interfaces.</p></div>
+          <div class="box dep-node red"><span class="tag">Adapter</span><h4>infrastructure</h4><p>DB, HTTP vendors, cache, queue, filesystem.</p></div>
+        </div>
+      </div>
+      <table class="matrix">
+        <thead><tr><th>Rule</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Domain should not import API or infrastructure.</td><td>Keeps core rules testable and independent.</td></tr>
+          <tr><td>Adapters implement interfaces instead of being called directly everywhere.</td><td>Prevents vendor details from spreading through the codebase.</td></tr>
+          <tr><td>Boundary code should not silently bypass application services.</td><td>Prevents duplicate logic and unaudited shortcuts.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>4. Domain Model Diagram</h2>
+      <p>Shows business concepts, not database tables. This is the “mental model” of the system.</p>
+      <div class="grid-3">
+        <div class="box blue"><span class="tag">Actor</span><h4>Account / User</h4><p>Identity, role, tenant, status, permissions.</p></div>
+        <div class="box green"><span class="tag">Object</span><h4>Resource</h4><p>The thing being viewed, changed, approved, exported, or deleted.</p></div>
+        <div class="box amber"><span class="tag">Policy</span><h4>Permission</h4><p>Action, scope, constraints, expiration, approval status.</p></div>
+        <div class="box violet"><span class="tag">Workflow</span><h4>Job / Request</h4><p>Stateful operation with status, owner, timestamps, and transitions.</p></div>
+        <div class="box blue"><span class="tag">Evidence</span><h4>Event / Audit</h4><p>Decision, reason, actor, resource, time, and safe payload.</p></div>
+        <div class="box red"><span class="tag">Risk</span><h4>Exception / Incident</h4><p>Failure, denial, override, escalation, or investigation record.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>5. Data Store / ERD Structure</h2>
+      <p>Shows table groups, ownership, and relationships at a review level.</p>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Data Group</th>
+            <th>Example Tables</th>
+            <th>Owner</th>
+            <th>Classification</th>
+            <th>Structural Concerns</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Identity</td><td>users, roles, sessions, service_accounts</td><td>Identity team</td><td>Restricted</td><td>Uniqueness, revocation, tenant isolation.</td></tr>
+          <tr><td>Business Records</td><td>orders, cases, projects, documents</td><td>Product domain</td><td>Sensitive</td><td>Ownership, lifecycle, state transitions.</td></tr>
+          <tr><td>Workflow</td><td>jobs, approvals, tasks, locks</td><td>Application team</td><td>Internal</td><td>Idempotency, retries, expiration, single-claim.</td></tr>
+          <tr><td>Audit</td><td>audit_events, access_logs, policy_decisions</td><td>Security/compliance</td><td>Restricted</td><td>Append-only, safe payload, retention, tamper evidence.</td></tr>
+          <tr><td>Operational</td><td>feature_flags, configs, migrations</td><td>Platform</td><td>Internal</td><td>Change control, rollback, environment drift.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>6. API Surface Structure</h2>
+      <p>Shows endpoint families and the type of controls each family needs.</p>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Endpoint Family</th>
+            <th>Purpose</th>
+            <th>Controls</th>
+            <th>Typical Risk</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Read APIs</td><td>Retrieve records and summaries.</td><td>Auth, scope, output filtering, pagination, audit.</td><td>Data leakage, enumeration, overbroad reads.</td></tr>
+          <tr><td>Write APIs</td><td>Create or update business records.</td><td>Schema, ownership, state transition checks, idempotency.</td><td>Client-created truth, duplicate side effects.</td></tr>
+          <tr><td>Admin APIs</td><td>Configuration, reset, user management.</td><td>Strong auth, step-up, approval, audit, rate limits.</td><td>Privilege abuse, destructive changes.</td></tr>
+          <tr><td>Ingestion APIs</td><td>Accept external files, webhooks, messages.</td><td>Size/type caps, canonicalization, malware/content checks, quarantine.</td><td>Injection, poisoned data, unsafe persistence.</td></tr>
+          <tr><td>Export APIs</td><td>Generate downloadable data.</td><td>Explicit grant, review, throttling, watermarking, audit.</td><td>Bulk exfiltration.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>7. Infrastructure Topology Structure</h2>
+      <p>Shows public, private, and restricted infrastructure zones.</p>
+      <div class="grid-3">
+        <div class="box blue"><span class="tag">Public</span><h4>Edge Zone</h4><p>DNS, CDN, WAF, load balancer, public API ingress.</p></div>
+        <div class="box amber"><span class="tag">Private</span><h4>App Zone</h4><p>API services, workers, queue consumers, internal APIs.</p></div>
+        <div class="box green"><span class="tag">Restricted</span><h4>Data Zone</h4><p>Databases, KMS, object stores, backups, audit stores.</p></div>
+      </div>
+      <div class="callout">The structural question: what can directly talk to what, and what network/security control sits between them?</div>
+    </section>
+
+    <section>
+      <h2>8. Repository / Folder Structure Diagram</h2>
+      <p>Shows how code is organized so contributors know where responsibilities live.</p>
+      <div class="diagram">
+        <div class="tree">repo/
+  apps/
+    web/                  UI application
+    api/                  API service
+    worker/               background workers
+  packages/
+    domain/               pure domain rules and types
+    policy/               authorization and validation policies
+    shared-ui/            reusable UI components
+    clients/              typed API/vendor clients
+  infra/
+    terraform/            cloud infrastructure
+    docker/               runtime images and compose files
+  tests/
+    unit/                 pure logic tests
+    integration/          service and DB tests
+    e2e/                  user workflow tests
+    security/             abuse and boundary tests
+  docs/
+    architecture/         diagrams and ADRs
+    runbooks/             operational procedures
+    threat-models/        risk and mitigation documents</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>9. Ownership Structure</h2>
+      <p>Shows who owns each structural area. This is how pros prevent orphaned controls.</p>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Area</th>
+            <th>Primary Owner</th>
+            <th>Reviewers</th>
+            <th>Artifacts</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Identity and access</td><td>Security/platform</td><td>Compliance, application owner</td><td>Auth matrix, access logs, review records.</td></tr>
+          <tr><td>Core domain</td><td>Product engineering</td><td>QA, domain experts</td><td>Domain model, state machines, invariant tests.</td></tr>
+          <tr><td>Data stores</td><td>Data/platform</td><td>Security, privacy</td><td>ERD, retention map, backup policy.</td></tr>
+          <tr><td>Infrastructure</td><td>Platform/SRE</td><td>Security</td><td>Deployment diagram, IaC, monitoring runbooks.</td></tr>
+          <tr><td>Audit and incident response</td><td>Security/compliance</td><td>SRE, legal, product owner</td><td>Audit map, SIEM alerts, incident runbooks.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>10. Structural Review Checklist</h2>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Question</th>
+            <th>Why It Matters</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Can every component name its owner?</td><td>Controls decay when nobody owns them.</td></tr>
+          <tr><td>Are trust boundaries visible?</td><td>Validation and auth must sit at crossings.</td></tr>
+          <tr><td>Are dependency directions intentional?</td><td>Prevents core rules from depending on fragile outer layers.</td></tr>
+          <tr><td>Are sensitive data stores classified?</td><td>Enables encryption, retention, access review, and audit.</td></tr>
+          <tr><td>Are admin paths structurally isolated?</td><td>Reduces accidental exposure and privilege confusion.</td></tr>
+          <tr><td>Are tests organized by boundary and invariant?</td><td>Makes structural assumptions verifiable.</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

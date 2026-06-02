@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Health Data Agent Codebase Workflow</title>
+  <style>
+    :root {
+      --bg: #f6f8fc;
+      --ink: #172033;
+      --muted: #647286;
+      --panel: #ffffff;
+      --line: #d8e1ef;
+      --blue: #2d6fb8;
+      --green: #2f8068;
+      --amber: #c57a12;
+      --red: #bd4747;
+      --purple: #6c5ccd;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(45, 111, 184, 0.12), transparent 30rem),
+        radial-gradient(circle at 90% 100%, rgba(47, 128, 104, 0.12), transparent 34rem),
+        var(--bg);
+    }
+
+    main {
+      width: min(1320px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 34px 0 50px;
+    }
+
+    header {
+      margin-bottom: 22px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--blue);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.9rem, 3vw, 3.1rem);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    header p {
+      max-width: 920px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.65;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .chips span {
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.78);
+      color: #3c4a5f;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .diagram-shell {
+      border: 1px solid rgba(139, 164, 194, 0.34);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: 0 18px 42px rgba(23, 32, 51, 0.10);
+      overflow: auto;
+    }
+
+    .mermaid {
+      min-width: 760px;
+      min-height: 1480px;
+      padding: 34px 28px;
+      font-size: 18px;
+    }
+
+    .note {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border: 1px solid rgba(139, 164, 194, 0.30);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.76);
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+
+    noscript {
+      display: block;
+      padding: 20px;
+      color: var(--red);
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Standalone Mermaid.js documentation artifact</p>
+      <h1>Health Data Agent Codebase Workflow</h1>
+      <p>
+        A Mermaid.js flowchart for the actual repo workflow: HL7 processing from the browser into FastAPI,
+        validation and optional AI enrichment, parse-session based persistence, dashboard reads, and the
+        Warden-governed natural-language query path.
+      </p>
+      <div class="chips" aria-label="Source files referenced by the diagram">
+        <span>web/script.js</span>
+        <span>web/dashboard.js</span>
+        <span>app/api.py</span>
+        <span>app/agent.py</span>
+        <span>app/db.py</span>
+        <span>app/warden.py</span>
+        <span>app/healthcare_agent.py</span>
+      </div>
+    </header>
+
+    <section class="diagram-shell" aria-label="Health Data Agent codebase Mermaid flowchart">
+      <pre class="mermaid">
+flowchart TD
+  subgraph UI["Browser UI"]
+    process(["Process Data UI<br/><small>web/process-data.html<br/>web/script.js</small>"])
+    chat(["Dashboard Chat<br/><small>web/dashboard.html<br/>web/dashboard.js</small>"])
+    dashboard(["Dashboard records<br/><small>message list, detail, observations, alerts</small>"])
+  end
+
+  subgraph ParseAPI["HL7 Parse + Save Path"]
+    parse["POST /oru/parse<br/><small>app/api.py</small>"]
+    guard{"HL7 guard<br/>passes?"}
+    guardDeny["400 Invalid HL7<br/><small>governance DENY</small>"]
+    msh{"MSH-9 is<br/>ORU?"}
+    mshDeny["400 Non-ORU<br/><small>stop before pipeline</small>"]
+    pipeline["run_oru_pipeline<br/><small>app/agent.py</small>"]
+    enrich{"AI enrichment<br/>requested + needed?"}
+    hl7Only["HL7-only result<br/><small>observations + FHIR + ACK</small>"]
+    aiMerge["LLM note extraction<br/><small>merge AI observations</small>"]
+    preview["Preview response<br/><small>parse_id + temporary session</small>"]
+    save{"Confirm save +<br/>parse_id valid?"}
+    saveDeny["Deny save<br/><small>expired, reused, or mismatched parse session</small>"]
+    db[("SQLite storage<br/><small>hl7_messages<br/>observations<br/>parse sessions</small>")]
+  end
+
+  subgraph QueryPath["Warden-Governed Query Path"]
+    query["POST /api/query<br/><small>app/api.py</small>"]
+    injection{"Prompt injection<br/>detected?"}
+    queryDeny["Governed denial<br/><small>no agent run</small>"]
+    grant["Resolve references<br/>classify intent<br/>build IntentGrant"]
+    scope{"Warden request<br/>scope allowed?"}
+    scopeDeny["Deny or clarify<br/><small>bounded scope required</small>"]
+    plan["Tokenize PHI + plan tools<br/><small>app/warden.py<br/>app/healthcare_agent.py</small>"]
+    policy{"Tool call policy<br/>allows it?"}
+    policyDeny["Warden DENY<br/><small>schema, SQL, table, or command-token block</small>"]
+    tools["Execute selected tools<br/><small>query DB, search guidelines,<br/>patient context, calculators</small>"]
+    synth["Synthesize answer<br/><small>restore authorized tokens only</small>"]
+    answer(["QueryResponse<br/><small>answer, highlights, trace, tools, sources</small>"])
+  end
+
+  process --> parse
+  parse --> guard
+  guard -- No --> guardDeny
+  guard -- Yes --> msh
+  msh -- No --> mshDeny
+  msh -- Yes --> pipeline
+  pipeline --> enrich
+  enrich -- No --> hl7Only
+  enrich -- Yes --> aiMerge
+  hl7Only --> preview
+  aiMerge --> preview
+  preview --> save
+  save -- No --> saveDeny
+  save -- Yes --> db
+  db --> dashboard
+
+  chat --> query
+  query --> injection
+  injection -- Yes --> queryDeny
+  injection -- No --> grant
+  grant --> scope
+  scope -- No --> scopeDeny
+  scope -- Yes --> plan
+  plan --> policy
+  policy -- No --> policyDeny
+  policy -- Yes --> tools
+  db -. "read patient + observation data" .-> tools
+  tools --> synth
+  synth --> answer
+  answer --> chat
+
+  process ~~~ chat
+
+  classDef ui fill:#e8f2ff,stroke:#2d6fb8,stroke-width:2px,color:#172033;
+  classDef api fill:#eef8f4,stroke:#2f8068,stroke-width:2px,color:#172033;
+  classDef decision fill:#fff2d8,stroke:#c57a12,stroke-width:2px,color:#172033;
+  classDef deny fill:#fff0f0,stroke:#bd4747,stroke-width:2px,color:#172033;
+  classDef data fill:#f0edff,stroke:#6c5ccd,stroke-width:2px,color:#172033;
+
+  class process,chat,dashboard,answer ui;
+  class parse,pipeline,aiMerge,query,grant,plan,tools,synth api;
+  class guard,msh,enrich,save,injection,scope,policy decision;
+  class guardDeny,mshDeny,saveDeny,queryDeny,scopeDeny,policyDeny deny;
+  class preview,hl7Only,db data;
+      </pre>
+      <noscript>Enable JavaScript to render the Mermaid diagram.</noscript>
+    </section>
+
+    <p class="note">
+      This file is documentation only. It is not linked into the running app and does not modify
+      application HTML, CSS, JavaScript, Python, routes, or database behavior. Mermaid.js is loaded
+      from a CDN to render the diagram in the browser.
+    </p>
+  </main>
+
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+
+    mermaid.initialize({
+      startOnLoad: true,
+      securityLevel: "loose",
+      htmlLabels: true,
+      theme: "base",
+      flowchart: {
+        curve: "basis",
+        nodeSpacing: 74,
+        rankSpacing: 92,
+        padding: 24
+      },
+      themeVariables: {
+        fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+        fontSize: "18px",
+        primaryTextColor: "#172033",
+        lineColor: "#8ba4c2",
+        clusterBkg: "#ffffff",
+        clusterBorder: "#d8e1ef",
+        edgeLabelBackground: "#ffffff"
+      }
+    });
+  </script>
+</body>
+</html>
