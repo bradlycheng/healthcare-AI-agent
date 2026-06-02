@@ -379,6 +379,13 @@ def retrieve_context(question: str) -> tuple[str, List[Dict[str, Any]]]:
     """
     Search vector store for relevant medical context.
     Returns (context_text, sources_list).
+
+    IMPORTANT: The question parameter must be pre-tokenized (Warden-anonymized) when
+    called from a Warden-active context.  Raw PHI in the question will be forwarded to
+    embed_text() and then to Bedrock Titan for embedding -- bypassing the Warden IN-GATE.
+    See healthcare_agent.py (_tool_query_database, _tool_search_guidelines, and the direct-
+    answer path in _run_standard) for the correct call pattern using safe_question /
+    _safe_rag_query.
     """
     if not RAG_ENABLED:
         return "", []
@@ -639,6 +646,12 @@ def process_query(question: str, history: List[Dict[str, str]] = []) -> Dict[str
         }
     
     # Step 4: Retrieve RAG context
+    # DEFERRED (Slice 3): process_query() is a legacy function with no Warden scope.
+    # retrieve_context() is called here with the raw question, which means any patient
+    # name in the question is sent to Bedrock Titan for embedding without tokenization.
+    # Fixing this requires adding a Warden request_scope to process_query(), which is a
+    # larger refactor deferred to a future hardening slice.  The primary clinical query
+    # path in healthcare_agent.py (HealthcareAgent._run_standard) is already fixed.
     context_text, sources = retrieve_context(question)
     
     # Step 5: Format response with context

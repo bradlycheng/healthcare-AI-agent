@@ -5,6 +5,34 @@ Add new entries at the top (most recent first).
 
 ---
 
+---
+Date: 2026-06-02
+Agent: security-reviewer (Slice 3)
+Model: opus
+Tools allowed: Read, Grep, Glob
+Assignment: Final security review of Slice 3 -- RAG query tokenization
+Files inspected: app/healthcare_agent.py (lines 346-539, 750-848), app/query_assistant.py, tests/test_rag_query_tokenization.py, docs/agent-reports/baseline-audit/30-worker-slice3-rag-query-tokenization.md
+Files changed: none (read-only)
+Summary: Primary PHI-to-Bedrock leakage risk on HealthcareAgent._run_standard fully closed at all three active call sites. One warning (W-1): fallback in _tool_query_database line 809 uses post-mutation query (subject-appended) if _safe_rag_query absent -- fixed in lead session by capturing _pre_mutation_query before subject append. No critical findings.
+Residual risks: W-1 fallback fixed by lead session; process_query() legacy RAG path deferred (no Warden scope); RAG document PHI scanning pre-existing warning
+Tests run: none (read-only); confirmed 171/171 pass from worker report
+Report: docs/agent-reports/baseline-audit/31-reviewer-slice3-security-pass.md
+---
+
+---
+Date: 2026-06-02
+Agent: narrow-worker (Slice 3)
+Model: claude-sonnet-4-6
+Tools allowed: Read, Grep, Glob, Edit, Write, Bash
+Assignment: Fix RAG query tokenization -- ensure retrieve_context() is called with Warden-tokenized query at Sites 1, 2, 3 in healthcare_agent.py; add docstring and deferred comment at Site 4 in query_assistant.py; add 8 tests
+Files inspected: app/healthcare_agent.py, app/query_assistant.py, app/warden.py, app/sql_guard.py, app/grant_builder.py, app/security_validation.py, app/token_guard.py, docs/agent-reports/baseline-audit/00-lead-hardening-plan.md, docs/agent-reports/prompt-ledger.md, tests/test_hl7_note_extraction_warden.py
+Files changed: app/healthcare_agent.py, app/query_assistant.py, tests/test_rag_query_tokenization.py (new), docs/agent-reports/baseline-audit/30-worker-slice3-rag-query-tokenization.md (new), docs/agent-reports/prompt-ledger.md
+Summary: Three call sites in healthcare_agent.py fixed: (1) direct-answer path now uses safe_question instead of question for retrieve_context(); (2) _tool_query_database now uses _safe_rag_query (pre-deanonymization tokenized query) for the RAG call; (3) _tool_search_guidelines same fix. Private keys _safe_rag_query and _warden_ctx are threaded into real_tool_input after the Warden schema check so they do not trigger TOOL_SCHEMAS validation. Context_text is deanonymized in both tool functions before inclusion in the result dict (then re-tokenized by anonymize_json before synthesis -- correct behavior). Site 4 (process_query() in query_assistant.py) deferred with documented comment; this legacy path has no Warden scope and fixing it requires a larger refactor. retrieve_context() docstring updated with IMPORTANT note about pre-tokenization requirement. 8 new tests pass; 171/171 total tests pass; 0 regressions.
+Residual risks: process_query() RAG embedding deferred (legacy path, no Warden scope); RAG document PHI scanning not implemented (separate risk); anonymize_json re-tokenizes deanonymized context before synthesis (correct by design)
+Tests run: 8 new (8/8 pass), 163 regression (163/163 pass)
+Report: docs/agent-reports/baseline-audit/30-worker-slice3-rag-query-tokenization.md
+---
+
 ## Entry Template
 
 ```

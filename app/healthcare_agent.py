@@ -370,8 +370,10 @@ class HealthcareAgent:
                 # Check for direct answer (no tools needed)
                 if plan.get("direct_answer"):
                     # Still retrieve RAG context so sources appear for knowledge questions
+                    # IN-GATE: use the Warden-tokenized question so no raw PHI is sent
+                    # to Bedrock Titan for embedding (Slice 3 fix -- Site 1).
                     from .query_assistant import retrieve_context
-                    _, direct_sources = retrieve_context(question)
+                    _, direct_sources = retrieve_context(safe_question)
                     return AgentResponse(
                         answer=plan["direct_answer"],
                         success=True,
@@ -444,6 +446,16 @@ class HealthcareAgent:
                             real_tool_input[k] = warden_ctx.deanonymize(v)
                         else:
                             real_tool_input[k] = v
+
+                    # Slice 3 -- RAG Query Tokenization: thread the pre-tokenized
+                    # query and Warden context into real_tool_input under private keys
+                    # so tool functions can pass safe text to retrieve_context()
+                    # (which calls embed_text() / Bedrock Titan) instead of raw PHI.
+                    # These keys are added AFTER the Warden schema check so they do
+                    # not trigger the strict schema validator.
+                    if "query" in tool_input:
+                        real_tool_input["_safe_rag_query"] = tool_input["query"]
+                    real_tool_input["_warden_ctx"] = warden_ctx
                     
                     start_time = time.time()
                     try:
@@ -752,10 +764,15 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         query = input_data.get("query", "")
         if not query:
             return {"error": "No query provided", "results": [], "row_count": 0}
-        
+
         # Sanitize query input
         query = sanitize_text(query)
-        
+
+        # Capture pre-mutation query for RAG fallback (W-1 fix): query is mutated below
+        # when grant.subject is appended; the fallback must use the pre-mutation string
+        # to avoid sending a PHI-enriched subject-appended query to Bedrock Titan.
+        _pre_mutation_query = query
+
         # Generate SQL
         if grant and grant.subject:
             query = f"{query} for patient {grant.subject}"
@@ -770,7 +787,7 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
                     "row_count": 0
                 }
             return {"error": error, "results": [], "row_count": 0, "sql": ""}
-        
+
         # Validate SQL
         base_grant = grant or build_query_grant(
             session_id="agent_internal",
@@ -784,15 +801,26 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
         if not guard_result.allowed:
             return {"error": f"Invalid SQL: {guard_result.reason}", "results": [], "row_count": 0}
         sql = guard_result.sql
-        
+
         # Execute query
         results, exec_error = execute_safe_query(sql, sql_grant)
         if exec_error:
             return {"error": exec_error, "results": [], "row_count": 0, "sql": sql}
-        
-        # Also retrieve RAG context for source attribution
-        context_text, sources = retrieve_context(query)
-        
+
+        # Also retrieve RAG context for source attribution.
+        # Slice 3 fix (Site 2): use the Warden-tokenized query for embedding so that
+        # raw patient names are not sent to Bedrock Titan in cleartext.
+        # _safe_rag_query is threaded in by the dispatch loop before deanonymization.
+        # Fallback uses _pre_mutation_query (not the subject-appended `query`) so that
+        # the fallback path does not amplify PHI with grant.subject.
+        safe_rag_query = input_data.get("_safe_rag_query") or _pre_mutation_query
+        context_text, sources = retrieve_context(safe_rag_query)
+
+        # OUT-GATE: deanonymize any PHI tokens that may appear in retrieved context.
+        warden_ctx = input_data.get("_warden_ctx")
+        if warden_ctx is not None and context_text:
+            context_text = warden_ctx.deanonymize(context_text)
+
         return {
             "results": results[:50],  # Limit results
             "row_count": len(results),
@@ -805,13 +833,22 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
     def _tool_search_guidelines(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Search medical guidelines using RAG."""
         from .query_assistant import retrieve_context
-        
+
         query = input_data.get("query", "")
         if not query:
             return {"context": "", "sources": []}
-        
-        context_text, sources = retrieve_context(query)
-        
+
+        # Slice 3 fix (Site 3): use the Warden-tokenized query for embedding so that
+        # raw patient names are not sent to Bedrock Titan in cleartext.
+        # _safe_rag_query is threaded in by the dispatch loop before deanonymization.
+        safe_rag_query = input_data.get("_safe_rag_query") or query
+        context_text, sources = retrieve_context(safe_rag_query)
+
+        # OUT-GATE: deanonymize any PHI tokens that may appear in retrieved context.
+        warden_ctx = input_data.get("_warden_ctx")
+        if warden_ctx is not None and context_text:
+            context_text = warden_ctx.deanonymize(context_text)
+
         return {
             "context": context_text,
             "sources": sources
