@@ -119,3 +119,14 @@ Primary PHI-to-Bedrock leakage risk on HealthcareAgent._run_standard is fully cl
 at all three active call sites. W-1 fallback does not regress the pre-Slice-3 state
 for any in-scope call path and is acceptable as a tracked deferral. 8/8 new tests
 pass; 171/171 total tests pass; 0 regressions.
+
+---
+
+## Post-Review Addendum
+
+**W-1 fixed before commit.** The lead session applied the recommended fix inline:
+`_pre_mutation_query = query` is now captured before the `grant.subject` append at
+line 773 of `app/healthcare_agent.py`. The fallback at the RAG call site uses
+`_pre_mutation_query` (not the subject-appended `query`), so the fallback path no
+longer amplifies PHI with `grant.subject`. W-1 is resolved; no fallback PHI risk
+remains in the committed code. The fix is included in commit `24c9171`.
