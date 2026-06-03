@@ -15,7 +15,7 @@ It does not implement code itself. It orchestrates the existing subagents.
 
 ---
 
-## Step 1 — Read the plan
+## Step 1 -- Read the plan
 
 Read docs/agent-reports/baseline-audit/00-lead-hardening-plan.md.
 
@@ -24,7 +24,7 @@ Find that slice's section in the plan.
 
 ---
 
-## Step 2 — Confirm scope before dispatching
+## Step 2 -- Confirm scope before dispatching
 
 Before dispatching the narrow-worker, confirm with the user:
 
@@ -38,7 +38,7 @@ Do not proceed to Step 3 until the user confirms scope.
 
 ---
 
-## Step 3 — Dispatch narrow-worker
+## Step 3 -- Dispatch narrow-worker
 
 Use the narrow-worker subagent. Pass:
 - The exact file ownership list (confirmed in Step 2)
@@ -54,12 +54,12 @@ Wait for the worker to return. Do not proceed until the worker reports test resu
 
 ---
 
-## Step 4 — Verify worker output
+## Step 4 -- Verify worker output
 
 After the worker returns, check:
 
 - [ ] All specified tests pass
-- [ ] No regression in the full test suite
+- [ ] No regression in the slice-specific and relevant regression tests named in the plan; run full suite when feasible
 - [ ] Worker report written to docs/agent-reports/baseline-audit/
 - [ ] Prompt-ledger entry written and prepended to docs/agent-reports/prompt-ledger.md
 - [ ] Any deferred items documented with clear rationale
@@ -68,7 +68,7 @@ If any check fails, tell the user and do not proceed to the reviewer.
 
 ---
 
-## Step 5 — Require reviewer gate
+## Step 5 -- Require reviewer gate
 
 Dispatch the security-reviewer subagent (read-only: Read, Grep, Glob; model: opus).
 
@@ -86,7 +86,7 @@ Do not declare the slice done until the reviewer returns MERGEABLE.
 
 ---
 
-## Step 6 — Handle NOT MERGEABLE
+## Step 6 -- Handle NOT MERGEABLE
 
 If the reviewer returns NOT MERGEABLE:
 - List the blocking findings (Critical items only)
