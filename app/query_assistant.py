@@ -8,10 +8,13 @@ Supports RAG (Retrieval-Augmented Generation) with medical guidelines.
 """
 
 import json
+import logging
 import os
 import re
 import sqlite3
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from .llm_client import call_llm_for_json, LLMError
 from .security import sanitize_text
@@ -233,10 +236,14 @@ def sanitize_input(text: str) -> tuple[str, list[str]]:
 # ---------------------------------------------------------------------------
 
 FORBIDDEN_KEYWORDS = [
-    'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 
+    'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE',
     'TRUNCATE', 'REPLACE', 'GRANT', 'REVOKE', 'EXEC', 'EXECUTE',
-    'ATTACH', 'DETACH', 'PRAGMA', 'VACUUM'
+    'ATTACH', 'DETACH', 'PRAGMA', 'VACUUM', 'ANALYZE', 'EXPLAIN',
+    'UNION', 'CROSS JOIN',
 ]
+
+# Maximum rows returned by any query
+QUERY_ROW_CAP = 1000
 
 
 def validate_sql(sql: str) -> tuple[bool, str]:
@@ -246,19 +253,24 @@ def validate_sql(sql: str) -> tuple[bool, str]:
     """
     if not sql or not sql.strip():
         return False, "Empty query"
-    
+
+    # Normalize once — all checks are case-insensitive via .upper()
     normalized = sql.upper().strip()
-    
+
     # Must start with SELECT
     if not normalized.startswith('SELECT'):
         return False, "Only SELECT queries are allowed"
-    
-    # Check for forbidden keywords
+
+    # Check for forbidden keywords (case-insensitive via normalized)
     for keyword in FORBIDDEN_KEYWORDS:
-        # Use word boundary matching to avoid false positives
-        if re.search(rf'\b{keyword}\b', normalized):
-            return False, f"Forbidden keyword: {keyword}"
-    
+        # CROSS JOIN contains a space — use plain substring search with word boundaries
+        if ' ' in keyword:
+            if keyword in normalized:
+                return False, f"Forbidden keyword: {keyword}"
+        else:
+            if re.search(rf'\b{re.escape(keyword)}\b', normalized):
+                return False, f"Forbidden keyword: {keyword}"
+
     # Check for multiple statements (;)
     # Allow ; only at the very end
     semicolon_count = sql.count(';')
@@ -266,11 +278,11 @@ def validate_sql(sql: str) -> tuple[bool, str]:
         return False, "Multiple statements not allowed"
     if semicolon_count == 1 and not sql.strip().endswith(';'):
         return False, "Semicolon only allowed at end of query"
-    
+
     # Check for comments that might hide malicious code
     if '--' in sql or '/*' in sql:
         return False, "SQL comments not allowed"
-    
+
     return True, ""
 
 
@@ -289,18 +301,27 @@ def execute_safe_query(sql: str) -> tuple[List[Dict[str, Any]], Optional[str]]:
     
     try:
         # Open connection in read-only mode where possible
-        conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+        try:
+            conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+        except sqlite3.OperationalError as ro_err:
+            logger.warning(
+                "execute_safe_query: read-only connection failed (%s); "
+                "query will not be retried in read-write mode.",
+                ro_err,
+            )
+            return [], f"Database error: {str(ro_err)}"
+
         conn.row_factory = sqlite3.Row
-        
+
         cursor = conn.execute(sql)
-        rows = cursor.fetchall()
-        
-        # Convert to list of dicts
+        rows = cursor.fetchmany(QUERY_ROW_CAP)
+
+        # Convert to list of dicts (already capped at QUERY_ROW_CAP)
         results = [dict(row) for row in rows]
-        
+
         conn.close()
         return results, None
-        
+
     except sqlite3.Error as e:
         return [], f"Database error: {str(e)}"
     except Exception as e:

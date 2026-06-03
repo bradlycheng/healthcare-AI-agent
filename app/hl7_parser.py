@@ -1,9 +1,14 @@
 # app/hl7_parser.py
 
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from hl7apy.parser import parse_message
 from hl7apy.core import Message
+
+logger = logging.getLogger(__name__)
+
+_MAX_OBX_COUNT = 500
 
 
 def _normalize_hl7_text(hl7_text: str) -> str:
@@ -104,13 +109,28 @@ def _parse_patient(msg: Message) -> Dict[str, Any]:
             break
 
     if pid is None:
-        return patient
+        raise ValueError("HL7 message is missing required PID segment.")
+
+    # Validate PID-3 (patient identifier) is present and non-empty
+    patient_id_found = False
+    try:
+        pid_3 = pid.pid_3
+        if pid_3 and len(pid_3) > 0:
+            raw_id = _safe_value(pid_3[0]).strip()
+            if raw_id:
+                patient_id_found = True
+    except Exception:
+        pass
+
+    if not patient_id_found:
+        raise ValueError("HL7 PID segment is missing patient ID (PID-3).")
 
     try:
         pid_3 = pid.pid_3
         if pid_3 and len(pid_3) > 0:
-            cx = pid_3[0]
-            patient["id"] = _safe_value(cx)
+            raw_id = _safe_value(pid_3[0]).strip()
+            if raw_id:
+                patient["id"] = raw_id
     except Exception:
         pass
 
@@ -176,6 +196,19 @@ def _parse_value(value_raw: str) -> Any:
 
 def _parse_observations(msg: Message) -> List[Dict[str, Any]]:
     observations: List[Dict[str, Any]] = []
+
+    # Count OBX segments before processing to enforce the limit
+    obx_count = sum(1 for child in msg.children if child.name == "OBX")
+    if obx_count > _MAX_OBX_COUNT:
+        logger.warning(
+            "OBX segment count %d exceeds maximum allowed %d; rejecting message.",
+            obx_count,
+            _MAX_OBX_COUNT,
+        )
+        raise ValueError(
+            f"HL7 message contains {obx_count} OBX segments, which exceeds the "
+            f"maximum allowed limit of {_MAX_OBX_COUNT}."
+        )
 
     for child in msg.children:
         if child.name == "NTE":
@@ -248,6 +281,19 @@ def _parse_observations(msg: Message) -> List[Dict[str, Any]]:
                 value_raw = _safe_value(comp)
         except Exception:
             pass
+
+        # OBX-2 NM type mismatch: if declared numeric but value is not convertible to float, skip
+        if value_type == "NM" and value_raw.strip():
+            try:
+                float(value_raw.strip())
+            except (ValueError, TypeError):
+                logger.warning(
+                    "OBX value type mismatch: OBX-2 declares NM (numeric) but value %r "
+                    "cannot be converted to float for code %r; skipping observation.",
+                    value_raw,
+                    code,
+                )
+                continue
 
         value_parsed = _parse_value(value_raw)
 

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import threading
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Tuple, Optional
 
 import os
+
+logger = logging.getLogger(__name__)
 
 DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
 
@@ -128,7 +131,18 @@ def init_db(db_path: str = DB_PATH) -> None:
             );
             """
         )
-        
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS deletion_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                message_id INTEGER,
+                patient_id TEXT,
+                deleted_at TEXT
+            );
+            """
+        )
+
         # Migration for existing tables
         try:
             conn.execute("ALTER TABLE observations ADD COLUMN alert_level VARCHAR")
@@ -167,15 +181,35 @@ def prune_messages(days_to_keep: int = 2, db_path: str = DB_PATH) -> int:
         if not rows:
             return 0
         
-        ids_to_delete = [str(r[0]) for r in rows]
-        id_list_str = ",".join(ids_to_delete)
-        
+        ids_to_delete = [r[0] for r in rows]
+
         # 2. Delete observations (if cascading delete isn't enabled)
-        if id_list_str:
-             cur.execute(f"DELETE FROM observations WHERE message_id IN ({id_list_str})")
-             # 3. Delete messages
-             cur.execute(f"DELETE FROM hl7_messages WHERE id IN ({id_list_str})")
-        
+        if ids_to_delete:
+            placeholders = ",".join("?" * len(ids_to_delete))
+
+            # --- DELETION AUDIT: record each message before cascading delete ---
+            deleted_at = datetime.utcnow().isoformat(sep=" ", timespec="microseconds")
+            audit_rows = cur.execute(
+                "SELECT id, patient_id FROM hl7_messages WHERE id IN (" + placeholders + ")",
+                tuple(ids_to_delete),
+            ).fetchall()
+            for ar in audit_rows:
+                cur.execute(
+                    "INSERT INTO deletion_audit (message_id, patient_id, deleted_at) VALUES (?, ?, ?)",
+                    (ar[0], ar[1], deleted_at),
+                )
+            # -------------------------------------------------------------------
+
+            cur.execute(
+                "DELETE FROM observations WHERE message_id IN (" + placeholders + ")",
+                tuple(ids_to_delete),
+            )
+            # 3. Delete messages
+            cur.execute(
+                "DELETE FROM hl7_messages WHERE id IN (" + placeholders + ")",
+                tuple(ids_to_delete),
+            )
+
         conn.commit()
         return len(ids_to_delete)
     finally:
@@ -190,6 +224,17 @@ def delete_all_messages(db_path: str = DB_PATH) -> None:
     print(f"DEBUG: Attempting to delete all messages from {db_path}...", flush=True)
     try:
         cur = conn.cursor()
+
+        # --- DELETION AUDIT: record all messages before cascading delete ---
+        deleted_at = datetime.utcnow().isoformat(sep=" ", timespec="microseconds")
+        audit_rows = cur.execute("SELECT id, patient_id FROM hl7_messages").fetchall()
+        for ar in audit_rows:
+            cur.execute(
+                "INSERT INTO deletion_audit (message_id, patient_id, deleted_at) VALUES (?, ?, ?)",
+                (ar[0], ar[1], deleted_at),
+            )
+        # -------------------------------------------------------------------
+
         cur.execute("DELETE FROM observations")
         print(f"DEBUG: Deleted {cur.rowcount} observations", flush=True)
         cur.execute("DELETE FROM hl7_messages")
@@ -280,21 +325,38 @@ def insert_message_and_observations(
         dob = str(patient.get("dob") or "")
         sex = str(patient.get("sex") or "")
 
+        # --- PATIENT FIELD LENGTH ENFORCEMENT ---
+        if len(first) > 100:
+            logger.warning("patient first_name truncated from %d to 100 chars", len(first))
+            first = first[:100]
+        if len(last) > 100:
+            logger.warning("patient last_name truncated from %d to 100 chars", len(last))
+            last = last[:100]
+        if len(pid) > 50:
+            logger.warning("patient_id truncated from %d to 50 chars", len(pid))
+            pid = pid[:50]
+        if len(dob) > 10:
+            logger.warning("patient dob truncated from %d to 10 chars", len(dob))
+            dob = dob[:10]
+        # ----------------------------------------
+
         bundle_json = json.dumps(fhir_bundle)
 
         cur = conn.cursor()
 
-        # --- STORAGE LIMIT ENFORCEMENT ---
-        # Stop saving and raise error if 1300 records reached
-        # (Max seed ~1200 + 100 user buffer)
+        # --- STORAGE LIMIT ENFORCEMENT (BEGIN IMMEDIATE prevents TOCTOU race) ---
+        cur.execute("BEGIN IMMEDIATE")
         try:
             count = cur.execute("SELECT COUNT(*) FROM hl7_messages").fetchone()[0]
             if count >= 1300:
-                 raise ValueError("Demo database storage limit reached (1300 messages). Please Reset Demo.")
+                conn.rollback()
+                raise ValueError("Demo database storage limit reached (1300 messages). Please Reset Demo.")
         except ValueError:
             raise
         except Exception as e:
+            conn.rollback()
             print(f"Error checking storage limit: {e}")
+            raise
         # --------------------------------
 
         cur.execute(

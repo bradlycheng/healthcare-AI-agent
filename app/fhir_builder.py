@@ -7,6 +7,7 @@ def hl7_ts_to_iso(ts: str) -> str:
     """
     Convert a basic HL7 TS (e.g. '20250122090000') to ISO 8601.
     If we can't confidently parse it, just return the original string.
+    Raises ValueError if calendar components are out of range.
     """
     if not ts:
         return ""
@@ -21,6 +22,29 @@ def hl7_ts_to_iso(ts: str) -> str:
         minute = ts[10:12]
         second = ts[12:14]
         rest = ts[14:]
+
+        month_i = int(month)
+        day_i = int(day)
+        hour_i = int(hour)
+        minute_i = int(minute)
+
+        if not (1 <= month_i <= 12):
+            raise ValueError(
+                f"Invalid HL7 timestamp {ts!r}: month {month_i} is out of range 01-12."
+            )
+        if not (1 <= day_i <= 31):
+            raise ValueError(
+                f"Invalid HL7 timestamp {ts!r}: day {day_i} is out of range 01-31."
+            )
+        if not (0 <= hour_i <= 23):
+            raise ValueError(
+                f"Invalid HL7 timestamp {ts!r}: hour {hour_i} is out of range 00-23."
+            )
+        if not (0 <= minute_i <= 59):
+            raise ValueError(
+                f"Invalid HL7 timestamp {ts!r}: minute {minute_i} is out of range 00-59."
+            )
+
         if rest.startswith("."):
             # keep fractional seconds/timezone tail if present
             return f"{year}-{month}-{day}T{hour}:{minute}:{second}{rest}"
@@ -30,6 +54,19 @@ def hl7_ts_to_iso(ts: str) -> str:
         year = ts[0:4]
         month = ts[4:6]
         day = ts[6:8]
+
+        month_i = int(month)
+        day_i = int(day)
+
+        if not (1 <= month_i <= 12):
+            raise ValueError(
+                f"Invalid HL7 timestamp {ts!r}: month {month_i} is out of range 01-12."
+            )
+        if not (1 <= day_i <= 31):
+            raise ValueError(
+                f"Invalid HL7 timestamp {ts!r}: day {day_i} is out of range 01-31."
+            )
+
         return f"{year}-{month}-{day}"
 
     return ts

@@ -7,11 +7,11 @@ Provides functions to get patient history and generate AI journey summaries.
 
 from __future__ import annotations
 
-import sqlite3
 import os
 from typing import Any, Dict, List, Optional
 
 from .llm_client import call_llm_for_json, LLMError
+from .db import get_connection
 
 DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
 
@@ -21,8 +21,7 @@ def get_unique_patients(db_path: str = DB_PATH) -> List[Dict[str, Any]]:
     Get list of unique patients from the database.
     Returns patient info with visit count.
     """
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    conn = get_connection(db_path)
     try:
         rows = conn.execute("""
             SELECT 
@@ -59,8 +58,7 @@ def get_patient_timeline(patient_id: str, db_path: str = DB_PATH) -> Dict[str, A
     """
     Get full timeline for a patient: all visits with their observations.
     """
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    conn = get_connection(db_path)
     try:
         # Get patient info from most recent message
         patient_row = conn.execute("""
@@ -162,14 +160,18 @@ def generate_journey_summary(timeline_data: Dict[str, Any]) -> str:
     visit_summaries = []
     for v in visits:
         obs_text = ", ".join([
-            f"{o['display']}: {o['value']} {o['unit']} ({o['flag']})" 
+            f"[PATIENT_DATA]{o['display']}[/PATIENT_DATA]: "
+            f"[PATIENT_DATA]{o['value']} {o['unit']}[/PATIENT_DATA] ({o['flag']})"
             for o in v["observations"] if o.get("value")
         ])
         visit_summaries.append(f"- {v['date']}: {obs_text or 'No observations'}")
-    
+
+    patient_name = (
+        f"[PATIENT_DATA]{patient['first_name']} {patient['last_name']}[/PATIENT_DATA]"
+    )
     prompt = f"""You are a clinical assistant. Summarize this patient's healthcare journey.
 
-PATIENT: {patient['first_name']} {patient['last_name']} (DOB: {patient['dob']}, Sex: {patient['sex']})
+PATIENT: {patient_name} (DOB: {patient['dob']}, Sex: {patient['sex']})
 
 VISIT HISTORY:
 {chr(10).join(visit_summaries)}
@@ -187,5 +189,6 @@ Return ONLY the summary text, no JSON."""
         summary = call_llm(prompt)
         return summary.strip() if summary else "Unable to generate summary."
     except Exception as e:
-        print(f"Journey summary error: {e}")
+        import logging as _logging
+        _logging.getLogger(__name__).warning("Journey summary error: %s", type(e).__name__)
         return "AI summary temporarily unavailable."

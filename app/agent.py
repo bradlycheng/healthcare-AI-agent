@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json as _json
-import sys
-import traceback
+import logging
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -15,8 +15,15 @@ from .llm_client import LLMError, call_llm_for_json
 from .alerts import check_alert
 from .security import sanitize_text
 
+logger = logging.getLogger(__name__)
+
 # Toggle this if/when you want to actually use AI for enrichment.
 USE_LLM = True
+
+# LOINC code format: 4–6 digits, hyphen, 1 digit (e.g. "2345-7")
+_LOINC_RE = re.compile(r"^\d{4,6}-\d$")
+# Maximum AI-extracted observations accepted per message
+_MAX_AI_OBS = 10
 
 # Text-based OBX-2 value types that need AI analysis (per HL7 v2 spec)
 TEXT_VALUE_TYPES = {"TX", "FT", "ED", "ST"}
@@ -120,8 +127,14 @@ def _build_fhir_bundle(patient: Dict[str, Any], structured_observations: List[Di
 def _build_llm_prompt(patient: Dict[str, Any], structured_observations: List[Dict[str, Any]]) -> str:
     all_notes = []
     for o in structured_observations:
+        obs_display = sanitize_text(o.get("display", "observation") or "observation")
         for n in o.get("notes", []):
-            all_notes.append(f"- Note attached to {o.get('display', 'observation')}: {n}")
+            # Re-sanitize each NTE-3 note individually before embedding in the prompt
+            clean_note = sanitize_text(str(n))
+            all_notes.append(
+                f"- Note attached to [PATIENT_DATA]{obs_display}[/PATIENT_DATA]: "
+                f"[PATIENT_DATA]{clean_note}[/PATIENT_DATA]"
+            )
     notes_block = "CLINICAL NOTES FOUND IN INPUT:\n" + "\n".join(all_notes) if all_notes else "NO NOTES FOUND."
     
     json_format_example = """
@@ -165,22 +178,97 @@ Return JSON only:
 """.strip()
 
 
+def _validate_ai_observation(o: Dict[str, Any]) -> bool:
+    r"""
+    Validate a single AI-extracted observation before merging.
+
+    Rules:
+    - ``code`` must match the LOINC format ``^\d{4,6}-\d$``
+    - ``value`` must be a finite numeric (int/float) or a non-empty string
+      under 200 characters
+
+    Returns True if the observation is valid, False otherwise.
+    """
+    if not isinstance(o, dict):
+        return False
+
+    code = o.get("code") or ""
+    if not _LOINC_RE.match(str(code)):
+        logger.warning(
+            "AI observation rejected: LOINC code format invalid (code=%r)", code
+        )
+        return False
+
+    value = o.get("value")
+    if isinstance(value, bool):
+        # bool is a subclass of int in Python; treat it as invalid
+        logger.warning(
+            "AI observation rejected: value is boolean (code=%r)", code
+        )
+        return False
+    if isinstance(value, (int, float)):
+        import math
+        if not math.isfinite(value):
+            logger.warning(
+                "AI observation rejected: value is not finite (code=%r)", code
+            )
+            return False
+        return True
+    if isinstance(value, str):
+        if len(value) == 0:
+            logger.warning(
+                "AI observation rejected: value is empty string (code=%r)", code
+            )
+            return False
+        if len(value) >= 200:
+            logger.warning(
+                "AI observation rejected: value string too long len=%d (code=%r)",
+                len(value), code,
+            )
+            return False
+        return True
+    # None or any other type
+    logger.warning(
+        "AI observation rejected: value is None or unsupported type %s (code=%r)",
+        type(value).__name__, code,
+    )
+    return False
+
+
 def _merge_llm_output(base_patient, base_summary, base_structured_obs, base_fhir_bundle, llm_raw) -> Tuple:
     if not isinstance(llm_raw, dict):
         return base_patient, base_summary, base_structured_obs, base_fhir_bundle
-    
+
     structured_observations = list(base_structured_obs)
     new_obs = llm_raw.get("new_observations", [])
-    if isinstance(new_obs, list):
-        for o in new_obs:
-            if not isinstance(o, dict): continue
-            # Ensure required fields
-            if not o.get("code") or o.get("value") is None: continue
-            o["source"] = "AI_EXTRACTED"
-            # Allow update if value is different
-            is_dupe = any(str(b["code"]) == str(o.get("code")) and str(b["value"]) == str(o.get("value")) for b in base_structured_obs)
-            if not is_dupe:
-                structured_observations.append(o)
+    if not isinstance(new_obs, list):
+        return base_patient, base_summary, structured_observations, base_fhir_bundle
+
+    # Cap the number of AI-extracted observations at _MAX_AI_OBS
+    if len(new_obs) > _MAX_AI_OBS:
+        logger.warning(
+            "AI returned %d observations; truncating to %d (cap=%d)",
+            len(new_obs), _MAX_AI_OBS, _MAX_AI_OBS,
+        )
+        new_obs = new_obs[:_MAX_AI_OBS]
+
+    for o in new_obs:
+        if not isinstance(o, dict):
+            continue
+        # Drop observations where value is explicitly None (no useful data)
+        if o.get("value") is None:
+            continue
+        # Validate LOINC code format and value (logs warnings on failure)
+        if not _validate_ai_observation(o):
+            continue
+        o["source"] = "AI_EXTRACTED"
+        # Allow update if value is different
+        is_dupe = any(
+            str(b["code"]) == str(o.get("code")) and str(b["value"]) == str(o.get("value"))
+            for b in base_structured_obs
+        )
+        if not is_dupe:
+            structured_observations.append(o)
     return base_patient, base_summary, structured_observations, base_fhir_bundle
 
 
@@ -252,9 +340,11 @@ def run_oru_pipeline(hl7_text: str, use_llm: bool = True, persist: bool = True) 
             structured_observations = _normalize_loinc_codes(structured_observations)
             structured_observations = [o for o in structured_observations if o.get("value") is not None and o.get("value") != ""]
         except Exception as e:
-            print(f"CRITICAL: AI Pipeline Failure: {e}", file=sys.stderr, flush=True)
-            traceback.print_exc(file=sys.stderr)
-            pass
+            logger.error(
+                "AI pipeline failure: %s — %s",
+                type(e).__name__,
+                e,
+            )
 
     for ob in structured_observations:
         alert = check_alert(ob.get("code"), ob.get("value"))

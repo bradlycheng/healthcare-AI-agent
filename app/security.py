@@ -6,21 +6,26 @@ from typing import List, Tuple
 
 # Patterns that could be used for prompt injection or to confuse the LLM
 INJECTION_PATTERNS = [
-    r"(?i)System:", 
-    r"(?i)Human:", 
-    r"(?i)Assistant:", 
-    r"(?i)AI:", 
+    r"(?i)System\s*:",
+    r"(?i)Human\s*:",
+    r"(?i)Assistant:",
+    r"(?i)AI:",
     r"(?i)Admin:",
     r"(?i)user:",
-    r"\[INST\]", 
-    r"\[/INST\]", 
-    r"<<SYS>>", 
+    r"\[INST\]",
+    r"\[/INST\]",
+    r"<<SYS>>",
     r"<</SYS>>",
     r"(?i)ignore\s+(previous|above|all)\s+instructions",
     r"(?i)disregard\s+(previous|above|all)\s+instructions",
     r"(?i)forget\s+(previous|above|everything)",
     r"(?i)you are now a",
     r"(?i)system prompt",
+    r"(?i)you've\s+become",
+    r"(?i)you have become",
+    r"(?i)act as if",
+    r"(?i)pretend you are",
+    r"(?i)pretend to be",
 ]
 
 # Invisible or confusing unicode ranges

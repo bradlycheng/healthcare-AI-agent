@@ -1,10 +1,13 @@
 # app/llm_client.py
 
+import logging
 import os
 import json
 import boto3
 from botocore.exceptions import ClientError
 from typing import Dict, Any, List
+
+logger = logging.getLogger(__name__)
 
 # AWS Bedrock Configuration
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
@@ -21,7 +24,7 @@ try:
         region_name=AWS_REGION
     )
 except Exception as e:
-    print(f"Warning: Failed to initialize Bedrock client: {e}")
+    logger.warning("Failed to initialize Bedrock client: %s — %s", type(e).__name__, e)
     bedrock_runtime = None
 
 
@@ -142,12 +145,15 @@ def _try_repair_json(raw: str) -> str:
     """
     import re
     text = raw.strip()
-    
+
     # Remove single-line comments like // this is a comment
     text = re.sub(r'//.*$', '', text, flags=re.MULTILINE)
 
     # Case: LLM forgot the final closing brace on a top-level object.
     if text.startswith("{") and not text.endswith("}"):
+        logger.warning(
+            "LLM returned malformed JSON; attempting repair (missing closing brace)"
+        )
         candidate = text + "\n}"
         try:
             json.loads(candidate)

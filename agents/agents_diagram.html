@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Healthcare AI Agent — Sub-Agent Diagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 2rem;
+    }
+    h1 { font-size: 1.4rem; color: #7dd3fc; margin-bottom: 0.25rem; }
+    p.sub { font-size: 0.9rem; color: #64748b; margin-bottom: 2.5rem; }
+    .section { margin-bottom: 3.5rem; }
+    .section-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #475569;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid #1e2433;
+      padding-bottom: 0.5rem;
+    }
+    .mermaid {
+      background: #1e2433;
+      border-radius: 12px;
+      padding: 2rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Healthcare AI Agent — Sub-Agent Architecture</h1>
+  <p class="sub">Defined in CLAUDE.md · docs/agent-reports/ for all artifacts</p>
+
+  <!-- DIAGRAM 1: Default Workflow -->
+  <div class="section">
+    <div class="section-title">Default Workflow — feature work &amp; refactors</div>
+    <div class="mermaid">
+flowchart TD
+    TASK([New Feature / Refactor Task]):::entry
+
+    subgraph LEAD["🧠 Lead Session"]
+        LD[Lead\nOrchestrates sub-agents\nWrites all artifacts to disk]
+    end
+
+    subgraph EXP["🔍 Explorer Sub-Agent  ·  read-only"]
+        E1[Maps codebase\nFinds relevant files\nIdentifies entry points]
+        E2[Returns:\n• report text\n• ledger entry]
+        E1 --> E2
+    end
+
+    subgraph WORK["⚙️ Narrow Worker Sub-Agent  ·  scoped implementation"]
+        W1[Implements changes\nOnly touches assigned files\nNo exploratory edits]
+        W2[Writes:\n• ledger entry directly\nto docs/agent-reports/]
+        W1 --> W2
+    end
+
+    subgraph REVIEW["🔒 Security Reviewer Sub-Agent  ·  read-only final pass"]
+        R1[Reviews changed files\nChecks PHI surface\nFlags governance gaps]
+        R2[Returns:\n• report text\n• ledger entry]
+        R1 --> R2
+    end
+
+    ARTIFACTS[(docs/agent-reports/\nprompt-ledger.md)]
+
+    TASK --> LD
+    LD -->|"spawn with scoped prompt"| EXP
+    E2 -->|"report + ledger"| LD
+    LD -->|"spawn with file list\nfrom explorer report"| WORK
+    W2 -->|"ledger written directly"| ARTIFACTS
+    WORK -->|"done signal"| LD
+    LD -->|"spawn with diff"| REVIEW
+    R2 -->|"report + ledger"| LD
+    LD -->|"lead writes"| ARTIFACTS
+
+    classDef entry fill:#0ea5e9,color:#fff,stroke:none
+    classDef store fill:#0f766e,color:#fff,stroke:none
+    </div>
+  </div>
+
+  <!-- DIAGRAM 2: Security Hardening Workflow -->
+  <div class="section">
+    <div class="section-title">Security Hardening Workflow — Warden, guards, PHI surface changes</div>
+    <div class="mermaid">
+flowchart TD
+    TASK2([Security / Guard Change Task]):::entry
+
+    subgraph LEAD2["🧠 Lead Session"]
+        LD2[Lead\nOrchestrates parallel explorers\nWrites all artifacts to disk]
+    end
+
+    subgraph SECEXP["🔍 Security Explorer  ·  read-only"]
+        SE1[Maps security surface:\nwarden, guards, intent classifier\ngrant builder, token guard]
+        SE2[Returns:\n• security surface report\n• ledger entry]
+        SE1 --> SE2
+    end
+
+    subgraph HL7EXP["🔍 HL7 Storage Explorer  ·  read-only"]
+        HE1[Maps ingestion + storage surface:\nhl7_guard, hl7_parser\nfhir_builder, db.py]
+        HE2[Returns:\n• ingestion surface report\n• ledger entry]
+        HE1 --> HE2
+    end
+
+    subgraph WORK2["⚙️ Narrow Worker Sub-Agent  ·  one at a time"]
+        W3[Explicit file ownership\nper task assignment\nNo files outside scope]
+        W4[Writes:\n• ledger entry directly]
+        W3 --> W4
+    end
+
+    subgraph REVIEW2["🔒 Security Reviewer Sub-Agent  ·  read-only final pass"]
+        R3[Reviews all changed files\nVerifies PHI tokenization\nChecks governance event coverage]
+        R4[Returns:\n• security review report\n• ledger entry]
+        R3 --> R4
+    end
+
+    ARTIFACTS2[(docs/agent-reports/\nprompt-ledger.md)]
+
+    TASK2 --> LD2
+    LD2 -->|"spawn in parallel"| SECEXP
+    LD2 -->|"spawn in parallel"| HL7EXP
+    SE2 -->|"report + ledger"| LD2
+    HE2 -->|"report + ledger"| LD2
+    LD2 -->|"spawn with explicit\nfile list per worker"| WORK2
+    W4 -->|"ledger written directly"| ARTIFACTS2
+    WORK2 -->|"done signal"| LD2
+    LD2 -->|"spawn with full diff"| REVIEW2
+    R4 -->|"report + ledger"| LD2
+    LD2 -->|"lead writes"| ARTIFACTS2
+
+    classDef entry fill:#7c3aed,color:#fff,stroke:none
+    </div>
+  </div>
+
+  <!-- DIAGRAM 3: Sub-Agent Roles at a glance -->
+  <div class="section">
+    <div class="section-title">Sub-Agent Roles &amp; Constraints</div>
+    <div class="mermaid">
+flowchart LR
+    subgraph ROLES["Sub-Agent Capabilities"]
+        direction TB
+
+        subgraph EX["Explorer"]
+            EA[✅ Read files]
+            EB[✅ Grep / search]
+            EC[✅ Return report + ledger]
+            ED[❌ Propose final patches]
+            EE[❌ Write to codebase]
+        end
+
+        subgraph NW["Narrow Worker"]
+            NA[✅ Edit assigned files only]
+            NB[✅ Write ledger directly]
+            NC[❌ Edit unassigned files]
+            ND[❌ Explore beyond scope]
+        end
+
+        subgraph SR["Security Reviewer"]
+            RA2[✅ Read changed files]
+            RB2[✅ Return report + ledger]
+            RC2[❌ Propose patches]
+            RD2[❌ Write to codebase]
+        end
+
+        subgraph LDS["Lead Session"]
+            LA[✅ Spawn sub-agents]
+            LB[✅ Write all artifacts to disk]
+            LC[✅ Synthesize reports]
+            LD3[✅ Assign file ownership]
+        end
+    end
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+  </script>
+</body>
+</html>

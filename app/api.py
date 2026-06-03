@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from typing import Any, Dict, List, Optional
 
@@ -17,17 +18,39 @@ import os
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
+
 print("DEBUG: API MODULE LOADED", flush=True)
 
 DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
 # AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
 # AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "healthcare2025")
 
+# ---------- CORS configuration ----------
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "")
+if _raw_origins.strip():
+    ALLOWED_ORIGINS: List[str] = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+else:
+    ALLOWED_ORIGINS = ["http://localhost:8000", "http://localhost:8080"]
+
+# ---------- Trusted proxies for X-Forwarded-For ----------
+_raw_proxies = os.getenv("TRUSTED_PROXIES", "")
+TRUSTED_PROXIES: List[str] = [p.strip() for p in _raw_proxies.split(",") if p.strip()]
+
+# ---------- Admin password ----------
+ADMIN_PASSWORD: Optional[str] = os.getenv("ADMIN_PASSWORD")
+if not ADMIN_PASSWORD:
+    logger.warning(
+        "ADMIN_PASSWORD environment variable is not set. "
+        "The /admin/reset endpoint will return HTTP 503 until it is configured."
+    )
+
 app = FastAPI(title="Healthcare HL7 → FHIR Agent API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,6 +61,22 @@ app.add_middleware(
 # We only rate limit the LLM part to prevent expensive calls.
 _RATE_LIMIT_STORE: Dict[str, float] = {}
 RATE_LIMIT_SECONDS = 5.0
+
+
+def _get_rate_limit_key(request: Request) -> str:
+    """Return the IP to use as the rate-limit key.
+
+    Only uses the first address from X-Forwarded-For when the immediate
+    client IP is listed in TRUSTED_PROXIES.  Otherwise always falls back
+    to ``request.client.host`` so the header cannot be spoofed by
+    arbitrary callers.
+    """
+    client_ip: str = request.client.host if request.client else "unknown"
+    xff = request.headers.get("X-Forwarded-For", "").strip()
+    if xff and client_ip in TRUSTED_PROXIES:
+        # Take the leftmost (original-client) address from the header.
+        return xff.split(",")[0].strip()
+    return client_ip
 
 
 @app.middleware("http")
@@ -248,13 +287,13 @@ def query_assistant_endpoint(req: QueryRequest, request: Request) -> QueryRespon
     from .query_assistant import process_query
     
     # Rate limit check (reuse existing mechanism)
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = _get_rate_limit_key(request)
     now_ts = __import__("time").time()
     last_ts = _RATE_LIMIT_STORE.get(client_ip, 0.0)
-    
+
     if now_ts - last_ts < RATE_LIMIT_SECONDS:
         raise HTTPException(status_code=429, detail="Too many requests. Please wait a few seconds.")
-    
+
     _RATE_LIMIT_STORE[client_ip] = now_ts
     
     # Sanitize query to prevent injection
@@ -359,13 +398,13 @@ def get_patient_summary_endpoint(patient_id: str, request: Request) -> PatientSu
     from .patient_timeline import get_patient_timeline, generate_journey_summary
     
     # Rate limit check
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = _get_rate_limit_key(request)
     now_ts = __import__("time").time()
     last_ts = _RATE_LIMIT_STORE.get(client_ip, 0.0)
-    
+
     if now_ts - last_ts < RATE_LIMIT_SECONDS:
         raise HTTPException(status_code=429, detail="Too many requests. Please wait a few seconds.")
-    
+
     _RATE_LIMIT_STORE[client_ip] = now_ts
     
     timeline = get_patient_timeline(patient_id)
@@ -438,6 +477,18 @@ async def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParse
     if not req.hl7_text or "MSH" not in req.hl7_text:
         raise HTTPException(status_code=400, detail="Invalid HL7 message. Must start with MSH segment.")
 
+    # 1b. Structural segment validation — PID and OBX are required for ORU messages
+    if "PID|" not in req.hl7_text:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid HL7 message: missing required PID segment.",
+        )
+    if "OBX|" not in req.hl7_text:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid HL7 message: missing required OBX segment.",
+        )
+
     # 1. Message Type Validation
     from .hl7_msh import parse_msh, build_ack
     msh = parse_msh(req.hl7_text)
@@ -459,13 +510,13 @@ async def parse_oru_endpoint(req: ORUParseRequest, request: Request) -> ORUParse
         # Rate limit check if requesting LLM
         if req.use_llm:
             print(f"DEBUG: API /oru/parse called. persist={req.persist}, use_llm={req.use_llm}", flush=True)
-            client_ip = request.client.host if request.client else "unknown"
+            client_ip = _get_rate_limit_key(request)
             now_ts = __import__("time").time()
             last_ts = _RATE_LIMIT_STORE.get(client_ip, 0.0)
-            
+
             if now_ts - last_ts < RATE_LIMIT_SECONDS:
                 raise HTTPException(status_code=429, detail="Too many AI requests. Please wait a few seconds.")
-    
+
             _RATE_LIMIT_STORE[client_ip] = now_ts
     
         # Run in separate thread to avoid blocking the event loop during Bedrock call
@@ -731,12 +782,16 @@ async def reset_demo_data(req: ResetRequest):
     Deletes all messages and reseeds with sample data.
     Requires password.
     """
-    # Load password from env, default to d3m0th1s
-    admin_password = os.getenv("ADMIN_PASSWORD", "d3m0th1s")
+    # Use module-level ADMIN_PASSWORD (read at startup, no hardcoded default)
+    if not ADMIN_PASSWORD:
+        raise HTTPException(
+            status_code=503,
+            detail="Admin endpoint unavailable: server not configured",
+        )
 
-    if req.password != admin_password:
+    if req.password != ADMIN_PASSWORD:
         # Anti-brute force delay
-        time.sleep(1.0)
+        time.sleep(3.0)
         raise HTTPException(status_code=401, detail="Incorrect Password")
 
     if reset_lock.locked():
