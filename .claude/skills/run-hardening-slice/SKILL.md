@@ -28,11 +28,11 @@ Find that slice's section in the plan.
 
 Before dispatching the narrow-worker, confirm with the user:
 
-1. **File ownership** — list every file the worker may edit. Ask the user to confirm.
-2. **Files NOT to touch** — list the explicit exclusions from the plan.
-3. **Sign-off condition** — state it plainly. Example: "Patient name must not appear
+1. **File ownership** -- list every file the worker may edit. Ask the user to confirm.
+2. **Files NOT to touch** -- list the explicit exclusions from the plan.
+3. **Sign-off condition** -- state it plainly. Example: "Patient name must not appear
    in the string passed to embed_text()."
-4. **Tests required** — list the test names from the plan.
+4. **Tests required** -- list the test names from the plan.
 
 Do not proceed to Step 3 until the user confirms scope.
 
