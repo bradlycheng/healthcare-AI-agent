@@ -12,7 +12,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=33">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
@@ -28,7 +28,7 @@
         .about-container {
             max-width: 900px;
             margin: 0 auto;
-            padding: 8rem 2rem 4rem;
+            padding: 3.5rem 2rem 4rem;
         }
 
         .section-block {
@@ -39,11 +39,9 @@
         .section-block h1 {
             font-size: 3rem;
             margin-bottom: 1.5rem;
-            background: var(--gradient-main);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-
+            background: none;
+            color: var(--text-main);
+            -webkit-text-fill-color: currentColor;
         }
 
         .section-block h2 {
@@ -195,16 +193,57 @@
         }
 
         @media (max-width: 640px) {
+            .about-container {
+                padding-inline: 1rem;
+            }
+
             .case-grid,
             .case-grid.balanced-three,
             .case-grid.four-up {
                 grid-template-columns: 1fr;
             }
+
+            .highlight-box,
+            .game-card {
+                padding: 1.25rem;
+            }
+
+            .social-links-large {
+                align-items: stretch;
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+
+            .social-btn {
+                justify-content: center;
+                width: 100%;
+                min-width: 0;
+            }
+
+            .about-container .cta-section {
+                padding-inline: 0;
+            }
+
+            .about-container .cta-content {
+                padding: 1.5rem 1rem;
+            }
+
+            .about-container .cta-content .btn-primary.large {
+                display: flex;
+                justify-content: center;
+                width: 100%;
+                max-width: 100%;
+                min-width: 0;
+                text-align: center;
+                white-space: normal;
+                overflow-wrap: anywhere;
+            }
         }
     </style>
+    <link rel="stylesheet" href="signal-atlas.css?v=3">
 </head>
 
-<body>
+<body class="about-page">
     <div class="background-glow"></div>
 
     <nav class="navbar">
@@ -246,7 +285,7 @@
                     <strong class="note-closing">And what is true safety without accountability?</strong>
                 </div>
 
-                <p style="margin-top: 1rem;">
+                <p class="content-spaced">
                     This is not only a data-protection problem. When AI touches sensitive workflows, one hallucination,
                     missed detail, or flawed summary can influence decisions that affect real people: their care,
                     finances, rights, safety, or reputation. <strong>If that mistake causes harm, the organization is
@@ -284,7 +323,7 @@
                     language, and an impressive demo. The lesson is that those claims need enforceable controls behind
                     them.
                 </p>
-                <p style="margin-top: 1rem;">
+                <p class="content-spaced">
                     This MVP is incomplete by design so the next version has a clear target. The demo shows the app, the
                     risk, and the fix path in one place.
                 </p>
@@ -299,7 +338,7 @@
                     is whether the system can prove the access was authorized, scoped, necessary, sourced from a trusted
                     workflow, and recorded in a useful audit trail.
                 </p>
-                <p style="margin-top: 1rem;">
+                <p class="content-spaced">
                     Health Data Agent uses the current MVP to make that question concrete. When an AI system connects
                     natural language to clinical data, ingestion workflows, and summaries, governance becomes the control
                     plane around every capability.
@@ -348,16 +387,16 @@
                     Hi, I'm Bradly Cheng, a software developer and AI engineer focused on healthcare AI governance,
                     interoperability, security, and practical clinical AI systems.
                 </p>
-                <p style="margin-top: 1rem;">
+                <p class="content-spaced">
                     I built Health Data Agent to show that building the AI workflow is only half the work. The more
                     serious challenge is identifying where the first safety story fails, then designing the controls that
                     make the system attributable, scoped, auditable, and production-minded.
                 </p>
-                <p style="margin-top: 1rem;">
+                <p class="content-spaced">
                     Warden 1.0 is the visible demo layer. Warden 2.0 is the direction I care most about: governance that
                     can stand up to real questions about liability, trust, PHI minimization, and clinical data integrity.
                 </p>
-                <p style="margin-top: 1rem;">
+                <p class="content-spaced">
                     Healthcare is the test case because the stakes are obvious, but the same governance problem applies
                     to any AI system working with sensitive data: finance, identity, legal records, private
                     communications, internal company data, or any workflow where the output can affect real people.
@@ -378,9 +417,9 @@
                 <h2>Get Your AI Product Governed</h2>
                 <p>Building with sensitive data? Request a governance review for safer AI access, liability tracking,
                     audit visibility, and Warden-style controls.</p>
-                <a href="mailto:bradly@healthdataagent.com?subject=AI%20governance%20review%20request"
-                    class="btn-primary large">Email bradly@healthdataagent.com</a>
-                <p style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
+                <a href="mailto:Bradly@healthdataagent.com?subject=AI%20governance%20review%20request"
+                    class="btn-primary large">Email Bradly@healthdataagent.com</a>
+                <p class="cta-note">
                     This opens your email app so you can send the request directly.
                 </p>
             </div>
@@ -390,18 +429,16 @@
 
     <footer class="footer">
         <p>&copy; 2026 Health Data Agent | Created by Bradly Cheng <a href="https://www.linkedin.com/in/bradly-cheng/"
-                target="_blank" rel="noopener" style="margin-left: 0.25rem; color: inherit;"><i
+                target="_blank" rel="noopener" aria-label="Bradly Cheng on LinkedIn"><i
                     class="fa-brands fa-linkedin"></i></a></p>
         <div class="social-links footer-links">
-            <a href="/about.html" class="footer-email"
-                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">About
+            <a href="/about.html" class="footer-email">About
                 <i class="fa-solid fa-circle-info"></i></a>
-            <a href="mailto:bradly@healthdataagent.com" class="footer-email"
-                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">bradly@healthdataagent.com
+            <a href="mailto:Bradly@healthdataagent.com" class="footer-email">Bradly@healthdataagent.com
                 <i class="fa-solid fa-envelope"></i></a>
         </div>
     </footer>
-    <script src="script.js?v=1.1.1"></script>
+    <script src="script.js?v=1.1.4"></script>
 </body>
 
 </html>

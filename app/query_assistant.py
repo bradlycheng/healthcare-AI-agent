@@ -454,6 +454,107 @@ def retrieve_context(question: str) -> tuple[str, List[Dict[str, Any]]]:
         return "", []
 
 
+CRITICAL_COHORT_SQL = """
+SELECT
+    h.patient_first_name,
+    h.patient_last_name,
+    o.display,
+    o.value_num,
+    o.value_raw,
+    o.unit,
+    o.flag,
+    o.alert_level,
+    o.alert_message,
+    o.reference_low,
+    o.reference_high
+FROM hl7_messages h
+JOIN observations o ON o.message_id = h.id
+WHERE o.alert_level = 'CRITICAL'
+ORDER BY h.received_at DESC
+LIMIT 50
+""".strip()
+
+CONCERNING_COHORT_SQL = """
+SELECT
+    h.patient_first_name,
+    h.patient_last_name,
+    o.display,
+    o.value_num,
+    o.value_raw,
+    o.unit,
+    o.flag,
+    o.alert_level,
+    o.alert_message,
+    o.reference_low,
+    o.reference_high
+FROM hl7_messages h
+JOIN observations o ON o.message_id = h.id
+WHERE (
+    o.flag IN ('H', 'HH', 'L', 'LL')
+    OR o.alert_level IN ('CRITICAL', 'WARNING')
+)
+ORDER BY
+    CASE
+        WHEN o.alert_level = 'CRITICAL' THEN 1
+        WHEN o.alert_level = 'WARNING' THEN 2
+        ELSE 3
+    END,
+    h.received_at DESC
+LIMIT 50
+""".strip()
+
+
+def deterministic_sql_for_question(question: str) -> Optional[tuple[str, str]]:
+    """Return stable SQL for common broad safety-cohort questions."""
+    normalized = re.sub(r"\s+", " ", question.lower()).strip()
+    cohort_terms = ("patient", "patients", "who", "alerts", "findings", "results")
+    asks_about_cohort = any(term in normalized for term in cohort_terms)
+    measurement_terms = (
+        "a1c",
+        "blood pressure",
+        "bp",
+        "cholesterol",
+        "creatinine",
+        "egfr",
+        "glucose",
+        "heart rate",
+        "oxygen",
+        "pulse",
+        "spo2",
+        "temperature",
+        "triglyceride",
+    )
+    names_a_measurement = any(term in normalized for term in measurement_terms)
+
+    if (
+        "critical" in normalized
+        and asks_about_cohort
+        and not names_a_measurement
+        and not any(term in normalized for term in ("not critical", "non-critical"))
+    ):
+        return CRITICAL_COHORT_SQL, "Retrieved all critical patient findings."
+
+    concern_phrases = (
+        "worried about",
+        "worry about",
+        "concerned about",
+        "at risk",
+        "at-risk",
+    )
+    asks_about_abnormal_cohort = (
+        "abnormal" in normalized
+        and asks_about_cohort
+        and not any(
+            phrase in normalized
+            for phrase in ("no abnormal", "without abnormal", "normal results")
+        )
+    )
+    if any(phrase in normalized for phrase in concern_phrases) or asks_about_abnormal_cohort:
+        return CONCERNING_COHORT_SQL, "Retrieved concerning patient findings by acuity."
+
+    return None
+
+
 
 def generate_sql_from_question(question: str, history: List[Dict[str, str]] = []) -> tuple[str, str, Optional[str]]:
     """
@@ -462,6 +563,11 @@ def generate_sql_from_question(question: str, history: List[Dict[str, str]] = []
     """
     # Pre-process common medical synonyms that confuse the LLM
     question = question.replace("oxygen saturation", "SpO2").replace("Oxygen Saturation", "SpO2")
+
+    deterministic_query = deterministic_sql_for_question(question)
+    if deterministic_query:
+        sql, explanation = deterministic_query
+        return sql, explanation, None
     
     prompt = f"""
 {SQL_GENERATION_PROMPT}

@@ -1,99 +1,75 @@
-# Health Data Agent 🏥
+# Health Data Agent
 
-**Live Demo**: [healthdataagent.com](https://healthdataagent.com)
+Public demo: [healthdataagent.com](https://healthdataagent.com)
 
-An intelligent healthcare interoperability agent that parses HL7 v2 ORU messages, converts them to FHIR R4, and uses AWS Bedrock (Llama 3) to generate clinical summaries.
+Health Data Agent is a healthcare interoperability and clinical AI demo. It parses HL7 v2 ORU messages, produces FHIR R4 resources, supports patient-data chat, and demonstrates Warden guardrails around AI workflows.
 
-## ✨ Features
+## Important Scope
 
-| Feature | Description |
-|---------|-------------|
-| **HL7 Parsing** | Parses ORU^R01 messages with PID, OBR, OBX segments |
-| **Input Validation** | Rejects invalid/malformed messages (non-ORU) with HTTP 400 |
-| **ACK Generation** | Automatically generates HL7 v2 ACK (Acknowledgement) messages |
-| **FHIR Conversion** | Generates FHIR R4 Bundles (Patient + Observation resources) |
-| **AI Summaries** | AWS Bedrock LLM generates clinical summaries |
-| **Natural Language Query**| Ask questions like "Show patients with high glucose" (SQL Gen) |
-| **Web Dashboard** | Real-time monitoring of processed messages |
-| **Rate Limiting** | 5-second cooldown between LLM requests |
+This repository is suitable for a public portfolio demo using synthetic data. It is **not approved for real PHI, clinical decision-making, or a regulated production environment**. A real healthcare deployment still requires authentication, authorization, tenant and patient scoping, managed secrets, compliant infrastructure, audit retention, incident response, and formal security/privacy review.
 
-## 🚀 Quick Start
+## Features
 
-### Prerequisites
-1. **AWS Account** with Bedrock access enabled
-2. **AWS Credentials** configured (`aws configure`)
-3. **Bedrock Model Access**: Enable Llama 3 in AWS Console → Bedrock → Model access
+- HL7 ORU parsing and validation
+- FHIR R4 bundle generation
+- Clinical observation review
+- Patient dashboard and timeline
+- Natural-language patient-data queries
+- RAG-backed clinical references
+- Warden request and tool guardrails
 
-### Local Development
+## Local Development
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m uvicorn app.api:app --host 127.0.0.1 --port 8080
+```
+
+Open `http://127.0.0.1:8080`.
+
+## Tests
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+The browser suites require Playwright:
+
+```powershell
+node tests/chat_frontend_browser_test.cjs
+node tests/critical_banner_browser_test.cjs
+```
+
+## Production Demo Deployment
+
+1. Copy `.env.example` to `.env`.
+2. Set a unique `ADMIN_PASSWORD` with at least 16 characters.
+3. Use an AWS IAM role with `bedrock:InvokeModel` access to the configured chat model and `amazon.titan-embed-text-v1`. Enable both models in Bedrock. Do not put AWS keys in the repository.
+4. Keep `MESSAGE_RETENTION_DAYS=0` unless an explicit retention policy has been approved.
+5. Leave `CORS_ALLOW_ORIGINS` empty for the same-origin Caddy deployment.
+6. Run:
+
 ```bash
-pip install -r requirements.txt
-aws configure  # Set region to us-east-1
-uvicorn app.api:app --reload
-```
-Visit **http://localhost:8000**
-
-### Docker (Recommended)
-```bash
-docker compose up -d
-```
-Visit **http://localhost:8080**
-
-### Run Tests
-```bash
-python test_multiple_messages.py
+docker compose up --build -d
 ```
 
-## 📁 Project Structure
+Caddy serves HTTPS on ports 80/443. Uvicorn is bound to loopback port 8080 for local diagnostics only.
 
-```
-├── app/                  # Backend (FastAPI)
-│   ├── api.py           # REST endpoints
-│   ├── agent.py         # ORU pipeline logic
-│   ├── hl7_parser.py    # HL7 message parsing
-│   ├── fhir_builder.py  # FHIR Bundle generation
-│   └── llm_client.py    # AWS Bedrock integration
-├── web/                  # Frontend (HTML/CSS/JS)
-├── agent.db             # SQLite database
-├── docker-compose.yml   # Container orchestration
-└── test_multiple_messages.py  # Integration tests
-```
+Production Compose disables API documentation, runs the app as a non-root user, requires a non-demo reset password, adds health checks, and stores application and RAG SQLite data in named volumes.
 
-## 🔬 Supported HL7 Format
+## Environment Variables
 
-```
-MSH|^~\&|LAB|HOSPITAL|EHR|CLINIC|202501170900||ORU^R01|MSG001|P|2.5
-PID|1||123456^^^MRN||DOE^JOHN||19800101|M
-OBR|1|||CBC_PANEL
-OBX|1|NM|GLU^Glucose||105|mg/dL|70-100|H|||F
-```
+| Variable | Default | Purpose |
+|---|---|---|
+| `DATABASE_PATH` | `agent.db` | SQLite database location |
+| `AWS_REGION` | `us-east-1` | AWS Bedrock region |
+| `BEDROCK_MODEL_ID` | Llama 3 8B | Bedrock chat model identifier |
+| `ADMIN_PASSWORD` | none | Required for demo reset |
+| `MESSAGE_RETENTION_DAYS` | `0` | Optional startup pruning; `0` disables it |
+| `CORS_ALLOW_ORIGINS` | empty | Explicit comma-separated cross-origin allowlist |
+| `ENABLE_API_DOCS` | `true` locally | Enables FastAPI docs; production Compose disables them |
 
-| Segment | Purpose |
-|---------|---------|
-| MSH | Message header |
-| PID | Patient demographics |
-| OBR | Order/panel info |
-| OBX | Observation results (NM=numeric, TX=text) |
+## License
 
-## ⚙️ Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AWS_REGION` | `us-east-1` | AWS region for Bedrock |
-| `BEDROCK_MODEL_ID` | `meta.llama3-8b-instruct-v1:0` | LLM model |
-| `DATABASE_PATH` | `agent.db` | SQLite database path |
-
-## 🔒 Security Note
-
-Authentication is **disabled** for demo purposes. For production, enable auth logic in `app/api.py`.
-
-## 💰 Cost Estimate
-
-| Resource | Cost |
-|----------|------|
-| EC2 (t2.micro) | Free Tier |
-| Bedrock | ~$0.01 per message |
-| **Monthly Total** | < $5 USD |
-
-## 📄 License
-
-MIT License - Created by [Bradly Cheng](https://bradlycheng.com)
+MIT License. Created by [Bradly Cheng](https://bradlycheng.com).

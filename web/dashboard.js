@@ -23,7 +23,7 @@ function handleClarification(option) {
     const queryInput = document.getElementById('query-input');
     if (queryInput) {
         queryInput.value = option;
-        queryInput.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter' }));
+        queryInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     }
 }
 
@@ -74,11 +74,18 @@ document.addEventListener('DOMContentLoaded', () => {
         filterDate.addEventListener('change', applyFilters);
         refreshBtn.addEventListener('click', loadMessages);
 
+        const alertsView = document.getElementById('alerts-view');
+        if (alertsView) {
+            alertsView.addEventListener('click', () => {
+                filterFlag.value = 'critical';
+                applyFilters();
+            });
+        }
+
         // Dismiss Critical Banner
         const alertsDismiss = document.getElementById('alerts-dismiss');
         if (alertsDismiss) {
-            alertsDismiss.addEventListener('click', (e) => {
-                e.stopPropagation(); // don't trigger banner click
+            alertsDismiss.addEventListener('click', () => {
                 isCriticalBannerDismissed = true;
                 const alertBanner = document.getElementById('alerts-banner');
                 if (alertBanner) alertBanner.classList.add('hidden');
@@ -247,35 +254,30 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateAlertBanner() {
         const alertBanner = document.getElementById('alerts-banner');
         const alertCount = document.getElementById('alert-count');
+        const alertPatientLabel = document.getElementById('alert-patient-label');
         if (!alertBanner) return; // Guard clause
 
-        // Check if any loaded message has a CRITICAL alert
-        let criticalCount = 0;
-        allMessages.forEach(msg => {
-            if (msg.observations) {
-                const hasCritical = msg.observations.some(o => o.alert_level === 'CRITICAL');
-                if (hasCritical) criticalCount++;
+        // Count affected patients once, even if they have multiple critical messages.
+        const criticalPatientIds = new Set();
+        allMessages.forEach((msg, index) => {
+            const hasCritical = (msg.observations || [])
+                .some(o => o.alert_level === 'CRITICAL');
+            if (hasCritical) {
+                criticalPatientIds.add(msg.patient_id || `message-${msg.id ?? index}`);
             }
         });
+        const criticalCount = criticalPatientIds.size;
 
         if (criticalCount > 0 && !isCriticalBannerDismissed) {
             alertBanner.classList.remove('hidden');
-            // Add click-to-filter hint
-            alertBanner.title = "Click to show only critical patients";
-            alertBanner.style.cursor = "pointer";
 
             if (alertCount) {
                 alertCount.textContent = criticalCount;
             }
+            if (alertPatientLabel) {
+                alertPatientLabel.textContent = criticalCount === 1 ? 'patient requires' : 'patients require';
+            }
 
-            // Add one-time click listener (or check if already added? simpler to just overwrite onclick or use named function)
-            alertBanner.onclick = () => {
-                const filterFlag = document.getElementById('filter-flag');
-                if (filterFlag) {
-                    filterFlag.value = 'critical';
-                    applyFilters();
-                }
-            };
         } else {
             alertBanner.classList.add('hidden');
         }
@@ -451,7 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${formatDob(msg.dob)}</td>
                 <td>${msg.sex || '--'}</td>
                 <td class="obs-count">${obsCount}</td>
-                <td class="flags-cell">${flags}${moreFlags}</td>
+                <td class="flags-cell"><div class="flags-list">${flags}${moreFlags}</div></td>
                 <td class="timestamp-cell">${timestamp}</td>
             </tr>
         `;
@@ -628,25 +630,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const querySubmit = document.getElementById('query-submit');
     const queryMessages = document.getElementById('query-messages');
     const suggestionChips = document.querySelectorAll('.suggestion-chip');
+    let isQueryPending = false;
 
     // Set up query assistant event listeners
     if (queryInput && querySubmit) {
+        const updateSubmitState = () => {
+            querySubmit.disabled = isQueryPending || !queryInput.value.trim();
+        };
+
+        queryInput.addEventListener('input', updateSubmitState);
+
         querySubmit.addEventListener('click', () => {
-            const question = queryInput.value.trim();
-            if (question) sendQuery(question);
+            requestQuery(queryInput.value);
         });
 
-        queryInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const question = queryInput.value.trim();
-                if (question) sendQuery(question);
+        queryInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.isComposing && !e.repeat) {
+                e.preventDefault();
+                requestQuery(queryInput.value);
             }
         });
+
+        updateSubmitState();
     }
 
     // Suggestion chips
     suggestionChips.forEach(chip => {
         chip.addEventListener('click', () => {
+            if (isQueryPending) return;
+
             const query = chip.dataset.query;
             const depth = chip.dataset.depth;
             if (query) {
@@ -656,13 +668,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (depthEl) depthEl.value = depth;
                 }
                 queryInput.value = query;
-                sendQuery(query);
+                requestQuery(query);
             }
         });
     });
 
+    function requestQuery(rawQuestion) {
+        const question = typeof rawQuestion === 'string' ? rawQuestion.trim() : '';
+        if (!question || isQueryPending) {
+            queryInput.focus();
+            return;
+        }
+        sendQuery(question);
+    }
+
     async function sendQuery(question) {
-        if (!question.trim()) return;
+        if (isQueryPending) return;
+        isQueryPending = true;
 
         // Clear input
         queryInput.value = '';
@@ -735,7 +757,8 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Query error:', err);
             addMessage('Sorry, something went wrong. Please try again.', 'ai', { isError: true });
         } finally {
-            querySubmit.disabled = false;
+            isQueryPending = false;
+            querySubmit.disabled = !queryInput.value.trim();
             queryInput.focus();
         }
     }
@@ -879,6 +902,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add error styling
         if (options.isError) {
             messageDiv.classList.add('message-error');
+            messageDiv.setAttribute('role', 'alert');
         }
 
         messageDiv.innerHTML = `
@@ -889,6 +913,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${contentHtml}
             </div>
         `;
+
+        messageDiv.querySelectorAll('.markdown-content table').forEach(table => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'chat-table-scroll';
+            wrapper.setAttribute('role', 'region');
+            wrapper.setAttribute('aria-label', 'Scrollable response table');
+            wrapper.tabIndex = 0;
+            table.parentNode.insertBefore(wrapper, table);
+            wrapper.appendChild(table);
+        });
 
         queryMessages.appendChild(messageDiv);
         queryMessages.scrollTop = queryMessages.scrollHeight;
@@ -905,6 +939,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message message-ai';
         messageDiv.id = `loading-${Date.now()}`;
+        messageDiv.setAttribute('role', 'status');
+        messageDiv.setAttribute('aria-label', 'Assistant is thinking');
 
         messageDiv.innerHTML = `
             <div class="message-avatar">

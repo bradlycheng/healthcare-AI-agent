@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import sqlite3
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from .agent import run_oru_pipeline
 from .security import sanitize_text
@@ -16,29 +18,84 @@ import sys
 # Force unbuffered stdout
 sys.stdout.reconfigure(encoding='utf-8')
 
-import os
 from fastapi import FastAPI, HTTPException, Query, Request
 from dotenv import load_dotenv
 
 # Load environment variables from .env file (if present)
 load_dotenv()
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-print("DEBUG: API MODULE LOADED", flush=True)
+from pydantic import BaseModel, Field
 
 DB_PATH = os.getenv("DATABASE_PATH", "agent.db")
-# AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
-# AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "healthcare2025")
 
-app = FastAPI(title="Healthcare HL7 → FHIR Agent API")
+def validate_production_config() -> None:
+    if os.getenv("APP_ENV", "development").lower() != "production":
+        return
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    admin_password = os.getenv("ADMIN_PASSWORD", "")
+    known_demo_passwords = {"d3m0th1s", "healthcare2025", "changeme", "change-me"}
+    if len(admin_password) < 16 or admin_password.lower() in known_demo_passwords:
+        raise RuntimeError(
+            "Production requires an ADMIN_PASSWORD of at least 16 characters "
+            "that is not a known demo password."
+        )
+
+
+def prune_expired_messages() -> None:
+    retention_days = int(os.getenv("MESSAGE_RETENTION_DAYS", "0"))
+    if retention_days <= 0:
+        return
+
+    from .db import prune_messages
+
+    deleted = prune_messages(days_to_keep=retention_days)
+    if deleted > 0:
+        print(f"Pruned {deleted} old messages on startup.")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    from .db import init_db
+
+    validate_production_config()
+    init_db()
+    prune_expired_messages()
+    yield
+
+
+api_docs_enabled = os.getenv("ENABLE_API_DOCS", "true").lower() == "true"
+app = FastAPI(
+    title="Healthcare HL7 to FHIR Agent API",
+    docs_url="/docs" if api_docs_enabled else None,
+    redoc_url="/redoc" if api_docs_enabled else None,
+    openapi_url="/openapi.json" if api_docs_enabled else None,
+    lifespan=lifespan,
 )
+
+allowed_hosts = [
+    host.strip()
+    for host in os.getenv("ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+]
+if allowed_hosts:
+    from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
+
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOW_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if cors_origins:
+    from fastapi.middleware.cors import CORSMiddleware
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization"],
+    )
 
 
 # Simple in-memory rate limiter: keys=IP, values=timestamp of last LLM request
@@ -50,21 +107,19 @@ RATE_LIMIT_SECONDS = 5.0
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     response = await call_next(request)
-    # Required for Godot 4 HTML5 export (SharedArrayBuffer)
-    # response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
-    # response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault(
+        "Permissions-Policy",
+        "camera=(), microphone=(), geolocation=()",
+    )
     return response
     
-@app.on_event("startup")
-def on_startup():
-    from .db import init_db
-    init_db()
-    print("DEBUG: Database initialized", flush=True)
-
 # ---------- Pydantic Models ----------
 
 class ORUParseRequest(BaseModel):
-    hl7_text: str
+    hl7_text: str = Field(min_length=1, max_length=100_000)
     use_llm: bool = True
     persist: bool = True
 
@@ -106,7 +161,7 @@ class SaveMessageRequest(BaseModel):
     clinical_summary: str
     structured_observations: List[ObservationOut]
     fhir_bundle: Dict[str, Any]
-    raw_hl7: str
+    raw_hl7: str = Field(min_length=1, max_length=100_000)
 
 
 class MessageListItem(BaseModel):
@@ -140,25 +195,25 @@ class ObservationListResponse(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    question: str
-    history: List[Dict[str, str]] = []
-    reasoning_depth: str = "standard"
+    question: str = Field(min_length=1, max_length=2_000)
+    history: List[Dict[str, str]] = Field(default_factory=list, max_length=20)
+    reasoning_depth: Literal["standard", "deep"] = "standard"
 
 
 class QueryResponse(BaseModel):
     success: bool
     answer: str
-    highlights: List[str] = []
+    highlights: List[str] = Field(default_factory=list)
     sql_used: str = ""
     row_count: int = 0
-    sources: List[Dict[str, Any]] = []  # RAG sources
+    sources: List[Dict[str, Any]] = Field(default_factory=list)
     error: Optional[str] = None
     # New agent fields (backward compatible)
-    reasoning_trace: List[Dict[str, Any]] = []
-    tools_used: List[str] = []
+    reasoning_trace: List[Dict[str, Any]] = Field(default_factory=list)
+    tools_used: List[str] = Field(default_factory=list)
     needs_clarification: bool = False
     clarification_question: Optional[str] = None
-    clarification_options: List[str] = []
+    clarification_options: List[str] = Field(default_factory=list)
 
 
 # Patient Timeline Models
@@ -208,11 +263,6 @@ class PatientSummaryResponse(BaseModel):
     summary: str
 
 
-class ContactRequest(BaseModel):
-    email: str
-    nickname: Optional[str] = None # Honeypot field (should be empty)
-
-
 # ---------- DB Helpers ----------
 
 from .db import get_connection as _conn
@@ -247,61 +297,9 @@ def _obs_value(row: sqlite3.Row) -> Any:
 from fastapi import Request
 from datetime import datetime
 
-@app.on_event("startup")
-async def startup_event():
-    # Prune old messages on startup
-    from .db import prune_messages
-    try:
-        deleted = prune_messages(days_to_keep=2)
-        if deleted > 0:
-            print(f"Pruned {deleted} old messages on startup.")
-    except Exception as e:
-        print(f"Startup pruning failed: {e}")
-
-
 @app.get("/health")
 def health_check() -> Dict[str, str]:
     return {"status": "ok"}
-
-
-@app.post("/api/contact", status_code=201)
-def contact_endpoint(req: ContactRequest, request: Request):
-    """
-    Save a contact request (email) to the database.
-    Rate limited to prevent abuse.
-    """
-    # 0. Honeypot Check (Spam Protection)
-    if req.nickname:
-        # Silently fail (pretend it worked to confuse bots) or 400
-        # Returning 201 keeps them guessing, but for now let's just return.
-        print(f"SPAM BLOCK: Honeypot filled by {request.client.host}")
-        return {"status": "received", "message": "Thanks!"}
-
-    # 1. Input Validation
-    if not req.email or "@" not in req.email or "." not in req.email:
-        raise HTTPException(status_code=400, detail="Invalid email address.")
-
-    # 2. Rate Limiting
-    client_ip = request.client.host if request.client else "unknown"
-    now_ts = __import__("time").time()
-    limit_key = f"contact_{client_ip}"
-    last_ts = _RATE_LIMIT_STORE.get(limit_key, 0.0)
-    
-    # Strict rate limit: 1 request per minute per IP
-    if now_ts - last_ts < 60.0:
-        raise HTTPException(status_code=429, detail="Too many contact requests. Please wait a minute.")
-    
-    _RATE_LIMIT_STORE[limit_key] = now_ts
-
-    # 3. Save to DB
-    from .db import save_contact_request
-    success = save_contact_request(req.email, client_ip)
-    
-    if not success:
-        # likely due to overflow limit
-        raise HTTPException(status_code=503, detail="Contact list is full. Please try again later.")
-        
-    return {"status": "received", "message": "Thanks for your interest! We've saved your request."}
 
 
 @app.post("/api/query", response_model=QueryResponse)
@@ -535,41 +533,6 @@ def get_patient_summary_endpoint(patient_id: str, request: Request) -> PatientSu
     
     return PatientSummaryResponse(patient_id=patient_id, summary=summary)
 
-
-
-class ResetRequest(BaseModel):
-    password: str
-
-@app.delete("/messages", status_code=204)
-def clear_all_messages_endpoint(req: ResetRequest):
-    """
-    Reset database to original sample data.
-    Requires password validation.
-    """
-    from .db import delete_all_messages
-    from .seed import seed_database
-    
-    # Require an environment variable to be explicitly set
-    admin_password = os.environ.get("ADMIN_PASSWORD")
-    if not admin_password:
-        print("SECURITY: Reset attempt blocked. ADMIN_PASSWORD is not configured.")
-        raise HTTPException(status_code=403, detail="Reset functionality is disabled. ADMIN_PASSWORD is not configured.")
-
-    if req.password != admin_password:
-        import time
-        time.sleep(1.0) # Anti-brute force delay
-        print(f"SECURITY: Failed reset attempt. Invalid password.")
-        raise HTTPException(status_code=401, detail="Invalid admin password")
-
-    try:
-        # 1. Wipe everything
-        delete_all_messages()
-        
-        # 2. Re-seed default data
-        seed_database(verbose=False)
-        return
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to reset database: {e}")
 
 
 @app.post("/messages", status_code=201)
@@ -897,10 +860,10 @@ import time
 from pydantic import BaseModel
 
 class ResetRequest(BaseModel):
-    password: str
+    password: str = Field(min_length=1, max_length=256)
 
 @app.post("/admin/reset")
-async def reset_demo_data(req: ResetRequest):
+async def reset_demo_data(req: ResetRequest, request: Request):
     """
     Reset database to initial demo state.
     Deletes all messages and reseeds with sample data.
@@ -912,9 +875,16 @@ async def reset_demo_data(req: ResetRequest):
         print("SECURITY: Reset attempt blocked. ADMIN_PASSWORD is not configured.")
         raise HTTPException(status_code=403, detail="Reset functionality is disabled. ADMIN_PASSWORD is not configured.")
 
-    if req.password != admin_password:
-        # Anti-brute force delay
-        time.sleep(1.0)
+    client_ip = request.client.host if request.client else "unknown"
+    reset_key = f"reset_{client_ip}"
+    now = time.monotonic()
+    last_attempt = _RATE_LIMIT_STORE.get(reset_key, 0.0)
+    if now - last_attempt < 2.0:
+        raise HTTPException(status_code=429, detail="Please wait before trying again.")
+    _RATE_LIMIT_STORE[reset_key] = now
+
+    if not secrets.compare_digest(req.password, admin_password):
+        await asyncio.sleep(1.0)
         raise HTTPException(status_code=401, detail="Incorrect Password")
 
     if reset_lock.locked():
@@ -935,52 +905,6 @@ async def reset_demo_data(req: ResetRequest):
             return {"success": True, "message": "Database reset with 100 realistic patients and corresponding clinical data."}
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Reset failed: {str(e)}")
-
-# ---------- Contact and Lead Gen ----------
-
-class ContactRequest(BaseModel):
-    email: str
-    nickname: Optional[str] = None # Honeypot
-
-@app.post("/api/contact")
-async def handle_contact(req: ContactRequest, request: Request):
-    """
-    Handle contact form submissions.
-    Includes a honeypot field 'nickname' which must be empty.
-    """
-    # 1. Honeypot check
-    if req.nickname:
-        print(f"Honeypot triggered by IP {request.client.host}")
-        # Return success to fool bot, but don't save
-        return {"status": "received"}
-
-    # 2. Rate Limit (Simple IP-based)
-    client_ip = request.client.host
-    now = time.time()
-    last_request = _RATE_LIMIT_STORE.get(client_ip, 0)
-    
-    if now - last_request < 60.0: # 1 minute cooldown for contacts
-        raise HTTPException(status_code=429, detail="Please wait a minute before sending another request.")
-    
-    _RATE_LIMIT_STORE[client_ip] = now
-
-    # 3. Save to DB
-    from .db import get_connection
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO contacts (email, ip_address, created_at) VALUES (?, ?, ?)",
-            (req.email, client_ip, datetime.now().isoformat())
-        )
-        conn.commit()
-        print(f"New contact saved: {req.email}")
-        return {"status": "saved"}
-    except Exception as e:
-        print(f"Error saving contact: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save contact information.")
-    finally:
-        conn.close()
 
 # Mount the web directory for static assets (css, js)
 app.mount("/", StaticFiles(directory="web"), name="static")

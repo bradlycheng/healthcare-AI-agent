@@ -27,6 +27,9 @@ let trendChart = null;
 document.addEventListener('DOMContentLoaded', () => {
     if (!patientId) {
         patientName.textContent = 'No patient selected';
+        document.body.classList.add('patient-empty');
+        generateSummaryBtn.disabled = true;
+        chartMetricSelect.disabled = true;
         return;
     }
 

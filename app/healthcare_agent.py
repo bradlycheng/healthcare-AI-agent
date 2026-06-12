@@ -238,6 +238,62 @@ HIGHLIGHTS:
 - [Key takeaway 2 (optional)]""".strip()
 
 
+def normalize_tool_plan(question: str, plan: Dict[str, Any]) -> Dict[str, Any]:
+    """Correct invalid single-patient routing for population questions."""
+    tool_calls = plan.get("tool_calls")
+    if not isinstance(tool_calls, list):
+        return plan
+
+    user_question = re.sub(
+        r"^\[STRATEGY:.*?\]\s*",
+        "",
+        question,
+        count=1,
+        flags=re.DOTALL,
+    ).strip()
+    lowered = user_question.lower()
+    cohort_phrases = (
+        "which patients",
+        "show patients",
+        "list patients",
+        "all patients",
+        "synthetic patients",
+        "patients with",
+        "patients who",
+        "at-risk patients",
+        "worried about",
+        "critical findings",
+        "abnormal findings",
+    )
+    if not any(phrase in lowered for phrase in cohort_phrases):
+        return plan
+
+    changed = False
+    normalized_calls = []
+    for tool_call in tool_calls:
+        if tool_call.get("tool") == ToolName.GET_PATIENT_CONTEXT.value:
+            normalized_calls.append(
+                {
+                    "tool": ToolName.QUERY_DATABASE.value,
+                    "input": {"query": user_question},
+                }
+            )
+            changed = True
+        else:
+            normalized_calls.append(tool_call)
+
+    if not changed:
+        return plan
+
+    normalized_plan = dict(plan)
+    normalized_plan["tool_calls"] = normalized_calls
+    normalized_plan["thought"] = (
+        f"{plan.get('thought', '').strip()} "
+        "Population request routed through the cohort database query tool."
+    ).strip()
+    return normalized_plan
+
+
 # =============================================================================
 # Healthcare Agent
 # =============================================================================
@@ -336,7 +392,10 @@ class HealthcareAgent:
                         safe_msg["content"] = warden_ctx.anonymize(safe_msg["content"])
                     safe_history.append(safe_msg)
                 
-                plan = self._plan(safe_question, safe_history)
+                plan = normalize_tool_plan(
+                    safe_question,
+                    self._plan(safe_question, safe_history),
+                )
                 print(f"DEBUG: Plan result: {plan}")
             
                 if plan.get("error"):

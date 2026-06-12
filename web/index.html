@@ -12,7 +12,7 @@
         rel="stylesheet">
     <meta name="description"
         content="Clinical Intelligence for healthcare data. Process HL7 streams, convert to FHIR R4, and unlock patient insights with AI.">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=33">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
@@ -24,11 +24,10 @@
     <meta property="og:image" content="og-image.png">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="signal-atlas.css?v=3">
 </head>
 
-<body>
-    <div class="background-glow"></div>
-
+<body class="landing-page">
     <div class="background-glow"></div>
 
 
@@ -50,6 +49,10 @@
 
     <header class="hero">
         <div class="hero-content">
+            <div class="hero-kicker" aria-hidden="true">
+                <span>Clinical data intelligence</span>
+                <span>HL7 / FHIR / AI</span>
+            </div>
             <div class="badge">
                 <span class="pulse"></span>
                 v1.0 Available
@@ -60,21 +63,36 @@
                 guardrails for PHI-aware clinical AI workflows.
             </p>
             <div class="hero-actions">
-                <a href="/dashboard.html" class="btn-primary">Launch Dashboard</a>
-                <a href="/process-data.html" class="btn-secondary">Process Data</a>
-                <a href="/warden.html" class="btn-warden">View Warden 1.0</a>
-                <a href="/about.html" class="btn-secondary">About</a>
+                <a href="/dashboard.html" class="btn-primary hero-action-dashboard">Launch Dashboard</a>
+                <a href="/process-data.html" class="btn-secondary hero-action-process">Process Data</a>
+                <a href="/warden.html" class="btn-warden hero-action-warden"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Warden 1.0</a>
+                <a href="/about.html" class="btn-secondary hero-action-about">About <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
             </div>
         </div>
         <div class="hero-visual">
+            <div class="visual-index" aria-hidden="true">
+                <span>Dashboard</span>
+                <span>Live data</span>
+            </div>
+            <div class="dashboard-stage">
             <div class="glass-card mini-dashboard float-animation">
                 <div class="dashboard-header">
-                    <div class="dot red"></div>
-                    <div class="dot yellow"></div>
-                    <div class="dot green"></div>
-                    <span>AI Assistant</span>
+                    <div class="console-identity">
+                        <img src="brain_transparent.png" alt="" aria-hidden="true">
+                        <span>AI Assistant</span>
+                    </div>
+                    <div class="console-state" aria-hidden="true">
+                        <span>Warden active</span>
+                        <span class="console-live">Live</span>
+                    </div>
                 </div>
-                <div class="chat-interface">
+                <div class="console-body">
+                    <div class="console-rail" aria-hidden="true">
+                        <span class="active">01</span>
+                        <span>02</span>
+                        <span>03</span>
+                    </div>
+                    <div class="chat-interface">
                     <div class="chat-message user-msg">
                         <p>What patients should I be worried about?</p>
                     </div>
@@ -91,8 +109,18 @@
                     <div class="typing-indicator">
                         <span></span><span></span><span></span>
                     </div>
+                    </div>
                 </div>
-
+                <div class="console-footer" aria-hidden="true">
+                    <span>Evidence grounded</span>
+                    <span>Patient context loaded</span>
+                </div>
+            </div>
+            </div>
+            <div class="visual-telemetry" aria-hidden="true">
+                <span><b>117</b> messages</span>
+                <span><b>22</b> patients</span>
+                <span><b>7</b> recent</span>
             </div>
         </div>
     </header>
@@ -103,28 +131,28 @@
             <p>From ingestion to insight.</p>
         </div>
         <div class="feature-grid balanced-four">
-            <div class="feature-card">
+            <div class="feature-card feature-card-process">
                 <div class="icon-box">
                     <i class="fa-solid fa-fire-flame-curved"></i>
                 </div>
                 <h3>FHIR Transformation</h3>
                 <p>Convert raw HL7 v2 messages to standard FHIR R4.</p>
             </div>
-            <div class="feature-card">
+            <div class="feature-card feature-card-review">
                 <div class="icon-box">
                     <i class="fa-solid fa-check-double"></i>
                 </div>
                 <h3>Review AI Analysis</h3>
                 <p>Review and validate AI analysis on clinical notes.</p>
             </div>
-            <div class="feature-card">
+            <div class="feature-card feature-card-wide feature-card-chat">
                 <div class="icon-box">
                     <i class="fa-solid fa-comments"></i>
                 </div>
                 <h3>Chat with Data</h3>
                 <p>Ask the dashboard: "What patients should I be worried about?"</p>
             </div>
-            <div class="feature-card">
+            <div class="feature-card feature-card-governance">
                 <div class="icon-box">
                     <i class="fa-solid fa-user-shield"></i>
                 </div>
@@ -144,18 +172,21 @@
         </div>
         <div class="steps-container">
             <div class="step">
+                <div class="step-marker" aria-hidden="true"><i class="fa-solid fa-file-arrow-up"></i></div>
                 <div class="step-number">01</div>
                 <h3>Ingest</h3>
                 <p>Upload raw HL7 files or stream data via MLLP.</p>
             </div>
             <div class="line"></div>
             <div class="step">
+                <div class="step-marker" aria-hidden="true"><i class="fa-solid fa-gears"></i></div>
                 <div class="step-number">02</div>
                 <h3>Process</h3>
                 <p>Agent pipelines parse, structure, and analyze the data.</p>
             </div>
             <div class="line"></div>
             <div class="step">
+                <div class="step-marker" aria-hidden="true"><i class="fa-solid fa-comments"></i></div>
                 <div class="step-number">03</div>
                 <h3>Interact</h3>
                 <p>Chat with your agent to uncover trends, risks, and clinical summaries.</p>
@@ -166,7 +197,7 @@
     <section id="tech-stack" class="tech-stack">
         <div class="section-header">
             <h2>Technology</h2>
-            <p>Modern stack.</p>
+            <p>Grounded clinical AI with agent-driven workflows.</p>
         </div>
         <div class="tech-grid">
             <div class="tech-card">
@@ -176,8 +207,8 @@
             </div>
             <div class="tech-card">
                 <i class="fa-solid fa-database"></i>
-                <h4>ChromaDB</h4>
-                <p>Long-term conversation memory.</p>
+                <h4>SQLite Vector Store</h4>
+                <p>Embedded evidence retrieval index.</p>
             </div>
             <div class="tech-card">
                 <i class="fa-brands fa-python"></i>
@@ -189,6 +220,16 @@
                 <h4>Docker</h4>
                 <p>Secure containerization.</p>
             </div>
+            <div class="tech-card">
+                <i class="fa-solid fa-book-medical"></i>
+                <h4>Evidence-Grounded Retrieval</h4>
+                <p>Uses retrieval-augmented generation (RAG) to ground answers in relevant patient data and clinical references.</p>
+            </div>
+            <div class="tech-card">
+                <i class="fa-solid fa-diagram-project"></i>
+                <h4>Agent Tool Orchestration</h4>
+                <p>Coordinates multi-step analysis and specialized tools using a ReAct-style workflow.</p>
+            </div>
         </div>
     </section>
 
@@ -196,31 +237,30 @@
 
     <section id="demo" class="cta-section">
         <div class="cta-content">
-            <h2>Ready for the Future?</h2>
-            <p>See the product story, governance thesis, and request a review on the About page.</p>
-            <a href="/about.html#signup" class="btn-primary large">Request Governance Review</a>
-            <p style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
-                Or email us at <a href="mailto:bradly@healthdataagent.com"
-                    style="color: var(--primary);">bradly@healthdataagent.com</a>
+            <h2>Get Health Data Agent Updates</h2>
+            <p>Follow new product capabilities, clinical AI experiments, interoperability work, and Warden progress.</p>
+            <a href="mailto:Bradly@healthdataagent.com?subject=Health%20Data%20Agent%20Updates"
+                class="btn-primary large updates-mailto">Subscribe for Updates</a>
+            <p class="cta-secondary">
+                Interested in the governance work? <a href="/about.html#signup">Request a governance review</a> or
+                email <a href="mailto:Bradly@healthdataagent.com">Bradly@healthdataagent.com</a>.
             </p>
         </div>
     </section>
 
     <footer class="footer">
         <p>&copy; 2026 Health Data Agent | Created by Bradly Cheng <a href="https://www.linkedin.com/in/bradly-cheng/"
-                target="_blank" rel="noopener" style="margin-left: 0.25rem; color: inherit;"><i
+                target="_blank" rel="noopener" aria-label="Bradly Cheng on LinkedIn"><i
                     class="fa-brands fa-linkedin"></i></a></p>
         <div class="social-links footer-links">
-            <a href="/about.html" class="footer-email"
-                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">About
+            <a href="/about.html" class="footer-email">About
                 <i class="fa-solid fa-circle-info"></i></a>
-            <a href="mailto:bradly@healthdataagent.com" class="footer-email"
-                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">bradly@healthdataagent.com
+            <a href="mailto:Bradly@healthdataagent.com" class="footer-email">Bradly@healthdataagent.com
                 <i class="fa-solid fa-envelope"></i></a>
         </div>
     </footer>
 
-    <script src="script.js?v=1.1.1"></script>
+    <script src="script.js?v=1.1.4"></script>
 </body>
 
 </html>

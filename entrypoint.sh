@@ -9,16 +9,23 @@ if [ "$DATABASE_PATH" = "/data/agent.db" ] && [ ! -f /data/agent.db ]; then
     echo "Database initialized successfully"
 fi
 
-# Initialize RAG vector store if it doesn't exist
-if [ ! -d "/app/chroma_db" ] || [ -z "$(ls -A /app/chroma_db 2>/dev/null)" ]; then
+# Initialize the embedded RAG vector store if it doesn't exist
+if [ ! -f "/app/vector_data/vectors.sqlite3" ]; then
     echo "Initializing RAG vector store..."
-    python ingest_guidelines.py || echo "Warning: RAG indexing failed, continuing anyway"
-    echo "RAG initialization complete"
+    if python ingest_guidelines.py; then
+        echo "RAG initialization complete"
+    else
+        echo "Warning: RAG indexing failed; starting without guideline retrieval"
+    fi
 fi
 
 # Start the application or run passed command
 if [ $# -eq 0 ]; then
-    exec uvicorn app.api:app --host 0.0.0.0 --port 8080
+    # The app port is exposed only to localhost and Caddy in Compose.
+    # Trust Caddy's forwarded client IP so per-IP rate limits do not collapse
+    # all public visitors into the proxy container address.
+    exec uvicorn app.api:app --host 0.0.0.0 --port 8080 \
+        --proxy-headers --forwarded-allow-ips="*"
 else
     exec "$@"
 fi

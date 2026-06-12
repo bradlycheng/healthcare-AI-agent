@@ -1,0 +1,16 @@
+{
+  "name": "health-data-agent-frontend-tests",
+  "private": true,
+  "scripts": {
+    "test:browser": "npm run test:browser:chat && npm run test:browser:banner && npm run test:browser:workflows && npm run test:browser:smoke && npm run test:browser:a11y",
+    "test:browser:chat": "node tests/chat_frontend_browser_test.cjs",
+    "test:browser:banner": "node tests/critical_banner_browser_test.cjs",
+    "test:browser:workflows": "node tests/frontend_workflows_browser_test.cjs",
+    "test:browser:smoke": "node tests/site_smoke_browser_test.cjs",
+    "test:browser:a11y": "node tests/accessibility_browser_test.cjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.11.3",
+    "playwright": "1.60.0"
+  }
+}

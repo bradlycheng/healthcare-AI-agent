@@ -22,13 +22,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }, observerOptions);
 
-    const elementsToAnimate = document.querySelectorAll('.feature-card, .step');
-    elementsToAnimate.forEach(el => {
-        el.style.opacity = '0';
-        el.style.transform = 'translateY(20px)';
-        el.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
-        observer.observe(el);
-    });
+    if (!document.body.classList.contains('landing-page')) {
+        const elementsToAnimate = document.querySelectorAll('.feature-card, .step');
+        elementsToAnimate.forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(20px)';
+            el.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
+            observer.observe(el);
+        });
+    }
 
     function showToast(message, type = 'info') {
         const toast = document.createElement('div');

@@ -12,77 +12,14 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=33">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        .portfolio-container {
-            max-width: 960px;
-            margin: 0 auto;
-            padding: 8rem 2rem 4rem;
-        }
-
-        .portfolio-header {
-            text-align: center;
-            margin-bottom: 3rem;
-        }
-
-        .portfolio-header h1 {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            background: var(--gradient-main);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .portfolio-header p {
-            color: var(--text-muted);
-            font-size: 1.2rem;
-            line-height: 1.7;
-            max-width: 720px;
-            margin: 0 auto;
-        }
-
-        .portfolio-grid {
-            display: grid;
-            gap: 1.5rem;
-        }
-
-        .portfolio-card {
-            background: linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 2rem;
-            transition: transform 0.3s ease, border-color 0.3s ease;
-        }
-
-        .portfolio-card:hover {
-            transform: translateY(-4px);
-            border-color: var(--primary);
-        }
-
-        .portfolio-card h2 {
-            font-size: 1.6rem;
-            margin-bottom: 0.75rem;
-        }
-
-        .portfolio-card p {
-            color: var(--text-muted);
-            line-height: 1.7;
-            margin-bottom: 1.5rem;
-        }
-
-        .portfolio-actions {
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-    </style>
+    <link rel="stylesheet" href="signal-atlas.css?v=3">
 </head>
 
-<body>
+<body class="portfolio-page">
     <div class="background-glow"></div>
 
     <nav class="navbar">
@@ -103,48 +40,81 @@
 
     <main class="portfolio-container">
         <section class="portfolio-header">
+            <div class="portfolio-kicker" aria-label="Portfolio summary">
+                <span>Selected work</span>
+                <span>03 projects / mixed media</span>
+            </div>
             <h1>Portfolio</h1>
             <p>
-                A few projects outside the Health Data Agent demo, showing software, creative tools, and web work.
+                A focused collection of software, client web work, and creative experiments built beyond Health Data
+                Agent.
             </p>
         </section>
 
         <section class="portfolio-grid" aria-label="Portfolio projects">
-            <article class="portfolio-card">
+            <article class="portfolio-card portfolio-card-game">
+                <div class="portfolio-card-head">
+                    <span class="portfolio-index">01 / Game</span>
+                    <span class="portfolio-status"><span aria-hidden="true"></span>Playable</span>
+                </div>
+                <div class="portfolio-icon" aria-hidden="true"><i class="fa-solid fa-crosshairs"></i></div>
                 <h2>EvadeMan</h2>
                 <p>
                     A strategic survival game built with Godot Engine. Navigate through pressure, survive, and reach the
                     goal.
                 </p>
+                <div class="portfolio-tags" aria-label="Project technologies">
+                    <span>Godot</span>
+                    <span>Game design</span>
+                </div>
                 <div class="portfolio-actions">
-                    <a href="/game.html" class="btn-primary large">
+                    <a href="/game.html" class="btn-primary portfolio-link">
                         <i class="fa-solid fa-play"></i> Play Game
                     </a>
                 </div>
             </article>
 
-            <article class="portfolio-card">
+            <article class="portfolio-card portfolio-card-client">
+                <div class="portfolio-card-head">
+                    <span class="portfolio-index">02 / Client web</span>
+                    <span class="portfolio-status"><span aria-hidden="true"></span>Live</span>
+                </div>
+                <div class="portfolio-icon" aria-hidden="true"><i class="fa-solid fa-paw"></i></div>
                 <h2>BC Dawgs</h2>
                 <p>
                     A custom website built for a dog sitting service, focused on simple branding, trust, and clear
                     customer action.
                 </p>
+                <div class="portfolio-tags" aria-label="Project focus">
+                    <span>Web design</span>
+                    <span>Branding</span>
+                </div>
                 <div class="portfolio-actions">
-                    <a href="https://bcdawgs.com" target="_blank" rel="noopener" class="btn-primary large">
-                        <i class="fa-solid fa-globe"></i> Visit Website
+                    <a href="https://bcdawgs.com" target="_blank" rel="noopener"
+                        class="btn-primary portfolio-link">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Visit Website
                     </a>
                 </div>
             </article>
 
-            <article class="portfolio-card">
+            <article class="portfolio-card portfolio-card-creative">
+                <div class="portfolio-card-head">
+                    <span class="portfolio-index">03 / Creative AI</span>
+                    <span class="portfolio-status"><span aria-hidden="true"></span>Ongoing</span>
+                </div>
+                <div class="portfolio-icon" aria-hidden="true"><i class="fa-solid fa-clapperboard"></i></div>
                 <h2>What's That Human Thing?</h2>
                 <p>
                     AI-assisted video editing and storytelling experiments exploring how human ideas can be shaped with
                     modern creative tools.
                 </p>
+                <div class="portfolio-tags" aria-label="Project focus">
+                    <span>Video</span>
+                    <span>Storytelling</span>
+                </div>
                 <div class="portfolio-actions">
                     <a href="https://www.youtube.com/@WhatsThatHumanThing" target="_blank" rel="noopener"
-                        class="btn-primary large">
+                        class="btn-primary portfolio-link">
                         <i class="fa-brands fa-youtube"></i> Watch Channel
                     </a>
                 </div>
@@ -154,18 +124,16 @@
 
     <footer class="footer">
         <p>&copy; 2026 Health Data Agent | Created by Bradly Cheng <a href="https://www.linkedin.com/in/bradly-cheng/"
-                target="_blank" rel="noopener" style="margin-left: 0.25rem; color: inherit;"><i
+                target="_blank" rel="noopener" aria-label="Bradly Cheng on LinkedIn"><i
                     class="fa-brands fa-linkedin"></i></a></p>
         <div class="social-links footer-links">
-            <a href="/about.html" class="footer-email"
-                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">About
+            <a href="/about.html" class="footer-email">About
                 <i class="fa-solid fa-circle-info"></i></a>
-            <a href="mailto:bradly@healthdataagent.com" class="footer-email"
-                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">bradly@healthdataagent.com
+            <a href="mailto:Bradly@healthdataagent.com" class="footer-email">Bradly@healthdataagent.com
                 <i class="fa-solid fa-envelope"></i></a>
         </div>
     </footer>
-    <script src="script.js?v=1.1.1"></script>
+    <script src="script.js?v=1.1.4"></script>
 </body>
 
 </html>

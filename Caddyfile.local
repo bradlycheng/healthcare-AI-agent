@@ -5,11 +5,13 @@
     # Serve static files from /web directory first
     root * /srv/web
     
-    # Add CORS and Cross-Origin isolation headers for Godot 4
+    # Cross-Origin isolation headers for Godot 4.
     header {
-        Access-Control-Allow-Origin *
         Cross-Origin-Embedder-Policy require-corp
         Cross-Origin-Opener-Policy same-origin
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        X-Frame-Options DENY
     }
     
     # Set proper MIME types for Godot files

@@ -2,19 +2,27 @@ services:
   app:
     build: .
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - sqlite_data:/data
-      - ~/.aws:/root/.aws:ro # Mount AWS credentials for Bedrock access
-      - ./docs:/app/docs:ro # Medical reference documents for RAG
-      - ./chroma_db:/app/chroma_db # ChromaDB vector store
-      - ./web:/app/web # Frontend code (hot reload)
-      - ./app:/app/app # Backend code (hot reload)
+      - rag_data:/app/vector_data
     environment:
       - DATABASE_PATH=/data/agent.db
       - AWS_REGION=us-east-1
       - BEDROCK_MODEL_ID=meta.llama3-8b-instruct-v1:0
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-d3m0th1s}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env before starting the stack}
+      - APP_ENV=production
+      - MESSAGE_RETENTION_DAYS=${MESSAGE_RETENTION_DAYS:-0}
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-healthdataagent.com,www.healthdataagent.com,localhost,127.0.0.1,app}
+      - ENABLE_API_DOCS=${ENABLE_API_DOCS:-false}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
       # If running locally without IAM Role, mount your .aws folder or pass keys
       # - AWS_PROFILE=default 
 
@@ -29,9 +37,12 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - app
+      app:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   sqlite_data:
+  rag_data:
   caddy_data:
   caddy_config:

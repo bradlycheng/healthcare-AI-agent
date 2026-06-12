@@ -11,7 +11,7 @@
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <meta name="description" content="AI-generated patient journey timeline and health data analysis.">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=33">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
@@ -22,10 +22,11 @@
     <meta property="og:image" content="og-image.png">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="signal-atlas.css?v=3">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
-<body class="dashboard-page">
+<body class="dashboard-page patient-page">
     <div class="background-glow"></div>
 
     <nav class="navbar">
@@ -68,14 +69,18 @@
 
         <!-- AI Summary Section -->
         <section class="ai-summary-section">
-            <div class="summary-card">
+                <div class="summary-card">
                 <div class="summary-header">
-                    <i class="fa-solid fa-robot"></i>
-                    <span>AI Journey Summary</span>
-                    <a href="/about.html" class="context-link" style="margin-left: auto; font-size: 0.85rem;">About</a>
-                    <button id="generate-summary-btn" class="btn-secondary small">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Generate
-                    </button>
+                    <div class="summary-title">
+                        <i class="fa-solid fa-robot"></i>
+                        <span>AI Journey Summary</span>
+                    </div>
+                    <div class="summary-actions">
+                        <a href="/about.html" class="context-link">About</a>
+                        <button id="generate-summary-btn" class="btn-secondary small">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Generate
+                        </button>
+                    </div>
                 </div>
                 <div class="summary-content" id="ai-summary">
                     <p class="placeholder-text">Click "Generate" to create an AI-powered summary of this patient's
@@ -89,7 +94,7 @@
             <div class="chart-container">
                 <div class="chart-header">
                     <h3><i class="fa-solid fa-chart-line"></i> Vital Signs Trend</h3>
-                    <select id="chart-metric">
+                    <select id="chart-metric" aria-label="Vital signs chart metric">
                         <option value="BP_COMBINED">Blood Pressure (Sys & Dia)</option>
                         <option value="2345-7">Glucose</option>
                         <option value="718-7">Hemoglobin</option>
@@ -108,7 +113,7 @@
             <div class="timeline-container" id="timeline-container">
                 <!-- Visit cards will be inserted here -->
             </div>
-            <div class="load-more-container" style="text-align: center; margin-top: 1.5rem; display: none;">
+            <div class="load-more-container">
                 <button id="load-more-btn" class="btn-secondary">Load More Visits</button>
             </div>
         </section>
@@ -116,19 +121,17 @@
 
     <footer class="footer">
         <p>&copy; 2026 Health Data Agent | Created by Bradly Cheng <a href="https://www.linkedin.com/in/bradly-cheng/"
-                target="_blank" rel="noopener" style="margin-left: 0.25rem; color: inherit;"><i
+                target="_blank" rel="noopener" aria-label="Bradly Cheng on LinkedIn"><i
                     class="fa-brands fa-linkedin"></i></a></p>
         <div class="social-links footer-links">
-            <a href="/about.html" class="footer-email"
-                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">About
+            <a href="/about.html" class="footer-email">About
                 <i class="fa-solid fa-circle-info"></i></a>
-            <a href="mailto:bradly@healthdataagent.com" class="footer-email"
-                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">bradly@healthdataagent.com
+            <a href="mailto:Bradly@healthdataagent.com" class="footer-email">Bradly@healthdataagent.com
                 <i class="fa-solid fa-envelope"></i></a>
         </div>
     </footer>
 
-    <script src="patient.js"></script>
+    <script src="patient.js?v=2"></script>
 </body>
 
 </html>

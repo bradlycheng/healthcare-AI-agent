@@ -11,7 +11,7 @@
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <meta name="description" content="Real-time HL7 to FHIR processing with AI-powered clinical identification.">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=33">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
@@ -22,11 +22,10 @@
     <meta property="og:image" content="og-image.png">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="signal-atlas.css?v=3">
 </head>
 
-<body>
-    <div class="background-glow"></div>
-
+<body class="process-page">
     <div class="background-glow"></div>
 
 
@@ -46,12 +45,10 @@
         <a href="/dashboard.html" class="btn-primary">Get Started</a>
     </nav>
 
-    <div style="margin-top: 100px;"></div>
-
     <!-- Ingest Section (Moved from Index) -->
     <section id="demo-live" class="demo-section">
         <div class="section-header">
-            <h2>Process Data</h2>
+            <h1>Process Data</h1>
             <p>Paste raw HL7 (ORU) messages below to extract observations and convert to FHIR.</p>
         </div>
 
@@ -71,7 +68,7 @@
                     <label for="hl7-input">Raw HL7 (ORU) Message</label>
                     <div class="input-controls">
                         <label class="toggle-switch">
-                            <input type="checkbox" id="ai-toggle" checked>
+                            <input type="checkbox" id="ai-toggle" aria-label="Enable AI analysis" checked>
                             <span class="slider"></span>
                         </label>
                         <span class="toggle-label">Enable AI Analysis</span>
@@ -123,12 +120,12 @@ OBX|3|TX|NOTE^Clinical Note||50 y/o male presenting with crushing chest pain rad
                                 <thead>
                                     <tr>
                                         <!-- Select All Checkbox -->
-                                        <th style="width: 40px;"><input type="checkbox" id="select-all" checked></th>
-                                        <th style="width: 80px;">Source</th>
+                                        <th class="col-select"><input type="checkbox" id="select-all" checked></th>
+                                        <th class="col-source">Source</th>
                                         <th>Test Name / Code</th>
-                                        <th style="width: 100px;">Value</th>
-                                        <th style="width: 80px;">Unit</th>
-                                        <th style="width: 60px;">Flag</th>
+                                        <th class="col-value">Value</th>
+                                        <th class="col-unit">Unit</th>
+                                        <th class="col-flag">Flag</th>
                                         <th>Ref Range</th>
                                     </tr>
                                 </thead>
@@ -152,7 +149,7 @@ OBX|3|TX|NOTE^Clinical Note||50 y/o male presenting with crushing chest pain rad
                         <pre><code id="res-fhir"></code></pre>
                     </div>
                     <div class="tab-content" id="tab-ack">
-                        <pre><code id="res-ack" style="color:var(--success);"></code></pre>
+                        <pre><code id="res-ack" class="ack-output"></code></pre>
                     </div>
                 </div>
             </div>
@@ -161,19 +158,17 @@ OBX|3|TX|NOTE^Clinical Note||50 y/o male presenting with crushing chest pain rad
 
     <footer class="footer">
         <p>&copy; 2026 Health Data Agent | Created by Bradly Cheng <a href="https://www.linkedin.com/in/bradly-cheng/"
-                target="_blank" rel="noopener" style="margin-left: 0.25rem; color: inherit;"><i
+                target="_blank" rel="noopener" aria-label="Bradly Cheng on LinkedIn"><i
                     class="fa-brands fa-linkedin"></i></a></p>
         <div class="social-links footer-links">
-            <a href="/about.html" class="footer-email"
-                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">About
+            <a href="/about.html" class="footer-email">About
                 <i class="fa-solid fa-circle-info"></i></a>
-            <a href="mailto:bradly@healthdataagent.com" class="footer-email"
-                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">bradly@healthdataagent.com
+            <a href="mailto:Bradly@healthdataagent.com" class="footer-email">Bradly@healthdataagent.com
                 <i class="fa-solid fa-envelope"></i></a>
         </div>
     </footer>
 
-    <script src="script.js?v=1.1.1"></script>
+    <script src="script.js?v=1.1.4"></script>
 </body>
 
 </html>

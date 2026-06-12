@@ -30,15 +30,22 @@ ENV/
 env.bak/
 venv.bak/
 
+# Node test dependencies
+node_modules/
+
 # Database
 *.db
 *.sqlite3
+*.db-wal
+*.db-shm
+*.db-journal
 
 # Exception: Allow seed database to be committed
 !agent.db
 
 # Logs
 *.log
+warden_audit.jsonl
 
 # OS
 .DS_Store
@@ -53,3 +60,4 @@ Thumbs.db
 
 # Vector database (generated at runtime)
 chroma_db/
+vector_data/

@@ -12,7 +12,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=33">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
@@ -23,8 +23,8 @@
         content="AI-powered medical data dashboard for clinical intelligence and patient analysis.">
     <meta property="og:image" content="og-image.png">
 
-    <link rel="stylesheet" href="boxy.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="signal-atlas.css?v=3">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 
@@ -47,16 +47,6 @@
         <a href="/dashboard.html" class="btn-primary">Get Started</a>
     </nav>
 
-    <!-- Critical Alerts Banner -->
-    <div id="alerts-banner" class="alerts-banner hidden">
-        <div class="alerts-content">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <span><strong>CRITICAL ALERTS DETECTED</strong> - <span id="alert-count">0</span> patient(s) require
-                immediate attention</span>
-        </div>
-        <button id="alerts-dismiss" class="alerts-dismiss" title="Dismiss Alert">&times;</button>
-    </div>
-
     <main class="dashboard-container">
         <header class="dashboard-header">
             <div class="header-content">
@@ -64,25 +54,29 @@
                 <p>View and analyze processed HL7 messages and clinical data</p>
             </div>
             <div class="header-actions">
-                <button id="refresh-btn" class="btn-secondary">
+                <button id="refresh-btn" class="btn-secondary" type="button">
                     <i class="fa-solid fa-rotate"></i> Refresh
                 </button>
-                <button id="delete-btn" class="btn-danger"
-                    style="margin-left: 10px; background-color: #ef4444; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-family: inherit; font-size: 0.875rem; font-weight: 500;">
+                <button id="delete-btn" class="btn-danger" type="button">
                     <i class="fa-solid fa-rotate-left"></i> Reset Demo
                 </button>
             </div>
         </header>
 
-        <!-- Active Alerts Alert Box -->
-        <div id="active-alerts-box" class="active-alerts-banner">
-            <i class="fa-solid fa-triangle-exclamation fa-beat"></i>
-            <div>
-                <p>CRITICAL ALERTS DETECTED</p>
-                <span id="alert-count-text" style="font-size: 0.9rem; opacity: 0.9;">Action required for high-risk
-                    findings.</span>
+        <!-- Critical Alerts Banner -->
+        <div id="alerts-banner" class="alerts-banner hidden" role="alert" aria-live="assertive">
+            <div class="alerts-content">
+                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                <span><strong>Critical alerts detected</strong> — <span id="alert-count">0</span>
+                    <span id="alert-patient-label">patients require</span> immediate attention</span>
+            </div>
+            <div class="alerts-actions">
+                <button id="alerts-view" class="alerts-view" type="button">View critical</button>
+                <button id="alerts-dismiss" class="alerts-dismiss" type="button"
+                    aria-label="Dismiss critical alerts"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
             </div>
         </div>
+
         <section class="stats-grid">
             <div class="stat-card">
                 <div class="stat-icon messages">
@@ -133,11 +127,11 @@
                     <div class="warden-badge">
                         <i class="fa-solid fa-shield-halved"></i>
                         Warden 1.0 Guardrails Active
-                        <a href="/about.html" class="context-link"
-                            style="margin-left: 0.35rem; color: #60a5fa; text-decoration: underline;">Why it's not enough</a>
+                        <a href="/about.html" class="context-link">Why it's not enough</a>
                     </div>
                 </div>
-                <div class="query-messages" id="query-messages">
+                <div class="query-messages" id="query-messages" role="log" aria-live="polite"
+                    aria-relevant="additions">
                     <div class="message message-ai">
                         <div class="message-avatar">
                             <i class="fa-solid fa-robot"></i>
@@ -153,14 +147,15 @@
                     </div>
                 </div>
                 <div class="query-input-row">
-                    <input type="text" id="query-input" placeholder="Ask about your patient data...">
+                    <input type="text" id="query-input" placeholder="Ask about your patient data..."
+                        aria-label="Ask about your patient data">
                     <div class="reasoning-selector-container">
-                        <select id="reasoning-depth" class="query-depth-select">
+                        <select id="reasoning-depth" class="query-depth-select" aria-label="Reasoning depth">
                             <option value="standard" selected>Standard</option>
                             <option value="deep">Deep</option>
                         </select>
                     </div>
-                    <button id="query-submit" class="btn-query-submit">
+                    <button id="query-submit" class="btn-query-submit" aria-label="Send question" disabled>
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
                 </div>
@@ -188,13 +183,13 @@
                 <input type="text" id="search-input" placeholder="Search by patient name, ID, or test...">
             </div>
             <div class="filter-group">
-                <select id="filter-flag">
+                <select id="filter-flag" aria-label="Filter by result status">
                     <option value="">All Results</option>
                     <option value="abnormal">Abnormal Only</option>
                     <option value="critical">Critical Only</option>
                     <option value="normal">Normal Only</option>
                 </select>
-                <select id="filter-date">
+                <select id="filter-date" aria-label="Filter by date range">
                     <option value="">All Time</option>
                     <option value="today">Today</option>
                     <option value="week">This Week</option>
@@ -205,7 +200,7 @@
 
         <!-- Messages Table -->
         <section class="messages-section">
-            <div class="table-container">
+            <div class="table-container" role="region" aria-label="Processed message table" tabindex="0">
                 <table class="messages-table">
                     <thead>
                         <tr>
@@ -228,11 +223,11 @@
             <div class="table-footer">
                 <span id="showing-count">Showing 0 of 0 messages</span>
                 <div class="pagination">
-                    <button id="prev-page" class="page-btn" disabled>
+                    <button id="prev-page" class="page-btn" aria-label="Previous page" disabled>
                         <i class="fa-solid fa-chevron-left"></i>
                     </button>
                     <span id="page-info">Page 1</span>
-                    <button id="next-page" class="page-btn">
+                    <button id="next-page" class="page-btn" aria-label="Next page">
                         <i class="fa-solid fa-chevron-right"></i>
                     </button>
                 </div>
@@ -244,7 +239,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2><i class="fa-solid fa-file-medical"></i> Message Details</h2>
-                    <button class="modal-close" id="close-modal">
+                    <button class="modal-close" id="close-modal" aria-label="Close message details">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
@@ -292,31 +287,28 @@
 
         <!-- Reset Confirmation Modal -->
         <div class="modal-overlay" id="reset-modal">
-            <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-content reset-modal-content">
                 <div class="modal-header">
-                    <h2><i class="fa-solid fa-triangle-exclamation" style="color: #ef4444;"></i> Reset Database</h2>
-                    <button class="modal-close" id="close-reset-modal">
+                    <h2><i class="fa-solid fa-triangle-exclamation reset-warning-icon"></i> Reset Database</h2>
+                    <button class="modal-close" id="close-reset-modal" aria-label="Close reset dialog">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <p style="margin-bottom: 1rem; color: #ef4444; font-weight: 500;">
+                    <p class="reset-warning-copy">
                         Are you sure you want to reset the database? This action cannot be undone.
                     </p>
-                    <div style="margin-bottom: 1rem;">
-                        <label for="reset-password" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">
+                    <div class="reset-field">
+                        <label for="reset-password">
                             Enter Admin Password:
                         </label>
-                        <input type="password" id="reset-password"
-                            style="width: 100%; padding: 0.75rem; border: 1px solid #374151; border-radius: 6px; background: #1f2937; color: white; font-size: 1rem;"
-                            placeholder="Enter password...">
+                        <input type="password" id="reset-password" placeholder="Enter password...">
                     </div>
-                    <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-                        <button id="reset-cancel-btn" class="btn-secondary" style="padding: 0.75rem 1.5rem;">
+                    <div class="reset-actions">
+                        <button id="reset-cancel-btn" class="btn-secondary">
                             Cancel
                         </button>
-                        <button id="reset-confirm-btn" class="btn-danger"
-                            style="padding: 0.75rem 1.5rem; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                        <button id="reset-confirm-btn" class="btn-danger">
                             Reset Database
                         </button>
                     </div>
@@ -327,19 +319,17 @@
 
     <footer class="footer">
         <p>&copy; 2026 Health Data Agent | Created by Bradly Cheng <a href="https://www.linkedin.com/in/bradly-cheng/"
-                target="_blank" rel="noopener" style="margin-left: 0.25rem; color: inherit;"><i
+                target="_blank" rel="noopener" aria-label="Bradly Cheng on LinkedIn"><i
                     class="fa-brands fa-linkedin"></i></a></p>
         <div class="social-links footer-links">
-            <a href="/about.html" class="footer-email"
-                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">About
+            <a href="/about.html" class="footer-email">About
                 <i class="fa-solid fa-circle-info"></i></a>
-            <a href="mailto:bradly@healthdataagent.com" class="footer-email"
-                style="text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">bradly@healthdataagent.com
+            <a href="mailto:Bradly@healthdataagent.com" class="footer-email">Bradly@healthdataagent.com
                 <i class="fa-solid fa-envelope"></i></a>
         </div>
     </footer>
 
-    <script src="dashboard.js?v=8"></script>
+    <script src="dashboard.js?v=14"></script>
 </body>
 
 </html>

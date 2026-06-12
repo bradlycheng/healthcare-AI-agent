@@ -10,9 +10,12 @@ EMBEDDING_DIMENSION = 1536
 CHUNK_SIZE = 500  # characters
 CHUNK_OVERLAP = 50  # characters
 
-# Vector DB settings
-CHROMA_PERSIST_DIR = os.path.join(os.path.dirname(__file__), "..", "chroma_db")
-COLLECTION_NAME = "medical_guidelines"
+# Embedded vector-store settings
+VECTOR_STORE_DIR = os.getenv(
+    "VECTOR_STORE_DIR",
+    os.path.join(os.path.dirname(__file__), "..", "vector_data"),
+)
+VECTOR_STORE_PATH = os.path.join(VECTOR_STORE_DIR, "vectors.sqlite3")
 
 # Retrieval settings
 TOP_K_RESULTS = 3

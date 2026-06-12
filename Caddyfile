@@ -3,11 +3,13 @@ healthdataagent.com, www.healthdataagent.com {
     # Serve static files from /srv/web
     root * /srv/web
     
-    # Add CORS and Cross-Origin isolation headers for Godot 4
+    # Cross-Origin isolation headers for the Godot 4 demo.
     header {
-        Access-Control-Allow-Origin *
         Cross-Origin-Embedder-Policy require-corp
         Cross-Origin-Opener-Policy same-origin
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        X-Frame-Options DENY
     }
 
     # Set proper MIME types for Godot files
@@ -61,6 +63,9 @@ bradlycheng.com, www.bradlycheng.com {
     header {
         Cross-Origin-Embedder-Policy require-corp
         Cross-Origin-Opener-Policy same-origin
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        X-Frame-Options DENY
     }
 
     # Set proper MIME types for Godot files
