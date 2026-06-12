@@ -851,37 +851,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 </span>
             </button>`;
             contentHtml += '<div class="sources-content" style="display: none;">';
-            options.sources.forEach(src => {
+            options.sources.forEach((src, sourceIndex) => {
                 const relevancePercent = Math.round((src.relevance || 0) * 100);
                 const relevanceClass = relevancePercent >= 80 ? 'high' : (relevancePercent >= 50 ? 'medium' : 'low');
                 const sourceTitle = escapeHtml(src.title || 'Unknown Source');
-                // Use filename if available, otherwise fallback to title
-                const docIdentifier = src.filename || src.title || '';
-
-                // Prepare snippet for JS string (escape backslashes, quotes, newlines)
-                const rawSnippet = src.full_snippet || '';
-                const safeSnippet = rawSnippet
-                    .replace(/\\/g, '\\\\')
-                    .replace(/'/g, "\\'")
-                    .replace(/\n/g, '\\n')
-                    .replace(/\r/g, '');
-
-                // Escape HTML for attribute (mostly for double quotes if any, and general safety)
-                // Note: We used escapeHtml above for title/id, but safeSnippet needs to be passed to JS.
-                const attrSnippet = escapeHtml(safeSnippet);
-                const attrId = escapeHtml(docIdentifier.replace(/'/g, "\\'"));
-                const attrTitle = sourceTitle.replace(/'/g, "\\'"); // sourceTitle is ALREADY html escaped. prevent double escape of quotes?
-                // actually title is html escaped. so ' -> &#039;. so attrTitle has &#039;.
-                // if we use it in JS string '...', browser decodes &#039; -> '
-                // so we need \' in JS. so we need to ensure title has \' instead of ' BEFORE html escape?
-                // Too complex. Let's just use raw title and escape it properly for JS+HTML.
-
-                // Simpler approach:
-                // 1. Raw -> JS Escape -> HTML Escape
-                const jsId = (src.filename || src.title || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                const jsTitle = (src.title || 'Unknown Source').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                const finalId = escapeHtml(jsId);
-                const finalTitle = escapeHtml(jsTitle);
 
                 contentHtml += `
                     <div class="source-card">
@@ -890,7 +863,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="source-relevance ${relevanceClass}">${relevancePercent}% match</span>
                         </div>
                         <p class="source-snippet">${escapeHtml(src.snippet || '')}</p>
-                        <button class="view-doc-btn" onclick="showDocumentModal('${finalId}', '${finalTitle}', '${attrSnippet}')">
+                        <button type="button" class="view-doc-btn" data-source-index="${sourceIndex}">
                             <i class="fa-solid fa-file-lines"></i> View Full Document
                         </button>
                     </div>
@@ -913,6 +886,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${contentHtml}
             </div>
         `;
+
+        messageDiv.querySelectorAll('.view-doc-btn').forEach(button => {
+            const sourceIndex = Number.parseInt(button.dataset.sourceIndex, 10);
+            const source = options.sources?.[sourceIndex];
+            if (!source) {
+                button.disabled = true;
+                return;
+            }
+
+            button.addEventListener('click', () => {
+                showDocumentModal(
+                    source.filename || source.title || '',
+                    source.title || 'Unknown Source',
+                    source.full_snippet || ''
+                );
+            });
+        });
 
         messageDiv.querySelectorAll('.markdown-content table').forEach(table => {
             const wrapper = document.createElement('div');

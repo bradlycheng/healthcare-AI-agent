@@ -9,8 +9,11 @@ if [ "$DATABASE_PATH" = "/data/agent.db" ] && [ ! -f /data/agent.db ]; then
     echo "Database initialized successfully"
 fi
 
-# Initialize the embedded RAG vector store if it doesn't exist
-if [ ! -f "/app/vector_data/vectors.sqlite3" ]; then
+# Initialize the embedded RAG vector store when it is missing or empty.
+# A failed indexing attempt can leave a valid SQLite file with zero documents,
+# so file existence alone is not a sufficient readiness check.
+if ! python -c \
+    "from app.vector_store import get_document_count; raise SystemExit(0 if get_document_count() > 0 else 1)"; then
     echo "Initializing RAG vector store..."
     if python ingest_guidelines.py; then
         echo "RAG initialization complete"

@@ -104,3 +104,11 @@ def test_reverse_proxy_client_ips_are_trusted_for_rate_limits():
     entrypoint = (ROOT / "entrypoint.sh").read_text(encoding="utf-8")
     assert "--proxy-headers" in entrypoint
     assert '--forwarded-allow-ips="*"' in entrypoint
+
+
+def test_entrypoint_reindexes_missing_or_empty_rag_store():
+    entrypoint = (ROOT / "entrypoint.sh").read_text(encoding="utf-8")
+
+    assert "get_document_count() > 0" in entrypoint
+    assert "python ingest_guidelines.py" in entrypoint
+    assert '[ ! -f "/app/vector_data/vectors.sqlite3" ]' not in entrypoint

@@ -227,12 +227,103 @@ async function testErrorAndRateLimitStates(browser) {
   await ratePage.close();
 }
 
+async function testSourceDocumentViewer(browser) {
+  const page = await openDashboard(browser, 1024);
+  const agentContent = [
+    '# Agent Expertise: Critical Rules & Use Cases',
+    '',
+    '## Expert Refinement of Critical Rules',
+    '',
+    'The "Data Primacy" Rule treats tool results as the patient\'s ground truth.',
+  ].join('\n');
+  const labContent = '# Medical Reference: Common Lab Values\n\nReference ranges.';
+
+  await mockQuery(page, route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      ...successPayload(),
+      sources: [
+        {
+          title: 'Agent Expertise: Critical Rules & Use Cases',
+          filename: 'agent_expertise.md',
+          snippet: 'Expert refinement of critical rules.',
+          full_snippet: agentContent,
+          relevance: 0.92,
+        },
+        {
+          title: 'Common Lab Values',
+          filename: 'lab_values_reference.txt',
+          snippet: 'Common laboratory reference ranges.',
+          full_snippet: labContent,
+          relevance: 0.84,
+        },
+      ],
+    }),
+  }));
+
+  await page.route('**/api/document/*', route => {
+    const filename = decodeURIComponent(new URL(route.request().url()).pathname.split('/').pop());
+    const documents = {
+      'agent_expertise.md': agentContent,
+      'lab_values_reference.txt': labContent,
+    };
+    const content = documents[filename];
+    return route.fulfill({
+      status: content ? 200 : 404,
+      contentType: 'application/json',
+      body: JSON.stringify(content
+        ? { filename, content }
+        : { detail: 'Document not found' }),
+    });
+  });
+
+  await page.locator('#query-input').fill('Explain critical rules');
+  await page.locator('#query-submit').click();
+  const sourcesToggle = page.locator('.sources-toggle');
+  await sourcesToggle.waitFor({ state: 'visible' });
+  await sourcesToggle.click();
+
+  const sourceCards = page.locator('.source-card');
+  assert(await sourceCards.count() === 2, 'expected both RAG source cards');
+
+  const agentCard = sourceCards.filter({ hasText: 'Agent Expertise: Critical Rules & Use Cases' });
+  assert(await agentCard.count() === 1, 'agent expertise source card missing');
+  const agentButton = agentCard.getByRole('button', { name: 'View Full Document' });
+  assert(await agentButton.count() === 1, 'agent expertise document button missing');
+  await agentButton.click();
+
+  const modal = page.locator('#doc-viewer-modal.visible');
+  await modal.waitFor({ state: 'visible' });
+  assert((await page.locator('#doc-modal-title').innerText())
+    === 'Agent Expertise: Critical Rules & Use Cases',
+  'agent expertise modal title is incorrect');
+  assert((await page.locator('#doc-modal-body').innerText()).includes('Data Primacy'),
+    'agent expertise document content did not load');
+
+  const closeButton = modal.locator('.doc-modal-close');
+  assert(await closeButton.count() === 1, 'document modal close button missing');
+  await closeButton.click();
+
+  const labCard = sourceCards.filter({ hasText: 'Common Lab Values' });
+  assert(await labCard.count() === 1, 'common lab values source card missing');
+  const labButton = labCard.getByRole('button', { name: 'View Full Document' });
+  assert(await labButton.count() === 1, 'common lab values document button missing');
+  await labButton.click();
+  await modal.waitFor({ state: 'visible' });
+  assert((await page.locator('#doc-modal-body').innerText()).includes('Reference ranges'),
+    'existing text document source no longer loads');
+
+  await page.close();
+}
+
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   try {
     await testResponsiveSuccess(browser);
     await testEmptyAndPendingSubmission(browser);
     await testErrorAndRateLimitStates(browser);
+    await testSourceDocumentViewer(browser);
     console.log(`Chat frontend browser tests passed at ${widths.join(', ')}px.`);
   } finally {
     await browser.close();
