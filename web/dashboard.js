@@ -660,13 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isQueryPending) return;
 
             const query = chip.dataset.query;
-            const depth = chip.dataset.depth;
             if (query) {
-                // Set depth if provided
-                if (depth) {
-                    const depthEl = document.getElementById('reasoning-depth');
-                    if (depthEl) depthEl.value = depth;
-                }
                 queryInput.value = query;
                 requestQuery(query);
             }
@@ -700,17 +694,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Prepare history (last 5 messages)
             const context = chatHistory.slice(-5);
 
-            // Get selected reasoning depth
-            const depthEl = document.getElementById('reasoning-depth');
-            const depth = depthEl ? depthEl.value : 'standard';
-
             const response = await fetch(`${API_BASE}/api/query`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     question,
                     history: context,
-                    reasoning_depth: depth
+                    reasoning_depth: 'deep'
                 })
             });
 

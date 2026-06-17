@@ -49,6 +49,8 @@ def test_retention_is_disabled_by_default(monkeypatch):
 
 
 def test_public_request_models_enforce_bounds():
+    assert QueryRequest(question="ok").reasoning_depth == "deep"
+
     with pytest.raises(ValidationError):
         QueryRequest(question="")
     with pytest.raises(ValidationError):

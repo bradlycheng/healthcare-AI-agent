@@ -1763,8 +1763,7 @@ textarea {
     min-height: 48px;
 }
 
-.dashboard-page .query-input-row #query-input,
-.dashboard-page .query-input-row .query-depth-select {
+.dashboard-page .query-input-row #query-input {
     box-sizing: border-box;
     height: 48px;
     min-height: 48px;
@@ -1850,7 +1849,6 @@ textarea {
 }
 
 #query-input,
-.query-depth-select,
 .filter-select,
 .search-box input,
 textarea,
@@ -1864,7 +1862,6 @@ select {
 }
 
 #query-input:focus,
-.query-depth-select:focus,
 .filter-select:focus,
 .search-box input:focus,
 textarea:focus,

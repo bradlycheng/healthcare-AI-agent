@@ -125,7 +125,6 @@ def test_dashboard_keeps_javascript_contract_ids():
         "stat-recent",
         "query-messages",
         "query-input",
-        "reasoning-depth",
         "query-submit",
         "search-input",
         "filter-flag",
@@ -301,11 +300,19 @@ def test_chat_controls_and_log_have_accessible_names():
         'id="query-messages" role="log" aria-live="polite"',
         'id="query-input" placeholder="Ask about your patient data..."',
         'aria-label="Ask about your patient data"',
-        'id="reasoning-depth" class="query-depth-select" aria-label="Reasoning depth"',
         'id="query-submit" class="btn-query-submit" aria-label="Send question"',
     )
     for expected in required_markup:
         assert expected in source
+
+
+def test_chat_always_uses_deep_reasoning_without_visible_selector():
+    source = (WEB / "dashboard.html").read_text(encoding="utf-8")
+    script = (WEB / "dashboard.js").read_text(encoding="utf-8")
+
+    assert 'id="reasoning-depth"' not in source
+    assert "reasoning_depth: 'deep'" in script
+    assert "dataset.depth" not in script
 
 
 def test_no_known_mojibake_in_frontend_sources():

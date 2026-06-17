@@ -62,7 +62,6 @@ async function assertControlsContained(page, width) {
     const viewportWidth = document.documentElement.clientWidth;
     const controls = [
       document.querySelector('#query-input'),
-      document.querySelector('#reasoning-depth'),
       document.querySelector('#query-submit'),
     ].map(el => {
       const rect = el.getBoundingClientRect();
@@ -155,6 +154,50 @@ async function testResponsiveSuccess(browser) {
     await assertControlsContained(page, width);
     await page.close();
   }
+}
+
+async function testOldestPatientDeepModeRegression(browser) {
+  const page = await openDashboard(browser, 375);
+  let requestPayload = null;
+  await mockQuery(page, route => {
+    requestPayload = route.request().postDataJSON();
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...successPayload(),
+        answer: [
+          'The oldest patient is **Elizabeth SearchTest**, age **78**.',
+          '',
+          '| Patient | Status | Findings |',
+          '| :--- | :--- | :--- |',
+          '| **Elizabeth SearchTest** | -- | Age: **78**; DOB: 1947-07-12 |',
+        ].join('\n'),
+        row_count: 1,
+        sql_used: 'SELECT patient_first_name FROM hl7_messages ORDER BY patient_dob ASC LIMIT 1',
+      }),
+    });
+  });
+
+  assert(await page.locator('#reasoning-depth').count() === 0,
+    'reasoning mode selector must stay removed');
+
+  const input = page.locator('#query-input');
+  await input.fill('Who is the oldest patient?');
+  await input.press('Enter');
+  await page.locator('.chat-table-scroll').waitFor({ state: 'visible' });
+
+  assert(requestPayload?.question === 'Who is the oldest patient?',
+    'frontend changed the exact oldest-patient question');
+  assert(requestPayload?.reasoning_depth === 'deep',
+    'frontend did not submit the oldest-patient question in Deep mode');
+  assert((await page.locator('#query-messages').innerText()).includes('Elizabeth SearchTest'),
+    'oldest-patient answer did not render in chat');
+  assert(await page.locator('.message-error').count() === 0,
+    'oldest-patient answer rendered as an error');
+
+  await assertControlsContained(page, 375);
+  await page.close();
 }
 
 async function testEmptyAndPendingSubmission(browser) {
@@ -321,6 +364,7 @@ async function testSourceDocumentViewer(browser) {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   try {
     await testResponsiveSuccess(browser);
+    await testOldestPatientDeepModeRegression(browser);
     await testEmptyAndPendingSubmission(browser);
     await testErrorAndRateLimitStates(browser);
     await testSourceDocumentViewer(browser);

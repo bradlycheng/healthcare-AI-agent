@@ -503,10 +503,66 @@ ORDER BY
 LIMIT 50
 """.strip()
 
+OLDEST_PATIENT_SQL = """
+SELECT DISTINCT
+    h.patient_id,
+    h.patient_first_name,
+    h.patient_last_name,
+    h.patient_dob,
+    (
+        CAST(strftime('%Y', 'now') AS INTEGER)
+        - CAST(strftime('%Y', h.patient_dob) AS INTEGER)
+        - (strftime('%m-%d', 'now') < strftime('%m-%d', h.patient_dob))
+    ) AS age
+FROM hl7_messages h
+WHERE h.patient_dob IS NOT NULL
+  AND TRIM(h.patient_dob) <> ''
+ORDER BY DATE(h.patient_dob) ASC
+LIMIT 1
+""".strip()
+
+YOUNGEST_PATIENT_SQL = """
+SELECT DISTINCT
+    h.patient_id,
+    h.patient_first_name,
+    h.patient_last_name,
+    h.patient_dob,
+    (
+        CAST(strftime('%Y', 'now') AS INTEGER)
+        - CAST(strftime('%Y', h.patient_dob) AS INTEGER)
+        - (strftime('%m-%d', 'now') < strftime('%m-%d', h.patient_dob))
+    ) AS age
+FROM hl7_messages h
+WHERE h.patient_dob IS NOT NULL
+  AND TRIM(h.patient_dob) <> ''
+ORDER BY DATE(h.patient_dob) DESC
+LIMIT 1
+""".strip()
+
 
 def deterministic_sql_for_question(question: str) -> Optional[tuple[str, str]]:
     """Return stable SQL for common broad safety-cohort questions."""
     normalized = re.sub(r"\s+", " ", question.lower()).strip()
+    plain_question = re.sub(r"[^a-z0-9\s]", "", normalized)
+    demographic_extrema = {
+        "oldest patient": (OLDEST_PATIENT_SQL, "Retrieved the oldest patient by date of birth."),
+        "who is the oldest patient": (OLDEST_PATIENT_SQL, "Retrieved the oldest patient by date of birth."),
+        "whos the oldest patient": (OLDEST_PATIENT_SQL, "Retrieved the oldest patient by date of birth."),
+        "which patient is the oldest": (OLDEST_PATIENT_SQL, "Retrieved the oldest patient by date of birth."),
+        "show me the oldest patient": (OLDEST_PATIENT_SQL, "Retrieved the oldest patient by date of birth."),
+        "find the oldest patient": (OLDEST_PATIENT_SQL, "Retrieved the oldest patient by date of birth."),
+        "eldest patient": (OLDEST_PATIENT_SQL, "Retrieved the oldest patient by date of birth."),
+        "who is the eldest patient": (OLDEST_PATIENT_SQL, "Retrieved the oldest patient by date of birth."),
+        "youngest patient": (YOUNGEST_PATIENT_SQL, "Retrieved the youngest patient by date of birth."),
+        "who is the youngest patient": (YOUNGEST_PATIENT_SQL, "Retrieved the youngest patient by date of birth."),
+        "whos the youngest patient": (YOUNGEST_PATIENT_SQL, "Retrieved the youngest patient by date of birth."),
+        "which patient is the youngest": (YOUNGEST_PATIENT_SQL, "Retrieved the youngest patient by date of birth."),
+        "show me the youngest patient": (YOUNGEST_PATIENT_SQL, "Retrieved the youngest patient by date of birth."),
+        "find the youngest patient": (YOUNGEST_PATIENT_SQL, "Retrieved the youngest patient by date of birth."),
+    }
+    if plain_question in demographic_extrema:
+        return demographic_extrema[plain_question]
+
     cohort_terms = ("patient", "patients", "who", "alerts", "findings", "results")
     asks_about_cohort = any(term in normalized for term in cohort_terms)
     measurement_terms = (

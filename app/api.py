@@ -197,7 +197,7 @@ class ObservationListResponse(BaseModel):
 class QueryRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2_000)
     history: List[Dict[str, str]] = Field(default_factory=list, max_length=20)
-    reasoning_depth: Literal["standard", "deep"] = "standard"
+    reasoning_depth: Literal["standard", "deep"] = "deep"
 
 
 class QueryResponse(BaseModel):

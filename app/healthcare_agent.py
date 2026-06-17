@@ -264,8 +264,25 @@ def normalize_tool_plan(question: str, plan: Dict[str, Any]) -> Dict[str, Any]:
         "worried about",
         "critical findings",
         "abnormal findings",
+        "oldest patient",
+        "youngest patient",
+        "eldest patient",
     )
-    if not any(phrase in lowered for phrase in cohort_phrases):
+    aggregate_terms = (
+        "count",
+        "how many",
+        "oldest",
+        "eldest",
+        "youngest",
+        "highest",
+        "lowest",
+        "maximum",
+        "minimum",
+        "max ",
+        "min ",
+    )
+    should_preserve_query = any(term in lowered for term in aggregate_terms)
+    if not any(phrase in lowered for phrase in cohort_phrases) and not should_preserve_query:
         return plan
 
     changed = False
@@ -279,6 +296,14 @@ def normalize_tool_plan(question: str, plan: Dict[str, Any]) -> Dict[str, Any]:
                 }
             )
             changed = True
+        elif tool_call.get("tool") == ToolName.QUERY_DATABASE.value and should_preserve_query:
+            normalized_call = dict(tool_call)
+            normalized_input = dict(normalized_call.get("input") or {})
+            if normalized_input.get("query") != user_question:
+                normalized_input["query"] = user_question
+                normalized_call["input"] = normalized_input
+                changed = True
+            normalized_calls.append(normalized_call)
         else:
             normalized_calls.append(tool_call)
 
@@ -328,7 +353,7 @@ class HealthcareAgent:
             ToolName.ASK_CLARIFICATION.value: self._tool_ask_clarification,
         }
     
-    def run(self, question: str, history: List[Dict[str, str]] = None, depth: str = "standard") -> AgentResponse:
+    def run(self, question: str, history: List[Dict[str, str]] = None, depth: str = "deep") -> AgentResponse:
         """
         Main agent entry point with Reasoning Router.
         
@@ -346,7 +371,12 @@ class HealthcareAgent:
         else:
             return self._run_standard(question, history)
 
-    def _run_standard(self, question: str, history: List[Dict[str, str]] = None) -> AgentResponse:
+    def _run_standard(
+        self,
+        question: str,
+        history: List[Dict[str, str]] = None,
+        strategy_context: str = "",
+    ) -> AgentResponse:
         """
         Standard ReAct Loop (Legacy 'run' method).
         """
@@ -385,6 +415,7 @@ class HealthcareAgent:
                 # Step 1: Planning - decide which tools to use
                 # IN-GATE: Tokenize question + history before LLM sees it
                 safe_question = warden_ctx.anonymize(question)
+                safe_strategy_context = warden_ctx.anonymize(strategy_context) if strategy_context else ""
                 safe_history = []
                 for msg in (history or []):
                     safe_msg = dict(msg)
@@ -394,7 +425,7 @@ class HealthcareAgent:
                 
                 plan = normalize_tool_plan(
                     safe_question,
-                    self._plan(safe_question, safe_history),
+                    self._plan(safe_question, safe_history, safe_strategy_context),
                 )
                 print(f"DEBUG: Plan result: {plan}")
             
@@ -573,7 +604,12 @@ class HealthcareAgent:
                 error=f"Agent error: {str(e)}"
             )
     
-    def _plan(self, question: str, history: List[Dict[str, str]]) -> Dict[str, Any]:
+    def _plan(
+        self,
+        question: str,
+        history: List[Dict[str, str]],
+        strategy_context: str = "",
+    ) -> Dict[str, Any]:
         """Use LLM to plan which tools to call."""
         history_str = ""
         if history:
@@ -590,11 +626,36 @@ class HealthcareAgent:
                     label = " [IMMEDIATELY PRECEDING MESSAGE]"
                 
                 history_str += f"{role.upper()}{label}: {content}\n"
+
+        strategy_str = ""
+        if strategy_context:
+            strategy_str = f"""
+
+DEEP STRATEGY CONTEXT:
+{strategy_context}
+
+Use this strategy as guidance only. It is not the user's question.
+For database questions involving count, oldest, youngest, highest,
+lowest, max, or min, preserve the user's exact aggregate/superlative
+intent in `query_database.input.query`. Do not broaden the tool input
+into a roster/list query.
+Examples:
+- "Who is the oldest patient?" -> query_database("Who is the oldest patient?")
+- "Who has the highest glucose?" -> query_database("Who has the highest glucose?")
+- Do not rewrite those as "show patients" or "show patients with glucose".
+- "Who is the oldest patient?" and "Who is the youngest patient?" are
+  population demographic queries. Use query_database, not get_patient_context.
+- For highest/lowest/max/min lab or vital questions, use exactly one
+  query_database call with the original user question. Do not add
+  clinical_calculator or search_guidelines unless the user explicitly asks for
+  calculation, interpretation, normal ranges, risk, or guidelines.
+"""
         
         prompt = f"""
 {AGENT_SYSTEM_PROMPT}
 
 {history_str}
+{strategy_str}
 
 CURRENT USER QUESTION: {question}
 
@@ -613,6 +674,20 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
     
     def _synthesize(self, question: str, tool_results: List[ToolResult]) -> Tuple[str, List[str]]:
         """Synthesize tool results into a natural language answer."""
+        demographic_answer = self._build_deterministic_demographic_answer(
+            question,
+            tool_results,
+        )
+        if demographic_answer:
+            return demographic_answer, []
+
+        deterministic_answer = self._build_deterministic_findings_answer(
+            question,
+            tool_results,
+        )
+        if deterministic_answer:
+            return deterministic_answer, []
+
         # Format tool results for LLM
         results_str = ""
         for tr in tool_results:
@@ -671,7 +746,204 @@ Decide which tools to use. Output valid JSON only. Do not use code blocks.
             if tr.success and tr.tool == ToolName.QUERY_DATABASE.value:
                 return tr.result.get("row_count", 0)
         return 0
-    
+
+    def _build_deterministic_demographic_answer(
+        self,
+        question: str,
+        tool_results: List[ToolResult],
+    ) -> str:
+        """Render plain oldest/youngest patient answers from the database row."""
+        normalized = re.sub(r"\s+", " ", question.lower()).strip()
+        plain_question = re.sub(r"[^a-z0-9\s]", "", normalized)
+        oldest_questions = {
+            "oldest patient",
+            "who is the oldest patient",
+            "whos the oldest patient",
+            "which patient is the oldest",
+            "show me the oldest patient",
+            "find the oldest patient",
+            "eldest patient",
+            "who is the eldest patient",
+        }
+        youngest_questions = {
+            "youngest patient",
+            "who is the youngest patient",
+            "whos the youngest patient",
+            "which patient is the youngest",
+            "show me the youngest patient",
+            "find the youngest patient",
+        }
+        if plain_question in oldest_questions:
+            label = "oldest"
+        elif plain_question in youngest_questions:
+            label = "youngest"
+        else:
+            return ""
+
+        for tr in tool_results:
+            if not tr.success or tr.tool != ToolName.QUERY_DATABASE.value:
+                continue
+            results = tr.result.get("results", [])
+            if len(results) != 1 or not isinstance(results[0], dict):
+                return ""
+
+            row = results[0]
+            patient_name = self._escape_markdown_cell(
+                self._patient_name_from_row(row)
+            )
+            age = row.get("age")
+            dob = row.get("patient_dob")
+            details = []
+            if age is not None:
+                details.append(f"Age: **{self._escape_markdown_cell(age)}**")
+            if dob:
+                details.append(f"DOB: {self._escape_markdown_cell(dob)}")
+            findings = "; ".join(details) or "Demographic record"
+
+            intro = f"The {label} patient is **{patient_name}**"
+            if age is not None:
+                intro += f", age **{self._escape_markdown_cell(age)}**"
+            intro += "."
+            return (
+                f"{intro}\n\n"
+                "| Patient | Status | Findings |\n"
+                "| :--- | :--- | :--- |\n"
+                f"| **{patient_name}** | -- | {findings} |"
+            )
+
+        return ""
+
+    def _build_deterministic_findings_answer(
+        self,
+        question: str,
+        tool_results: List[ToolResult],
+    ) -> str:
+        """Render broad abnormal-finding cohorts without an LLM transcription step."""
+        normalized_question = re.sub(r"\s+", " ", question.lower()).strip()
+        broad_finding_phrases = (
+            "worried about",
+            "worry about",
+            "concerned about",
+            "at risk",
+            "at-risk",
+            "critical vitals",
+            "critical findings",
+            "critical alerts",
+            "abnormal findings",
+            "abnormal observations",
+        )
+        if not any(phrase in normalized_question for phrase in broad_finding_phrases):
+            return ""
+
+        for tr in tool_results:
+            if not tr.success or tr.tool != ToolName.QUERY_DATABASE.value:
+                continue
+
+            results = tr.result.get("results", [])
+            if not results or not all(isinstance(row, dict) for row in results):
+                return ""
+            if not any(
+                key in results[0]
+                for key in ("alert_level", "flag", "observation_type", "display")
+            ):
+                return ""
+
+            grouped: Dict[str, Dict[str, Any]] = {}
+            for row in results:
+                patient_name = self._patient_name_from_row(row)
+                patient = grouped.setdefault(
+                    patient_name,
+                    {"status": "[WARNING]", "findings": []},
+                )
+
+                alert_level = str(row.get("alert_level") or "").upper()
+                if alert_level == "CRITICAL":
+                    patient["status"] = "[CRITICAL]"
+
+                finding = self._finding_from_row(row)
+                if finding and finding not in patient["findings"]:
+                    patient["findings"].append(finding)
+
+            if not grouped:
+                return ""
+
+            rows = []
+            for patient_name, patient in grouped.items():
+                findings = "; ".join(patient["findings"]) or "Abnormal finding"
+                rows.append(
+                    f"| **{self._escape_markdown_cell(patient_name)}** "
+                    f"| {patient['status']} "
+                    f"| {self._escape_markdown_cell(findings)} |"
+                )
+
+            patient_count = len(grouped)
+            record_count = len(results)
+            noun = "patient" if patient_count == 1 else "patients"
+            return (
+                f"Found {patient_count} {noun} with {record_count} concerning "
+                "finding(s), ordered by acuity.\n\n"
+                "| Patient | Status | Findings |\n"
+                "| :--- | :--- | :--- |\n"
+                + "\n".join(rows)
+            )
+
+        return ""
+
+    @staticmethod
+    def _patient_name_from_row(row: Dict[str, Any]) -> str:
+        """Return the best available patient label from a database row."""
+        for key in ("patient_name", "full_name"):
+            value = row.get(key)
+            if value:
+                return str(value)
+
+        first_name = row.get("patient_first_name")
+        last_name = row.get("patient_last_name")
+        full_name = " ".join(
+            str(part).strip()
+            for part in (first_name, last_name)
+            if part is not None and str(part).strip()
+        )
+        return full_name or str(row.get("patient_id") or "Unknown patient")
+
+    @staticmethod
+    def _finding_from_row(row: Dict[str, Any]) -> str:
+        """Format one observation without changing its patient attribution."""
+        label = (
+            row.get("observation_type")
+            or row.get("display")
+            or row.get("alert_message")
+            or "Finding"
+        )
+        value = row.get("value_num")
+        if value is None:
+            value = row.get("value")
+        if value is None:
+            value = row.get("value_raw")
+
+        finding = str(label)
+        if value is not None and str(value).strip():
+            finding += f" {value}"
+            unit = row.get("unit")
+            if unit:
+                finding += f" {unit}"
+
+        details = []
+        flag = row.get("flag")
+        if flag:
+            details.append(f"flag {flag}")
+        alert_message = row.get("alert_message")
+        if alert_message and str(alert_message) != str(label):
+            details.append(str(alert_message))
+        if details:
+            finding += f" ({'; '.join(details)})"
+        return finding
+
+    @staticmethod
+    def _escape_markdown_cell(value: Any) -> str:
+        """Keep raw database text inside one Markdown table cell."""
+        return str(value).replace("|", r"\|").replace("\r", " ").replace("\n", " ")
+
     def _build_table_from_results(self, tool_results: List[ToolResult]) -> str:
         """Build a markdown table from raw query results."""
         for tr in tool_results:
@@ -1017,12 +1289,7 @@ Output valid JSON only. Do not use code blocks.
             reflection = call_llm_for_json(reflection_prompt)
             strategy = reflection.get("strategy", "Proceed with standard analysis.")
             
-            # Inject strategy into history or prompt to guide _run_standard?
-            # For now, we prepend the strategy to the question to guide the ReAct agent
-            enhanced_question = f"[STRATEGY: {strategy}] {question}"
-            
-            # Run Standard loop with enhanced context
-            response = self._run_standard(enhanced_question, history)
+            response = self._run_standard(question, history, strategy_context=strategy)
             
             # Prepend reflection step to trace
             reflection_step = AgentStep(
@@ -1050,7 +1317,7 @@ Output valid JSON only. Do not use code blocks.
 # =============================================================================
 
 
-def run_agent_query(question: str, history: List[Dict[str, str]] = None, depth: str = "standard") -> Dict[str, Any]:
+def run_agent_query(question: str, history: List[Dict[str, str]] = None, depth: str = "deep") -> Dict[str, Any]:
     """
     Run an agent query and return the result as a dict.
     
