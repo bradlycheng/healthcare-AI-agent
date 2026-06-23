@@ -29,6 +29,27 @@
 
 <body class="landing-page">
     <div class="background-glow"></div>
+    <div class="hero-heartbeat" aria-hidden="true">
+        <svg viewBox="0 0 1600 360" preserveAspectRatio="none" role="presentation">
+            <defs>
+                <linearGradient id="heartbeat-gradient" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#22a8e0" stop-opacity="0" />
+                    <stop offset="18%" stop-color="#22a8e0" stop-opacity="0.42" />
+                    <stop offset="49%" stop-color="#67d0ff" stop-opacity="0.95" />
+                    <stop offset="76%" stop-color="#6bd6b1" stop-opacity="0.5" />
+                    <stop offset="100%" stop-color="#6bd6b1" stop-opacity="0" />
+                </linearGradient>
+                <filter id="heartbeat-glow" x="-20%" y="-80%" width="140%" height="260%">
+                    <feGaussianBlur stdDeviation="9" result="blur" />
+                </filter>
+            </defs>
+            <path class="heartbeat-gridline" d="M0 194 H1600" />
+            <path class="heartbeat-glow"
+                d="M0 194 H260 L300 194 L326 174 L349 194 H430 L454 214 L488 62 L530 286 L570 194 H700 C748 194 760 150 810 150 C860 150 878 194 930 194 H1600" />
+            <path class="heartbeat-trace"
+                d="M0 194 H260 L300 194 L326 174 L349 194 H430 L454 214 L488 62 L530 286 L570 194 H700 C748 194 760 150 810 150 C860 150 878 194 930 194 H1600" />
+        </svg>
+    </div>
 
 
     <nav class="navbar">

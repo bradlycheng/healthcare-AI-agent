@@ -54,6 +54,10 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+.claude/
+
+# Local browser/design previews
+web/screenshot*.png
 
 # Secret config
 .env.local
